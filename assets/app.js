@@ -14,6 +14,7 @@
     adminAccounts: "pkuih_h5_admin_accounts_v3",
     adminSession: "pkuih_h5_admin_session_v3",
     slotInventory: "pkuih_h5_slot_inventory_v4",
+    doctorSlotInventory: "pkuih_h5_doctor_slot_inventory_v5",
     doctorConfig: "pkuih_h5_doctor_config_v4",
     lastPortal: "pkuih_h5_last_portal_v4"
   };
@@ -120,12 +121,6 @@
       tone: "completed",
       title: "活动已完成",
       help: "感谢您的信任，项目组会跟进活动回访与后续服务。"
-    },
-    needs_info: {
-      label: "待补充信息",
-      tone: "needs_info",
-      title: "院方需要补充信息",
-      help: "请查看院方回复，或联系项目组补充活动信息。"
     }
   };
 
@@ -182,9 +177,11 @@
     adminSearch: "",
     adminReviewId: null,
     adminDraft: null,
+    adminNoteEditing: false,
     adminAccountDraft: null,
     adminDoctorDraft: null,
     adminSlotTier: "elite",
+    adminSlotDoctorId: "",
     adminSlotDate: "",
     profileDraft: null
   };
@@ -496,10 +493,44 @@
     saveSlotInventory(inventory);
   }
 
-  function bookedSlotCount(tierId, dateIso, slotId) {
-    return getAppointments().filter(
+  function getDoctorSlotInventory() {
+    return readJSON(STORAGE.doctorSlotInventory, {}) || {};
+  }
+
+  function saveDoctorSlotInventory(inventory) {
+    writeJSON(STORAGE.doctorSlotInventory, inventory);
+  }
+
+  function getDoctorSlotCapacity(doctorId, dateIso, slotId) {
+    const value = getDoctorSlotInventory()?.[dateIso]?.[String(doctorId)]?.[slotId];
+    if (value === undefined || value === null || value === "") return 1;
+    return Math.max(0, Math.min(9, Number(value) || 0));
+  }
+
+  function setDoctorSlotCapacity(doctorId, dateIso, slotId, capacity) {
+    const inventory = getDoctorSlotInventory();
+    const id = String(doctorId);
+    if (!inventory[dateIso]) inventory[dateIso] = {};
+    if (!inventory[dateIso][id]) inventory[dateIso][id] = {};
+    inventory[dateIso][id][slotId] = Math.max(0, Math.min(9, Number(capacity) || 0));
+    saveDoctorSlotInventory(inventory);
+  }
+
+  function bookedTierPoolCount(tierId, dateIso, slotId, appointments = getAppointments()) {
+    return appointments.filter(
       (item) =>
         item.tier === tierId &&
+        item.date === dateIso &&
+        item.slot === slotId &&
+        !item.doctorId &&
+        item.status !== "cancelled"
+    ).length;
+  }
+
+  function bookedDoctorSlotCount(doctorId, dateIso, slotId, appointments = getAppointments()) {
+    return appointments.filter(
+      (item) =>
+        String(item.doctorId) === String(doctorId) &&
         item.date === dateIso &&
         item.slot === slotId &&
         item.status !== "cancelled"
@@ -566,7 +597,7 @@
     const start = addDays(startOfDay(new Date()), tier.leadDays);
     return Array.from({ length: count }, (_, index) => {
       const date = addDays(start, index);
-      const slots = buildTimeSlots(tierId, isoDate(date), tier.leadDays);
+      const slots = buildTierTimeSlots(tierId, isoDate(date));
       return {
         iso: isoDate(date),
         date,
@@ -577,10 +608,58 @@
     });
   }
 
-  function buildTimeSlots(tierId, dateIso) {
+  function buildPoolTimeSlots(tierId, dateIso, appointments = getAppointments()) {
     return TIME_SLOTS.map((slot) => {
       const capacity = getSlotCapacity(tierId, dateIso, slot.id);
-      const booked = bookedSlotCount(tierId, dateIso, slot.id);
+      const booked = bookedTierPoolCount(tierId, dateIso, slot.id, appointments);
+      const remaining = Math.max(0, capacity - booked);
+      return {
+        ...slot,
+        capacity,
+        booked,
+        remaining,
+        full: capacity === 0 || remaining === 0,
+        tight:
+          capacity > 1 &&
+          remaining > 0 &&
+          remaining <= Math.max(1, Math.ceil(capacity * 0.34))
+      };
+    });
+  }
+
+  function buildDoctorTimeSlots(doctor, dateIso, appointments = getAppointments()) {
+    return TIME_SLOTS.map((slot) => {
+      const capacity = getDoctorSlotCapacity(doctor.id, dateIso, slot.id);
+      const booked = bookedDoctorSlotCount(doctor.id, dateIso, slot.id, appointments);
+      const remaining = Math.max(0, capacity - booked);
+      return {
+        ...slot,
+        capacity,
+        booked,
+        remaining,
+        full: capacity === 0 || remaining === 0,
+        tight:
+          capacity > 1 &&
+          remaining > 0 &&
+          remaining <= Math.max(1, Math.ceil(capacity * 0.34))
+      };
+    });
+  }
+
+  function buildTierTimeSlots(tierId, dateIso) {
+    const doctors = doctorsForTier(tierId);
+    const appointments = getAppointments();
+    const poolSlots = buildPoolTimeSlots(tierId, dateIso, appointments);
+    const doctorSlots = doctors.map((doctor) =>
+      buildDoctorTimeSlots(doctor, dateIso, appointments)
+    );
+    return TIME_SLOTS.map((slot, index) => {
+      const pool = poolSlots[index];
+      const capacity =
+        pool.capacity +
+        doctorSlots.reduce((total, slots) => total + slots[index].capacity, 0);
+      const booked =
+        pool.booked + doctorSlots.reduce((total, slots) => total + slots[index].booked, 0);
       const remaining = Math.max(0, capacity - booked);
       return {
         ...slot,
@@ -704,11 +783,11 @@
       reply: null
     };
 
-    const needsInfo = {
+    const completed = {
       id: "BD-20261220-305",
       createdAt: new Date(Date.now() - 1000 * 60 * 60 * 30).toISOString(),
       updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
-      status: "needs_info",
+      status: "completed",
       demo: true,
       ownerPhone: "13800000002",
       tier: "specialist",
@@ -744,7 +823,7 @@
       }
     };
 
-    return [pending, confirmed, needsInfo];
+    return [pending, confirmed, completed];
   }
 
   function ensureSeedData() {
@@ -760,6 +839,22 @@
     if (!readJSON(STORAGE.smsLogs, null)) {
       writeJSON(STORAGE.smsLogs, defaultSmsLogs);
     }
+  }
+
+  function migrateAppointmentStatuses() {
+    const items = getAppointments();
+    let changed = false;
+    const next = items.map((item) => {
+      if (item.status !== "needs_info") return item;
+      changed = true;
+      return {
+        ...item,
+        status: "pending",
+        reply: null,
+        updatedAt: new Date().toISOString()
+      };
+    });
+    if (changed) saveAppointments(next);
   }
 
   /* =========================================================
@@ -1858,37 +1953,62 @@
     const booking = state.booking;
     const doctors = doctorsForTier(booking.tier);
     const selectedDoctor = doctorById(booking.doctorId);
+    const appointments = getAppointments();
+    const poolSlot = buildPoolTimeSlots(booking.tier, booking.date, appointments).find(
+      (slot) => slot.id === booking.slot
+    );
+    const recommendationFull = !poolSlot || poolSlot.full;
     return `
       <h1 class="flow-title">选择专家<br>与活动主题</h1>
-      <p class="flow-subtitle">可指定专家，也可由院方项目组根据课题与档期推荐最合适的讲者。</p>
+      <p class="flow-subtitle">可指定有档期的专家，也可由院方项目组根据课题与剩余推荐名额匹配讲者。</p>
       <section class="flow-block">
         <div class="flow-block__head"><h2>拟邀专家</h2><span>${doctors.length} 位可选</span></div>
         <div class="doctor-options">
-          <button class="doctor-option ${!booking.doctorId ? "is-selected" : ""}" type="button"
-            data-action="booking-doctor" data-value="">
+          <button class="doctor-option ${
+            !booking.doctorId && !recommendationFull ? "is-selected" : ""
+          } ${
+            recommendationFull ? "is-unavailable" : ""
+          }" type="button" data-action="booking-doctor" data-value="" ${
+            recommendationFull ? "disabled" : ""
+          }>
             <span class="doctor-option__photo doctor-option__photo--recommend">${icon("spark", 19)}</span>
             <span>
               <strong>由院方推荐专家</strong>
-              <small>根据课题、人群与档期匹配</small>
+              <small>${
+                recommendationFull
+                  ? "该时段院方推荐名额已满，请指定专家"
+                  : `剩余 ${poolSlot.remaining} 个推荐名额`
+              }</small>
             </span>
             <span class="doctor-option__check">${icon("check", 11)}</span>
           </button>
           ${doctors
-            .map(
-              (doctor) => `
-                <button class="doctor-option ${booking.doctorId === String(doctor.id) ? "is-selected" : ""}" type="button"
-                  data-action="booking-doctor" data-value="${esc(doctor.id)}">
+            .map((doctor) => {
+              const slot = buildDoctorTimeSlots(doctor, booking.date, appointments).find(
+                (item) => item.id === booking.slot
+              );
+              const unavailable = !slot || slot.full;
+              return `
+                <button class="doctor-option ${
+                  booking.doctorId === String(doctor.id) ? "is-selected" : ""
+                } ${unavailable ? "is-unavailable" : ""}" type="button"
+                  data-action="booking-doctor" data-value="${esc(doctor.id)}" ${
+                    unavailable ? "disabled" : ""
+                  }>
                   <span class="doctor-option__photo"><img src="${esc(doctorPhoto(doctor))}" alt="${esc(
                     doctor.name
                   )}" loading="lazy" decoding="async"></span>
                   <span>
                     <strong>${esc(doctor.name)}</strong>
                     <small>${esc(doctor.dept)} · ${esc(doctor.title)}</small>
+                    <em class="doctor-option__availability ${
+                      unavailable ? "is-full" : ""
+                    }">${unavailable ? "该时段已约满" : `该时段余 ${slot.remaining} 席`}</em>
                   </span>
                   <span class="doctor-option__check">${icon("check", 11)}</span>
                 </button>
-              `
-            )
+              `;
+            })
             .join("")}
         </div>
       </section>
@@ -2142,6 +2262,20 @@
         showToast("请选择或填写活动课题。");
         return false;
       }
+      const doctor = booking.doctorId ? doctorById(booking.doctorId) : null;
+      const availability = doctor
+        ? buildDoctorTimeSlots(doctor, booking.date).find((slot) => slot.id === booking.slot)
+        : buildPoolTimeSlots(booking.tier, booking.date).find(
+            (slot) => slot.id === booking.slot
+          );
+      if (!availability || availability.full) {
+        showToast(
+          doctor
+            ? "该专家在所选时段已约满，请重新选择专家或时段。"
+            : "该时段院方推荐名额已满，请指定一位专家。"
+        );
+        return false;
+      }
       return true;
     }
     if (!booking.orgName.trim()) {
@@ -2170,7 +2304,7 @@
       startLogin({ type: "booking" });
       return;
     }
-    const availableSlot = buildTimeSlots(booking.tier, booking.date).find(
+    const availableSlot = buildTierTimeSlots(booking.tier, booking.date).find(
       (item) => item.id === booking.slot
     );
     if (!availableSlot || availableSlot.full) {
@@ -2178,6 +2312,29 @@
       state.booking.slot = "";
       renderOverlay();
       return;
+    }
+    const selectedDoctor = booking.doctorId ? doctorById(booking.doctorId) : null;
+    if (selectedDoctor) {
+      const doctorSlot = buildDoctorTimeSlots(selectedDoctor, booking.date).find(
+        (item) => item.id === booking.slot
+      );
+      if (!doctorSlot || doctorSlot.full) {
+        showToast("该专家在所选时段已约满，请重新选择专家或时段。");
+        state.booking.doctorId = "";
+        state.booking.step = 2;
+        renderOverlay();
+        return;
+      }
+    } else {
+      const poolSlot = buildPoolTimeSlots(booking.tier, booking.date).find(
+        (item) => item.id === booking.slot
+      );
+      if (!poolSlot || poolSlot.full) {
+        showToast("该时段院方推荐名额已满，请指定专家后重新提交。");
+        state.booking.step = 2;
+        renderOverlay();
+        return;
+      }
     }
     const slot = slotById(booking.slot);
     const appointment = {
@@ -2662,7 +2819,7 @@
       total: items.length,
       pending: items.filter((item) => item.status === "pending").length,
       confirmed: items.filter((item) => item.status === "confirmed").length,
-      needsInfo: items.filter((item) => item.status === "needs_info").length
+      completed: items.filter((item) => item.status === "completed").length
     };
   }
 
@@ -2670,7 +2827,6 @@
     return [
       { id: "all", label: "全部" },
       { id: "pending", label: "待确认" },
-      { id: "needs_info", label: "待补充" },
       { id: "confirmed", label: "已确认" },
       { id: "completed", label: "已完成" }
     ];
@@ -2685,16 +2841,7 @@
       tabs.push({
         id: "slots",
         label: "号源配置",
-        count: TIER_ORDER.reduce((total, tierId) => {
-          return (
-            total +
-            buildDateOptions(tierId, 1).reduce(
-              (sum, option) =>
-                sum + option.slots.reduce((slotSum, slot) => slotSum + slot.capacity, 0),
-              0
-            )
-          );
-        }, 0)
+        count: state.doctors.length
       });
       tabs.push({
         id: "doctors",
@@ -2708,7 +2855,7 @@
       });
     }
     return `
-      <div class="segmented admin-tabs admin-tabs--scroll horizontal-scroll">
+      <div class="segmented admin-tabs admin-tabs--scroll admin-tabs--${tabs.length}">
         ${tabs
           .map(
             (tab) => `
@@ -2768,7 +2915,7 @@
                   )} · ${icon("phone", 11)} ${esc(account.phone)}</span>
                 </span>
                 <span class="admin-account-card__side">
-                  <span class="pill ${account.active ? "pill--completed" : "pill--needs_info"}">${
+                  <span class="pill ${account.active ? "pill--completed" : "pill--inactive"}">${
                     account.active ? "启用" : "已停用"
                   }</span>
                   <span>编辑 ${icon("chevronRight", 11)}</span>
@@ -3320,10 +3467,10 @@
           "checkCircle",
           10
         )} 方案已同步</span></div>
-        <div class="admin-stat"><small>待补充信息</small><strong>${stats.needsInfo}<span>条</span></strong><span class="admin-stat__hint">${icon(
-          "message",
+        <div class="admin-stat"><small>已完成活动</small><strong>${stats.completed}<span>条</span></strong><span class="admin-stat__hint">${icon(
+          "checkCircle",
           10
-        )} 等待企业回复</span></div>
+        )} 已归档项目</span></div>
       </div>
       ${renderAdminTabs()}
       <div class="admin-search">
@@ -3427,10 +3574,28 @@
     return dates.find((date) => isoDate(date) === state.adminSlotDate) || dates[0];
   }
 
+  function adminSlotDoctors() {
+    return doctorsForTier(state.adminSlotTier);
+  }
+
+  function selectedAdminSlotDoctor() {
+    return (
+      adminSlotDoctors().find(
+        (doctor) => String(doctor.id) === String(state.adminSlotDoctorId)
+      ) || null
+    );
+  }
+
   function renderSlotConfigContent() {
     const date = selectedAdminSlotDate();
     const dateIso = isoDate(date);
-    const slots = buildTimeSlots(state.adminSlotTier, dateIso);
+    const tier = TIERS[state.adminSlotTier] || TIERS.elite;
+    const doctors = adminSlotDoctors();
+    const doctor = selectedAdminSlotDoctor();
+    const appointments = getAppointments();
+    const slots = doctor
+      ? buildDoctorTimeSlots(doctor, dateIso, appointments)
+      : buildPoolTimeSlots(state.adminSlotTier, dateIso, appointments);
     return `
       <div class="slot-config-tier segmented">
         ${TIER_ORDER.map(
@@ -3441,6 +3606,38 @@
             </button>
           `
         ).join("")}
+      </div>
+      <div class="slot-config-subhead">
+        <span>配置对象</span>
+        <small>每位专家独立号源</small>
+      </div>
+      <div class="slot-doctor-rail horizontal-scroll">
+        <button class="slot-doctor-pill is-pool ${
+          doctor ? "" : "is-active"
+        }" type="button" data-action="admin-slot-doctor" data-value="">
+          <span class="slot-doctor-pill__icon">${icon("spark", 16)}</span>
+          <span>
+            <strong>院方推荐池</strong>
+            <small>通用名额</small>
+          </span>
+        </button>
+        ${doctors
+          .map(
+            (item) => `
+              <button class="slot-doctor-pill ${
+                String(item.id) === String(doctor?.id) ? "is-active" : ""
+              }" type="button" data-action="admin-slot-doctor" data-value="${esc(item.id)}">
+                <span class="slot-doctor-pill__photo">
+                  <img src="${esc(doctorPhoto(item))}" alt="" loading="lazy" decoding="async">
+                </span>
+                <span>
+                  <strong>${esc(item.name)}</strong>
+                  <small>${esc(item.dept)}</small>
+                </span>
+              </button>
+            `
+          )
+          .join("")}
       </div>
       <div class="slot-date-rail horizontal-scroll">
         ${adminSlotDates()
@@ -3455,7 +3652,9 @@
           .join("")}
       </div>
       <div class="slot-config-head">
-        <div><strong>${formatDateCN(dateIso, true)}</strong><small>${TIERS[state.adminSlotTier].name}号源</small></div>
+        <div><strong>${formatDateCN(dateIso, true)}</strong><small>${
+          doctor ? `${esc(doctor.name)} · ${tier.name}` : `${tier.name} · 院方推荐池`
+        }</small></div>
         <span>0 表示关闭该时段</span>
       </div>
       <div class="slot-config-list">
@@ -3468,11 +3667,19 @@
                   <small>${slot.sub} · 已约 ${slot.booked} · 剩余 ${slot.remaining}</small>
                 </div>
                 <div class="capacity-stepper">
-                  <button type="button" data-action="slot-capacity" data-tier="${state.adminSlotTier}"
-                    data-date="${dateIso}" data-slot="${slot.id}" data-delta="-1" aria-label="减少号源">−</button>
+                  <button type="button" data-action="slot-capacity" data-scope="${
+                    doctor ? "doctor" : "tier"
+                  }" data-tier="${state.adminSlotTier}" ${
+                    doctor ? `data-doctor-id="${esc(doctor.id)}"` : ""
+                  } data-date="${dateIso}" data-slot="${slot.id}" data-delta="-1"
+                    aria-label="减少号源">−</button>
                   <strong>${slot.capacity}</strong>
-                  <button type="button" data-action="slot-capacity" data-tier="${state.adminSlotTier}"
-                    data-date="${dateIso}" data-slot="${slot.id}" data-delta="1" aria-label="增加号源">+</button>
+                  <button type="button" data-action="slot-capacity" data-scope="${
+                    doctor ? "doctor" : "tier"
+                  }" data-tier="${state.adminSlotTier}" ${
+                    doctor ? `data-doctor-id="${esc(doctor.id)}"` : ""
+                  } data-date="${dateIso}" data-slot="${slot.id}" data-delta="1"
+                    aria-label="增加号源">+</button>
                 </div>
               </div>
             `
@@ -3491,13 +3698,13 @@
     if (!isAdministrator()) return renderAdminAppointmentsPage();
     return `
       <div class="admin-page-head">
-        <div><h1>号源配置</h1><p>按专家层级、日期和时段设置可预约数量</p></div>
+        <div><h1>号源配置</h1><p>按专家个人、日期和时段设置可预约数量</p></div>
         <span class="admin-page-head__date">实时扣减</span>
       </div>
       ${renderAdminTabs()}
       <section class="slot-config-note">
         ${icon("calendar", 16)}
-        <p>客户预约成功后，号源会按预约记录自动扣减。将数量调为 0 可关闭该时段；已预约数量不会被强制清空。</p>
+        <p>选择具体专家可配置个人档期；选择“院方推荐池”用于客户不指定专家时的通用名额。预约成功后自动扣减，调为 0 可关闭。</p>
       </section>
       <div id="slot-config-content">${renderSlotConfigContent()}</div>
     `;
@@ -3539,7 +3746,7 @@
                 <span class="doctor-admin-card__main">
                   <span class="doctor-admin-card__heading">
                     <strong>${esc(doctor.name)}</strong>
-                    <span class="pill ${doctor.active === false ? "pill--needs_info" : "pill--completed"}">
+                    <span class="pill ${doctor.active === false ? "pill--inactive" : "pill--completed"}">
                       ${doctor.active === false ? "已停用" : tierOf(doctor).name}
                     </span>
                   </span>
@@ -3612,10 +3819,6 @@
     if (!appointment) return;
     const fields = collectReviewFields();
     const message = fields.message || "";
-    if (status === "needs_info" && !message) {
-      showToast("请填写需要企业补充的信息。");
-      return;
-    }
     if (status === "confirmed" && !fields.topic) {
       showToast("请填写确认后的活动课题。");
       return;
@@ -3633,11 +3836,12 @@
     };
     const items = getAppointments().map((item) => {
       if (item.id !== appointment.id) return item;
+      const nextStatus =
+        item.status === "completed" && status === "confirmed" ? "completed" : status;
       return {
         ...item,
-        status,
+        status: nextStatus,
         reply,
-        internalNote: fields.internalNote || "",
         assignedStaff: state.adminUser
           ? {
               username: state.adminUser.username,
@@ -3655,11 +3859,11 @@
     renderApp();
     showToast(
       status === "confirmed"
-        ? "活动方案已保存并同步给客户。"
-        : status === "needs_info"
-        ? "已标记为待补充信息。"
+        ? appointment.status === "completed"
+          ? "活动方案已更新，项目保持已完成状态。"
+          : "活动方案已保存并同步给客户。"
         : status === "completed"
-        ? "预约已标记完成。"
+        ? "活动已归档为完成，后续不再进入短信待办。"
         : "预约信息已保存。"
     );
   }
@@ -3699,18 +3903,25 @@
   function saveInternalNote() {
     const appointment = getAppointments().find((item) => item.id === state.adminReviewId);
     if (!appointment) return;
-    const fields = collectReviewFields();
+    const input = document.querySelector("[data-internal-note-input]");
+    const note = input?.value.trim() || "";
+    const now = new Date().toISOString();
     const items = getAppointments().map((item) =>
       item.id === appointment.id
         ? {
             ...item,
-            internalNote: fields.internalNote || "",
-            updatedAt: new Date().toISOString()
+            internalNote: note,
+            internalNoteUpdatedAt: now,
+            internalNoteBy: state.adminUser
+              ? { username: state.adminUser.username, name: state.adminUser.name }
+              : null,
+            updatedAt: now
           }
         : item
     );
     saveAppointments(items);
-    if (state.adminDraft) state.adminDraft.internalNote = fields.internalNote || "";
+    state.adminNoteEditing = false;
+    renderOverlay();
     showToast("院方内部备注已保存，客户端不可见。");
   }
 
@@ -3826,6 +4037,52 @@
     const copied = document.execCommand("copy");
     document.body.removeChild(field);
     return copied;
+  }
+
+  function renderInternalNoteCard(appointment) {
+    const note = appointment.internalNote || "";
+    const editing = state.adminNoteEditing;
+    const meta = appointment.internalNoteUpdatedAt
+      ? `${appointment.internalNoteBy?.name || "院方人员"} · ${formatDateTime(
+          appointment.internalNoteUpdatedAt
+        )}`
+      : "";
+    return `
+      <section class="internal-note-card ${note ? "has-note" : ""}">
+        <div class="internal-note-card__head">
+          <span class="internal-note-card__icon">${icon("lock", 15)}</span>
+          <div>
+            <strong>院方内部备注</strong>
+            <small>仅院方可见，不会同步给客户</small>
+          </div>
+          ${
+            editing
+              ? ""
+              : `<button type="button" data-action="review-edit-note">${
+                  note ? "编辑" : "添加备注"
+                }</button>`
+          }
+        </div>
+        ${
+          editing
+            ? `
+              <textarea data-internal-note-input placeholder="记录沟通情况、特殊要求、内部协作事项等">${esc(
+                note
+              )}</textarea>
+              <div class="internal-note-card__actions">
+                <button class="btn btn--ghost btn--sm" type="button" data-action="review-cancel-note">取消</button>
+                <button class="btn btn--primary btn--sm" type="button" data-action="review-save-note">保存备注</button>
+              </div>
+            `
+            : note
+            ? `
+              <p class="internal-note-card__content">${esc(note)}</p>
+              <small class="internal-note-card__meta">${esc(meta)}</small>
+            `
+            : `<p class="internal-note-card__empty">暂无内部备注，可记录沟通情况、特殊要求或内部协作事项。</p>`
+        }
+      </section>
+    `;
   }
 
   function renderReviewSheet() {
@@ -3948,16 +4205,8 @@
                     draft.message
                   )}</textarea>
                 </div>
-                <div class="field internal-note-field">
-                  <label for="review-internal-note">院方内部备注 <span>仅院方可见，不同步给客户</span></label>
-                  <textarea id="review-internal-note" data-review-field="internalNote" placeholder="可记录沟通情况、特殊要求、内部协作事项等">${esc(
-                    draft.internalNote || ""
-                  )}</textarea>
-                  <button class="btn btn--soft btn--sm internal-note-save" type="button" data-action="review-save-note">
-                    保存内部备注
-                  </button>
-                </div>
               </div>
+              ${renderInternalNoteCard(appointment)}
               <section class="manual-sms-card">
                 <div class="manual-sms-card__head">
                   <span class="manual-sms-card__icon">${icon("message", 16)}</span>
@@ -3987,11 +4236,25 @@
                 </p>
                 <div data-sms-followup-status>${smsFollowUpStatusMarkup(appointment)}</div>
               </section>
-              <div class="review-actions">
-                <button class="btn btn--ghost" type="button" data-action="review-needs">标记待补充</button>
-                <button class="btn btn--soft" type="button" data-action="review-complete">标记已完成</button>
-                <button class="btn btn--primary" type="button" data-action="review-confirm">保存方案并确认预约</button>
+              <div class="review-actions ${
+                appointment.status === "confirmed" ? "has-complete" : ""
+              }">
+                ${
+                  appointment.status === "confirmed"
+                    ? `<button class="btn btn--ghost" type="button" data-action="review-complete">活动结束并归档</button>`
+                    : ""
+                }
+                <button class="btn btn--primary" type="button" data-action="review-confirm">${
+                  appointment.reply ? "更新活动方案" : "保存方案并确认预约"
+                }</button>
               </div>
+              <p class="review-action-note">${
+                appointment.status === "completed"
+                  ? "该项目已归档为完成。更新方案不会改变完成状态。"
+                  : appointment.status === "confirmed"
+                  ? "活动结束后可用「活动结束并归档」收尾，归档后不再进入短信待办。"
+                  : "确认后，课题、流程、时间与联系人会同步到企业客户端的预约详情。"
+              }</p>
             </div>
           </div>
         </div>
@@ -4167,11 +4430,13 @@
         }
         state.booking.date = date;
         state.booking.slot = option.slots.find((slot) => !slot.full)?.id || "";
+        state.booking.doctorId = "";
         renderOverlay();
         break;
       }
       case "booking-slot":
         state.booking.slot = el.dataset.value;
+        state.booking.doctorId = "";
         renderOverlay();
         break;
       case "booking-doctor": {
@@ -4226,6 +4491,7 @@
         state.overlay = null;
         state.adminReviewId = null;
         state.adminDraft = null;
+        state.adminNoteEditing = false;
         state.adminAccountDraft = null;
         state.adminDoctorDraft = null;
         state.profileDraft = null;
@@ -4335,6 +4601,13 @@
       case "admin-slot-tier":
         if (!isAdministrator()) return;
         state.adminSlotTier = el.dataset.value || "elite";
+        state.adminSlotDoctorId = "";
+        state.adminSlotDate = "";
+        refreshSlotConfig();
+        break;
+      case "admin-slot-doctor":
+        if (!isAdministrator()) return;
+        state.adminSlotDoctorId = el.dataset.value || "";
         refreshSlotConfig();
         break;
       case "admin-slot-date":
@@ -4344,17 +4617,28 @@
         break;
       case "slot-capacity": {
         if (!isAdministrator()) return;
-        const current = getSlotCapacity(
-          el.dataset.tier,
-          el.dataset.date,
-          el.dataset.slot
-        );
-        setSlotCapacity(
-          el.dataset.tier,
-          el.dataset.date,
-          el.dataset.slot,
-          current + Number(el.dataset.delta || 0)
-        );
+        const delta = Number(el.dataset.delta || 0);
+        if (el.dataset.scope === "doctor") {
+          const current = getDoctorSlotCapacity(
+            el.dataset.doctorId,
+            el.dataset.date,
+            el.dataset.slot
+          );
+          setDoctorSlotCapacity(
+            el.dataset.doctorId,
+            el.dataset.date,
+            el.dataset.slot,
+            current + delta
+          );
+        } else {
+          const current = getSlotCapacity(el.dataset.tier, el.dataset.date, el.dataset.slot);
+          setSlotCapacity(
+            el.dataset.tier,
+            el.dataset.date,
+            el.dataset.slot,
+            current + delta
+          );
+        }
         refreshSlotConfig();
         break;
       }
@@ -4377,6 +4661,7 @@
         if (!appointment) return;
         state.adminReviewId = id;
         state.adminDraft = buildReviewDraft(appointment);
+        state.adminNoteEditing = false;
         state.overlay = { type: "review" };
         renderOverlay();
         break;
@@ -4388,8 +4673,16 @@
       case "review-save-note":
         saveInternalNote();
         break;
-      case "review-needs":
-        saveAdminReply("needs_info");
+      case "review-edit-note":
+        state.adminNoteEditing = true;
+        renderOverlay();
+        requestAnimationFrame(() => {
+          document.querySelector("[data-internal-note-input]")?.focus();
+        });
+        break;
+      case "review-cancel-note":
+        state.adminNoteEditing = false;
+        renderOverlay();
         break;
       case "review-complete":
         saveAdminReply("completed");
@@ -4520,6 +4813,7 @@
       state.overlay = null;
       state.adminReviewId = null;
       state.adminDraft = null;
+      state.adminNoteEditing = false;
       state.adminAccountDraft = null;
       state.adminDoctorDraft = null;
       state.profileDraft = null;
@@ -4538,6 +4832,7 @@
       state.baseDoctors = doctors;
       refreshDoctors();
       ensureSeedData();
+      migrateAppointmentStatuses();
       state.session = readJSON(STORAGE.session, null);
       state.lastPortal = readJSON(STORAGE.lastPortal, "client");
       const adminSession = readJSON(STORAGE.adminSession, null);
