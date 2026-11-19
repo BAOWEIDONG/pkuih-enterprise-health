@@ -65,6 +65,12 @@
     }
   ];
 
+  const SEED_PROJECT_STAFF = {
+    username: "admin",
+    name: "李老师",
+    phone: "13800009999"
+  };
+
   const TIERS = {
     elite: {
       id: "elite",
@@ -105,10 +111,16 @@
 
   const STATUS = {
     pending: {
-      label: "待院方确认",
+      label: "待院方接单",
       tone: "pending",
       title: "预约需求已提交",
-      help: "院方项目组正在匹配专家与档期，会尽快与您确认。"
+      help: "等待院方接单并分配项目负责人，接单后将显示具体对接人。"
+    },
+    accepted: {
+      label: "方案确认中",
+      tone: "accepted",
+      title: "院方已接单",
+      help: "项目负责人正在确认专家、课题、活动地点与执行流程。"
     },
     confirmed: {
       label: "已确认",
@@ -186,7 +198,23 @@
     adminSlotDate: "",
     adminSlotDraft: null,
     adminSlotBatchScope: "all",
-    profileDraft: null
+    profileDraft: null,
+    locationDraft: null,
+    viewScroll: {
+      main: {},
+      admin: {}
+    },
+    historyDepth: 0,
+    overlayHistoryDepth: 0,
+    suppressPopCount: 0,
+    authHistory: false,
+    adminHistory: false,
+    reuseHistoryForOverlay: false,
+    renderedOnce: false,
+    overlaySnapshot: {
+      key: "",
+      scrollTop: 0
+    }
   };
 
   const app = document.getElementById("app");
@@ -674,6 +702,174 @@
     return `<span class="pill pill--${meta.tone}">${meta.label}</span>`;
   }
 
+  function phoneHref(value) {
+    const cleaned = String(value || "").replace(/[^\d+]/g, "");
+    return cleaned.length >= 6 ? `tel:${cleaned}` : "";
+  }
+
+  function phoneLink(value, label = value, className = "tel-link") {
+    const href = phoneHref(value);
+    if (!href) return esc(label || "");
+    return `<a class="${esc(className)}" href="${esc(href)}">${esc(label || value)}</a>`;
+  }
+
+  function appointmentAssignee(appointment) {
+    return appointment?.assignedStaff?.name && appointment.assignedStaff?.phone
+      ? appointment.assignedStaff
+      : null;
+  }
+
+  function assigneeContactMarkup(staff) {
+    if (!staff) return "";
+    return `${esc(staff.name)} · ${phoneLink(staff.phone, staff.phone)}`;
+  }
+
+  function appointmentLocationMarkup(appointment) {
+    if (!appointment) return "待确认";
+    const hasVenue = Boolean(String(appointment.venue || "").trim());
+    const hasAddress = Boolean(String(appointment.address || "").trim());
+    if (appointment.locationPending || (!hasVenue && !hasAddress)) {
+      return `<span class="location-pending">活动地点待确认</span>`;
+    }
+    const region = [appointment.province, appointment.city]
+      .filter(Boolean)
+      .filter((value, index, list) => index === 0 || value !== list[0])
+      .join(" · ");
+    return [
+      region ? esc(region) : "",
+      hasVenue ? esc(appointment.venue) : "",
+      hasAddress ? esc(appointment.address) : ""
+    ]
+      .filter(Boolean)
+      .join("<br>");
+  }
+
+  function appointmentLocationText(appointment) {
+    if (!appointment || appointment.locationPending) return "活动地点待确认";
+    const region = [appointment.province, appointment.city]
+      .filter(Boolean)
+      .filter((value, index, list) => index === 0 || value !== list[0])
+      .join(" ");
+    return [region, appointment.venue, appointment.address]
+      .filter((value) => String(value || "").trim())
+      .join(" · ") || "活动地点待确认";
+  }
+
+  function currentViewScrollKey() {
+    if (state.screen === "admin") return `admin:${state.adminTab}`;
+    if (state.screen === "main") return `main:${state.tab}`;
+    return state.screen || "main:home";
+  }
+
+  function storeCurrentScroll() {
+    const key = currentViewScrollKey();
+    const bucket = key.startsWith("admin:")
+      ? state.viewScroll.admin
+      : state.viewScroll.main;
+    bucket[key] = window.scrollY || 0;
+    return key;
+  }
+
+  function storedScrollForView(key) {
+    const bucket = key.startsWith("admin:")
+      ? state.viewScroll.admin
+      : state.viewScroll.main;
+    return bucket[key] ?? 0;
+  }
+
+  function restoreWindowScroll(top, behavior = "auto") {
+    const target = Math.max(0, Number(top) || 0);
+    window.requestAnimationFrame(() => {
+      if (behavior === "smooth") window.scrollTo({ top: target, behavior: "smooth" });
+      else window.scrollTo(0, target);
+    });
+  }
+
+  function pushAppHistory(layer = "overlay") {
+    if (state.screen === "auth" && layer !== "auth") return false;
+    try {
+      window.history.pushState(
+        {
+          ...(window.history.state || {}),
+          pkuihLayer: layer,
+          pkuihScroll: window.scrollY
+        },
+        "",
+        window.location.href
+      );
+      state.historyDepth += 1;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function popAppHistory(levels = null) {
+    const depth = state.historyDepth;
+    if (depth <= 0) return 0;
+    const count = levels === null ? depth : Math.min(Math.max(1, levels), depth);
+    state.historyDepth = depth - count;
+    state.suppressPopCount += 1;
+    try {
+      window.history.go(-count);
+      return count;
+    } catch {
+      state.historyDepth += count;
+      state.suppressPopCount = Math.max(0, state.suppressPopCount - 1);
+      return 0;
+    }
+  }
+
+  function pushOverlayHistory() {
+    if (state.reuseHistoryForOverlay) {
+      state.reuseHistoryForOverlay = false;
+      state.overlayHistoryDepth = Math.max(1, state.overlayHistoryDepth);
+      return;
+    }
+    if (pushAppHistory("overlay")) state.overlayHistoryDepth += 1;
+  }
+
+  function releaseOverlayHistory(levels = null) {
+    const depth = state.overlayHistoryDepth;
+    if (depth <= 0) return 0;
+    const count = levels === null ? depth : Math.min(Math.max(1, levels), depth);
+    state.overlayHistoryDepth = depth - count;
+    return popAppHistory(count);
+  }
+
+  function releaseAuthHistory() {
+    if (!state.authHistory) return;
+    state.authHistory = false;
+    state.overlayHistoryDepth = 0;
+    popAppHistory();
+  }
+
+  function releaseAdminHistory() {
+    if (!state.adminHistory) return;
+    state.adminHistory = false;
+    state.overlayHistoryDepth = 0;
+    popAppHistory();
+  }
+
+  function clearOverlayState() {
+    state.overlay = null;
+    state.adminReviewId = null;
+    state.adminDraft = null;
+    state.adminNoteEditing = false;
+    state.adminAccountDraft = null;
+    state.adminDoctorDraft = null;
+    state.profileDraft = null;
+    state.locationDraft = null;
+  }
+
+  function dismissOverlay({ fromHistory = false } = {}) {
+    if (!fromHistory) releaseOverlayHistory();
+    clearOverlayState();
+    if (state.screen === "admin" || state.screen === "admin-login") renderApp();
+    else renderOverlay();
+    document.body.classList.remove("is-locked");
+  }
+
   /* =========================================================
      Seed demo data
      ========================================================= */
@@ -728,7 +924,8 @@
       customTopic: "",
       format: "主题讲座 + 现场问答",
       audience: "100–300 人",
-      city: "北京 · 朝阳",
+      province: "北京市",
+      city: "北京市",
       venue: "朝阳区企业健康活动中心",
       orgType: "保险公司",
       orgName: "示例保险 · 高客健康服务部",
@@ -737,8 +934,11 @@
       phone: DEMO_PHONE,
       email: "demo@pkuih-partner.com",
       address: "北京市朝阳区建国路 88 号",
+      locationPending: false,
       note: "希望围绕久坐、颈椎不适与办公室拉伸展开，现场约 120 人。",
       sms: { hospital: true, contact: true },
+      assignedStaff: SEED_PROJECT_STAFF,
+      acceptedAt: new Date(Date.now() - 1000 * 60 * 60 * 27).toISOString(),
       reply: null
     };
     confirmed.reply = makeSeedReply(confirmed, doctorById("9099"));
@@ -759,7 +959,8 @@
       customTopic: "",
       format: "专家健康咨询",
       audience: "50–100 人",
-      city: "北京 · 海淀",
+      province: "北京市",
+      city: "北京市",
       venue: "企业总部多功能厅",
       orgType: "保险公司",
       orgName: "示例保险 · 高客健康服务部",
@@ -768,8 +969,11 @@
       phone: DEMO_PHONE,
       email: "demo@pkuih-partner.com",
       address: "北京市海淀区中关村软件园二期",
+      locationPending: false,
       note: "客户体检中甲状腺结节检出率较高，希望安排一次专题科普与现场咨询。",
       sms: { hospital: true, contact: true },
+      assignedStaff: null,
+      acceptedAt: null,
       reply: null
     };
 
@@ -789,7 +993,8 @@
       customTopic: "",
       format: "主题讲座",
       audience: "30–50 人",
-      city: "北京 · 顺义",
+      province: "北京市",
+      city: "北京市",
       venue: "企业培训室",
       orgType: "企业",
       orgName: "示例科技 · 员工体验中心",
@@ -798,8 +1003,15 @@
       phone: "13800000002",
       email: "demo@example-tech.com",
       address: "北京市顺义区临空经济区",
+      locationPending: false,
       note: "希望增加现场一对一咨询环节。",
       sms: { hospital: true, contact: true },
+      assignedStaff: {
+        username: "consultant",
+        name: "周老师",
+        phone: "13800001111"
+      },
+      acceptedAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
       reply: {
         topic: "办公室人群的睡眠与压力管理",
         outline: "1. 睡眠节律与压力反应\n2. 常见误区\n3. 可执行的自助方法\n4. 现场问答",
@@ -835,14 +1047,46 @@
     const items = getAppointments();
     let changed = false;
     const next = items.map((item) => {
-      if (item.status !== "needs_info") return item;
-      changed = true;
-      return {
+      const city = String(item.city || "");
+      const inferredProvince =
+        item.province ||
+        provinceOptions().find((province) => {
+          const short = province.replace(
+            /(省|市|壮族自治区|回族自治区|维吾尔自治区|自治区|特别行政区)$/g,
+            ""
+          );
+          return city.includes(short);
+        }) ||
+        "北京市";
+      const normalized = normalizedCity(inferredProvince, city);
+      const needsLocationPending =
+        item.locationPending ??
+        (!String(item.venue || "").trim() && !String(item.address || "").trim());
+      const needsStaff =
+        item.status === "accepted" ||
+        item.status === "confirmed" ||
+        item.status === "completed";
+      const normalizedStatus =
+        item.status === "needs_info" ? "pending" : item.status === "accepted" ? "accepted" : item.status;
+      const shouldClearPendingStaff = normalizedStatus === "pending";
+      const staff = needsStaff ? item.assignedStaff || SEED_PROJECT_STAFF : null;
+      const acceptedAt =
+        needsStaff
+          ? item.acceptedAt || item.updatedAt || item.createdAt || new Date().toISOString()
+          : null;
+      const reply = normalizedStatus === "pending" ? null : item.reply || null;
+      const patch = {
         ...item,
-        status: "pending",
-        reply: null,
-        updatedAt: new Date().toISOString()
+        status: normalizedStatus,
+        province: inferredProvince,
+        city: normalized,
+        locationPending: needsLocationPending,
+        assignedStaff: shouldClearPendingStaff ? null : staff,
+        acceptedAt: shouldClearPendingStaff ? null : acceptedAt,
+        reply
       };
+      if (JSON.stringify(patch) !== JSON.stringify(item)) changed = true;
+      return patch;
     });
     if (changed) saveAppointments(next);
   }
@@ -910,8 +1154,8 @@
         <button class="topbar__brand" type="button" data-action="tab" data-tab="home" aria-label="返回首页">
           <img src="assets/logo.svg" alt="北京大学国际医院">
           <span>
-            <strong>北京大学国际医院</strong>
-            <span>名医入企 · 企业健康服务</span>
+            <strong>名医入企</strong>
+            <span>企业健康服务</span>
           </span>
         </button>
         <div class="topbar__actions">
@@ -1316,7 +1560,8 @@
   function appointmentFilterList() {
     return [
       { id: "all", label: "全部" },
-      { id: "pending", label: "待确认" },
+      { id: "pending", label: "待接单" },
+      { id: "accepted", label: "方案确认中" },
       { id: "confirmed", label: "已确认" },
       { id: "completed", label: "已完成" }
     ];
@@ -1325,9 +1570,10 @@
   function renderAppointmentCard(appointment) {
     const doctor = doctorById(appointment.doctorId);
     const status = statusMeta(appointment.status);
+    const assignee = appointmentAssignee(appointment);
     const date = parseDate(appointment.date);
     return `
-      <button class="appointment-card" type="button" data-action="open-appointment" data-appointment-id="${esc(
+      <article class="appointment-card" role="button" tabindex="0" data-action="open-appointment" data-appointment-id="${esc(
         appointment.id
       )}">
         <span class="appointment-card__top">
@@ -1340,15 +1586,24 @@
           <span>${icon("experts", 13)} ${esc(doctor ? doctor.name : "待院方安排")}</span>
         </div>
         ${
+          assignee
+            ? `<div class="appointment-card__assignee">${icon("user", 13)} 项目负责人 ${assigneeContactMarkup(
+                assignee
+              )}</div>`
+            : ""
+        }
+        ${
           appointment.reply
             ? `<div class="appointment-card__reply">${icon("message", 14)} 院方已回复活动方案，点击查看课题与流程</div>`
-            : `<div class="appointment-card__reply is-waiting">${icon("clock", 14)} ${esc(status.help)}</div>`
+            : `<div class="appointment-card__reply is-waiting">${icon("clock", 14)} ${esc(
+                assignee ? "院方已接单，项目负责人正在确认方案" : status.help
+              )}</div>`
         }
         <div class="appointment-card__footer">
           <span>${icon("clock", 13)} ${esc(appointment.time)}</span>
           <span>${esc(appointment.id)} ${icon("chevronRight", 13)}</span>
         </div>
-      </button>
+      </article>
     `;
   }
 
@@ -1465,6 +1720,7 @@
     }
     const appointments = appointmentsForUser(session.phone);
     const pending = appointments.filter((item) => item.status === "pending").length;
+    const inProgress = appointments.filter((item) => item.status === "accepted").length;
     const confirmed = appointments.filter(
       (item) => item.status === "confirmed" || item.status === "completed"
     ).length;
@@ -1488,12 +1744,16 @@
           </div>
           <div class="profile-card__badges">
             <span class="profile-badge">${icon("building", 11)} ${esc(session.orgType)}</span>
-            <span class="profile-badge">${icon("phone", 11)} ${maskPhone(session.phone)}</span>
+            <span class="profile-badge">${icon("phone", 11)} ${phoneLink(
+              session.contactPhone || session.phone,
+              maskPhone(session.contactPhone || session.phone)
+            )}</span>
             <span class="profile-badge">${icon("shield", 11)} 企业会员</span>
           </div>
           <div class="profile-stats">
             <div class="profile-stat"><strong>${appointments.length}</strong><span>全部预约</span></div>
-            <div class="profile-stat"><strong>${pending}</strong><span>待院方确认</span></div>
+            <div class="profile-stat"><strong>${pending}</strong><span>待接单</span></div>
+            <div class="profile-stat"><strong>${inProgress}</strong><span>方案确认中</span></div>
             <div class="profile-stat"><strong>${confirmed}</strong><span>已确认</span></div>
           </div>
         </section>
@@ -1525,12 +1785,20 @@
      Login / profile
      ========================================================= */
   function startLogin(pending = null) {
+    storeCurrentScroll();
     state.pendingAuth = pending;
+    if (state.overlay) {
+      clearOverlayState();
+      document.body.classList.remove("is-locked");
+    }
+    state.overlayHistoryDepth = 0;
+    if (state.historyDepth === 0) pushAppHistory("auth");
+    state.authHistory = true;
     state.screen = "auth";
-    state.overlay = null;
+    clearOverlayState();
     state.login.step = 1;
     renderApp();
-    window.scrollTo(0, 0);
+    restoreWindowScroll(0);
   }
 
   function readLoginFields() {
@@ -1578,7 +1846,7 @@
             <img src="assets/logo.svg" alt="北京大学国际医院">
             <div>
               <span>PEKING UNIVERSITY INTERNATIONAL HOSPITAL</span>
-              <strong>北京大学国际医院 · 名医入企</strong>
+              <strong>名医入企 · 企业健康服务</strong>
             </div>
           </div>
           <h1>${step === 1 ? "登录后，<br>开始预约专家。" : "补充信息，<br>建立企业档案。"}</h1>
@@ -1701,6 +1969,9 @@
     state.codeCountdown = 0;
     window.clearInterval(state.codeTimer);
     if (pending?.type === "booking" && state.booking) {
+      state.authHistory = false;
+      state.reuseHistoryForOverlay = true;
+      state.overlayHistoryDepth = 0;
       state.booking.orgName = state.booking.orgName || user.orgName || "";
       state.booking.orgType = state.booking.orgType || user.orgType || "保险公司";
       state.booking.contactName = state.booking.contactName || user.name || "";
@@ -1711,10 +1982,11 @@
       renderOverlay();
       return;
     }
-    state.tab = pending?.tab || "home";
+    releaseAuthHistory();
+    const targetTab = pending?.tab || state.tab || "home";
+    state.tab = targetTab;
     state.overlay = null;
-    renderApp();
-    window.scrollTo(0, 0);
+    renderApp({ scrollTo: storedScrollForView(`main:${targetTab}`) });
   }
 
   function submitLogin() {
@@ -1871,6 +2143,7 @@
       phone: session.contactPhone || session.phone || "",
       email: "",
       address: "",
+      locationPending: false,
       note: "",
       agree: false
     };
@@ -2234,9 +2507,10 @@
           </div>
           <div class="field-row">
             <div class="field">
-              <label for="booking-phone">联系手机号 <em>*</em> <span>默认登录手机号，可修改</span></label>
+              <label for="booking-phone">联系手机号 <em>*</em></label>
               <input id="booking-phone" type="tel" inputmode="numeric" maxlength="11"
                 data-booking-field="phone" value="${esc(booking.phone)}" placeholder="手机号码">
+              <small class="field-help">默认使用登录手机号，可修改</small>
             </div>
             <div class="field">
               <label for="booking-email">电子邮箱</label>
@@ -2509,7 +2783,7 @@
       audience: booking.audience,
       province: normalizedProvince(booking.province),
       city: booking.city,
-      venue: booking.venue.trim() || "待院方确认",
+      venue: booking.venue.trim() || booking.address.trim(),
       orgType: booking.orgType,
       orgName: booking.orgName.trim(),
       contactName: booking.contactName.trim(),
@@ -2517,9 +2791,12 @@
       phone: booking.phone,
       email: booking.email.trim(),
       address: booking.address.trim(),
+      locationPending: Boolean(booking.locationPending),
       note: booking.note.trim(),
       internalNote: "",
       smsFollowUp: null,
+      assignedStaff: null,
+      acceptedAt: null,
       reply: null
     };
     const items = getAppointments();
@@ -2537,6 +2814,9 @@
   function renderOverlay() {
     if (!overlayRoot) return;
     const hadOverlay = Boolean(overlayRoot.querySelector(".sheet, .flow"));
+    const previousBody = overlayRoot.querySelector(".sheet__body, .flow__body");
+    const previousScroll = previousBody?.scrollTop || 0;
+    if (state.overlay && !hadOverlay) pushOverlayHistory();
     const paint = (content) => {
       overlayRoot.innerHTML = content;
       document.body.classList.add("is-locked");
@@ -2544,6 +2824,14 @@
         overlayRoot
           .querySelectorAll(".sheet, .sheet-backdrop, .flow")
           .forEach((element) => element.classList.add("is-instant"));
+      }
+      if (hadOverlay && previousScroll) {
+        const nextBody = overlayRoot.querySelector(".sheet__body, .flow__body");
+        if (nextBody) {
+          window.requestAnimationFrame(() => {
+            nextBody.scrollTop = previousScroll;
+          });
+        }
       }
     };
     if (state.overlay?.type === "booking") {
@@ -2556,6 +2844,10 @@
     }
     if (state.overlay?.type === "appointment") {
       paint(renderAppointmentSheet());
+      return;
+    }
+    if (state.overlay?.type === "location") {
+      paint(renderLocationSheet());
       return;
     }
     if (state.overlay?.type === "profile") {
@@ -2574,8 +2866,10 @@
       paint(renderAdminDoctorSheet());
       return;
     }
-    overlayRoot.innerHTML = "";
-    document.body.classList.remove("is-locked");
+    if (!state.overlay) {
+      overlayRoot.innerHTML = "";
+      document.body.classList.remove("is-locked");
+    }
   }
 
   function openDoctorSheet(id) {
@@ -2591,6 +2885,7 @@
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet" role="dialog" aria-modal="true" aria-label="${esc(doctor.name)}专家详情">
+        <div class="sheet__grabber doctor-hero__grabber"></div>
         <div class="doctor-hero">
           <img class="doctor-hero__backdrop" src="${esc(doctorPhoto(doctor, "detail"))}" alt=""
             aria-hidden="true" decoding="async">
@@ -2630,7 +2925,11 @@
               )}」设计主题讲座、现场问答或一对一健康咨询。具体课题与流程由院方项目组结合企业人群特点共同确认。</p>
             </section>
             <div class="source-row">
-              <span>资料来自北京大学国际医院官网公开信息</span>
+              <span>${
+                doctor.profileUrl
+                  ? "资料来自北京大学国际医院官网公开信息"
+                  : "院方内部配置资料，官网暂未收录"
+              }</span>
               ${
                 doctor.profileUrl
                   ? `<a href="${esc(
@@ -2668,8 +2967,9 @@
     renderOverlay();
   }
 
-  function renderReplyPanel(reply) {
+  function renderReplyPanel(reply, appointment) {
     if (!reply) return "";
+    const assignee = appointmentAssignee(appointment);
     return `
       <section class="reply-panel">
         <h3>${icon("checkCircle", 14)} 院方活动方案</h3>
@@ -2677,9 +2977,14 @@
         <div class="reply-line"><span>出讲专家</span><div>${esc(reply.speaker || "待院方安排")}</div></div>
         <div class="reply-line"><span>活动形式</span><div>${esc(reply.format || "待确认")}</div></div>
         <div class="reply-line"><span>活动时间</span><div>${esc(reply.schedule || "待确认")}</div></div>
+        ${appointment ? `<div class="reply-line"><span>活动地点</span><div>${appointmentLocationMarkup(appointment)}</div></div>` : ""}
         ${reply.outline ? `<div class="reply-line"><span>课题大纲</span><div>${esc(reply.outline)}</div></div>` : ""}
         ${reply.agenda ? `<div class="reply-line"><span>活动流程</span><div>${esc(reply.agenda)}</div></div>` : ""}
-        ${reply.contact ? `<div class="reply-line"><span>项目组</span><div>${esc(reply.contact)}</div></div>` : ""}
+        ${
+          assignee
+            ? `<div class="reply-line"><span>项目组</span><div>${assigneeContactMarkup(assignee)}</div></div>`
+            : ""
+        }
         ${reply.message ? `<div class="reply-message">${esc(reply.message)}</div>` : ""}
       </section>
     `;
@@ -2692,6 +2997,7 @@
     if (!appointment) return "";
     const doctor = doctorById(appointment.doctorId);
     const meta = statusMeta(appointment.status);
+    const assignee = appointmentAssignee(appointment);
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet" role="dialog" aria-modal="true" aria-label="预约详情">
@@ -2731,14 +3037,38 @@
                 appointment.orgName
               )}</strong></div>
               <div class="detail-cell" style="grid-column:1/-1"><small>联系人</small><strong>${esc(
-                `${appointment.contactName || "--"} ${appointment.contactTitle || ""} · ${
-                  appointment.phone || ""
-                }`
-              )}</strong></div>
-              <div class="detail-cell" style="grid-column:1/-1"><small>活动场地</small><strong>${esc(
-                appointment.venue || "待确认"
-              )}${appointment.address ? `<br>${esc(appointment.address)}` : ""}</strong></div>
+                `${appointment.contactName || "--"} ${appointment.contactTitle || ""}`
+              )} · ${phoneLink(appointment.phone, appointment.phone)}</strong></div>
+              <div class="detail-cell detail-cell--location" style="grid-column:1/-1">
+                <small>活动地点</small>
+                <strong>${appointmentLocationMarkup(appointment)}</strong>
+                <button type="button" class="detail-cell__edit" data-action="edit-location" data-appointment-id="${esc(
+                  appointment.id
+                )}">更新地点</button>
+              </div>
             </div>
+            ${
+              assignee
+                ? `<section class="project-contact-card">
+                    <span class="project-contact-card__avatar">${esc(initialOf(assignee.name))}</span>
+                    <div>
+                      <small>本次项目负责人</small>
+                      <strong>${esc(assignee.name)}</strong>
+                      <p>${phoneLink(assignee.phone, assignee.phone)}</p>
+                    </div>
+                    <a class="project-contact-card__call" href="${esc(
+                      phoneHref(assignee.phone)
+                    )}">${icon("phone", 14)} 拨打</a>
+                  </section>`
+                : `<section class="project-contact-card is-pending">
+                    <span class="project-contact-card__avatar">${icon("clock", 16)}</span>
+                    <div>
+                      <small>项目对接人</small>
+                      <strong>待院方接单后显示</strong>
+                      <p>提交需求后，由院方项目人员接单并负责后续方案沟通。</p>
+                    </div>
+                  </section>`
+            }
             ${
               appointment.note
                 ? `<section class="detail-section"><h3>活动需求</h3><p>${esc(
@@ -2748,10 +3078,10 @@
             }
             ${
               appointment.reply
-                ? renderReplyPanel(appointment.reply)
+                ? renderReplyPanel(appointment.reply, appointment)
                 : `<div class="reply-waiting">
                     <span class="reply-waiting__icon">${icon("clock", 16)}</span>
-                    <div><strong>院方正在确认活动方案</strong><p>${esc(
+                    <div><strong>${assignee ? "院方正在确认活动方案" : "等待院方接单"}</strong><p>${esc(
                       meta.help
                     )} 方案回复后将在这里同步显示课题、流程与时间安排。</p></div>
                   </div>`
@@ -2771,6 +3101,128 @@
         </div>
       </section>
     `;
+  }
+
+  function openLocationEditor(appointmentId) {
+    const appointment = getAppointments().find((item) => item.id === appointmentId);
+    if (!appointment) {
+      showToast("未找到该预约记录。");
+      return;
+    }
+    if (state.session && appointment.ownerPhone !== state.session.phone && !state.adminAuthed) {
+      showToast("该预约不属于当前账号。");
+      return;
+    }
+    const province = normalizedProvince(appointment.province);
+    state.locationDraft = {
+      appointmentId,
+      province,
+      city: normalizedCity(province, appointment.city),
+      venue: appointment.venue || "",
+      address: appointment.address || "",
+      locationPending: Boolean(appointment.locationPending)
+    };
+    if (state.historyDepth > 0 && pushAppHistory("location")) {
+      state.overlayHistoryDepth += 1;
+    }
+    state.overlay = { type: "location", appointmentId };
+    renderOverlay();
+  }
+
+  function renderLocationSheet() {
+    const draft = state.locationDraft;
+    if (!draft) return "";
+    return `
+      <div class="sheet-backdrop" data-action="close-location"></div>
+      <section class="sheet" role="dialog" aria-modal="true" aria-label="更新活动地点">
+        <div class="sheet__grabber"></div>
+        <div class="sheet__bar">
+          <h2>更新活动地点</h2>
+          <button class="sheet__close" type="button" data-action="close-location" aria-label="返回预约详情">
+            ${icon("close", 15)}
+          </button>
+        </div>
+        <div class="sheet__body">
+          <div style="padding:8px 18px 22px">
+            <p class="form-hint" style="margin:0 0 12px">活动地点可在接单后继续调整，保存后会同步给院方项目组，并用于最新的方案与短信内容。</p>
+            <div class="form-card" style="margin-top:0">
+              <label class="switch-row">
+                <span class="switch-row__label"><strong>活动地点待确认</strong><small>开启后，省市场地信息暂不作为已确认安排</small></span>
+                <span class="switch"><input type="checkbox" data-location-pending ${
+                  draft.locationPending ? "checked" : ""
+                }><span></span></span>
+              </label>
+              <div class="field-row">
+                <div class="field">
+                  <label for="location-province">省份</label>
+                  <select id="location-province" data-location-field="province">
+                    ${renderProvinceOptions(draft.province)}
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="location-city">城市</label>
+                  <select id="location-city" data-location-field="city">
+                    ${renderCityOptions(draft.province, draft.city)}
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="location-venue">场地名称</label>
+                <input id="location-venue" type="text" data-location-field="venue"
+                  value="${esc(draft.venue)}" placeholder="如：企业总部多功能厅">
+              </div>
+              <div class="field">
+                <label for="location-address">详细地址 ${draft.locationPending ? "<span>待确认时可暂不填写</span>" : "<em>*</em>"}</label>
+                <input id="location-address" type="text" data-location-field="address"
+                  value="${esc(draft.address)}" placeholder="请输入活动场地详细地址">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="sheet__footer">
+          <button class="btn btn--ghost" type="button" data-action="close-location">取消</button>
+          <button class="btn btn--primary" type="button" data-action="save-location">保存地点</button>
+        </div>
+      </section>
+    `;
+  }
+
+  function saveLocation() {
+    const draft = state.locationDraft;
+    if (!draft) return;
+    document.querySelectorAll("[data-location-field]").forEach((field) => {
+      draft[field.dataset.locationField] = field.value.trim();
+    });
+    const pending = document.querySelector("[data-location-pending]");
+    if (pending) draft.locationPending = pending.checked;
+    const province = normalizedProvince(draft.province);
+    const city = normalizedCity(province, draft.city);
+    if (!draft.locationPending && !draft.address) {
+      showToast("请填写活动详细地址，或开启“活动地点待确认”。");
+      return;
+    }
+    const now = new Date().toISOString();
+    const items = getAppointments().map((item) =>
+      item.id === draft.appointmentId
+        ? {
+            ...item,
+            province,
+            city,
+            venue: draft.venue || (draft.locationPending ? "" : draft.address),
+            address: draft.address,
+            locationPending: draft.locationPending,
+            updatedAt: now
+          }
+        : item
+    );
+    saveAppointments(items);
+    const id = draft.appointmentId;
+    state.locationDraft = null;
+    if (state.overlayHistoryDepth > 1) releaseOverlayHistory(1);
+    state.overlay = { type: "appointment", appointmentId: id };
+    renderOverlay();
+    refreshAppointmentList();
+    showToast("活动地点已更新，院方项目组将看到最新信息。");
   }
 
   function renderProfileSheet() {
@@ -2865,7 +3317,8 @@
     const user = upsertUser({ ...draft, updatedAt: new Date().toISOString() });
     setSession(user);
     state.profileDraft = null;
-    state.overlay = null;
+    releaseOverlayHistory();
+    clearOverlayState();
     renderApp();
     showToast("企业信息已更新。");
   }
@@ -2874,6 +3327,13 @@
      Hospital workbench
      ========================================================= */
   function openAdmin() {
+    if (state.overlay) {
+      clearOverlayState();
+      document.body.classList.remove("is-locked");
+    }
+    state.overlayHistoryDepth = 0;
+    if (state.historyDepth === 0) pushAppHistory("admin");
+    state.adminHistory = true;
     state.overlay = null;
     state.screen = state.adminAuthed ? "admin" : "admin-login";
     if (state.adminAuthed) setLastPortal("admin");
@@ -2973,6 +3433,7 @@
     return {
       total: items.length,
       pending: items.filter((item) => item.status === "pending").length,
+      accepted: items.filter((item) => item.status === "accepted").length,
       confirmed: items.filter((item) => item.status === "confirmed").length,
       completed: items.filter((item) => item.status === "completed").length
     };
@@ -2981,7 +3442,8 @@
   function adminFilterOptions() {
     return [
       { id: "all", label: "全部" },
-      { id: "pending", label: "待确认" },
+      { id: "pending", label: "待接单" },
+      { id: "accepted", label: "方案确认中" },
       { id: "confirmed", label: "已确认" },
       { id: "completed", label: "已完成" }
     ];
@@ -3054,7 +3516,7 @@
         ${accounts
           .map(
             (account) => `
-              <button class="admin-account-card ${account.active ? "" : "is-disabled"}" type="button"
+              <article class="admin-account-card ${account.active ? "" : "is-disabled"}" role="button" tabindex="0"
                 data-action="admin-account-edit" data-username="${esc(account.username)}">
                 <span class="admin-account-card__avatar">${esc(initialOf(account.name))}</span>
                 <span class="admin-account-card__main">
@@ -3067,7 +3529,7 @@
                   )} · ${esc(roleMeta(account.role).desc)}</span>
                   <span class="admin-account-card__meta">${icon("user", 11)} ${esc(
                     account.username
-                  )} · ${icon("phone", 11)} ${esc(account.phone)}</span>
+                  )} · ${icon("phone", 11)} ${phoneLink(account.phone, account.phone)}</span>
                 </span>
                 <span class="admin-account-card__side">
                   <span class="pill ${account.active ? "pill--completed" : "pill--inactive"}">${
@@ -3075,7 +3537,7 @@
                   }</span>
                   <span>编辑 ${icon("chevronRight", 11)}</span>
                 </span>
-              </button>
+              </article>
             `
           )
           .join("")}
@@ -3289,7 +3751,8 @@
       }
     }
     state.adminAccountDraft = null;
-    state.overlay = null;
+    releaseOverlayHistory();
+    clearOverlayState();
     state.adminTab = "accounts";
     renderApp();
     showToast(draft.isNew ? "项目账号已创建并分配。" : "账号信息已更新。");
@@ -3533,7 +3996,8 @@
     saveDoctorConfig(config);
     refreshDoctors();
     state.adminDoctorDraft = null;
-    state.overlay = null;
+    releaseOverlayHistory();
+    clearOverlayState();
     state.adminTab = "doctors";
     renderApp();
     showToast(draft.isNew ? "专家已新增并上架。" : "专家信息已更新。");
@@ -3564,8 +4028,9 @@
 
   function renderAdminAppointmentCard(item) {
     const doctor = doctorById(item.doctorId);
+    const assignee = appointmentAssignee(item);
     return `
-      <button class="admin-appointment" type="button" data-action="open-review" data-appointment-id="${esc(
+      <article class="admin-appointment" role="button" tabindex="0" data-action="open-review" data-appointment-id="${esc(
         item.id
       )}">
         <span class="admin-appointment__top">
@@ -3580,11 +4045,18 @@
           )}</span>
           <span>${icon("calendar", 12)} ${formatMD(item.date)} ${esc(item.time)}</span>
         </div>
+        ${
+          assignee
+            ? `<div class="admin-appointment__assignee">${icon("user", 11)} ${esc(
+                assignee.name
+              )} 负责 · ${phoneLink(assignee.phone, assignee.phone)}</div>`
+            : `<div class="admin-appointment__assignee is-pending">${icon("clock", 11)} 等待接单，暂未分配项目负责人</div>`
+        }
         <span class="admin-appointment__foot">
-          <span>${esc(item.contactName)} · ${maskPhone(item.phone)}</span>
+          <span>${esc(item.contactName)} · ${phoneLink(item.phone, maskPhone(item.phone))}</span>
           <strong>${item.reply ? "查看 / 更新方案" : "处理预约"} ${icon("chevronRight", 12)}</strong>
         </span>
-      </button>
+      </article>
     `;
   }
 
@@ -3614,10 +4086,14 @@
           "calendar",
           10
         )} 含历史记录</span></div>
-        <div class="admin-stat"><small>待院方确认</small><strong>${stats.pending}<span>条</span></strong><span class="admin-stat__hint is-amber">${icon(
+        <div class="admin-stat"><small>待院方接单</small><strong>${stats.pending}<span>条</span></strong><span class="admin-stat__hint is-amber">${icon(
           "clock",
           10
-        )} 建议今日处理</span></div>
+        )} 需要分配项目负责人</span></div>
+        <div class="admin-stat"><small>方案确认中</small><strong>${stats.accepted}<span>条</span></strong><span class="admin-stat__hint is-blue">${icon(
+          "message",
+          10
+        )} 已接单待确认</span></div>
         <div class="admin-stat"><small>已确认方案</small><strong>${stats.confirmed}<span>条</span></strong><span class="admin-stat__hint is-blue">${icon(
           "checkCircle",
           10
@@ -3653,7 +4129,7 @@
     const pending = pendingSmsFollowUps();
     const completed = completedSmsFollowUps();
     const renderCard = (appointment, done = false) => `
-      <button class="followup-card ${done ? "is-done" : ""}" type="button"
+      <article class="followup-card ${done ? "is-done" : ""}" role="button" tabindex="0"
         data-action="open-review" data-appointment-id="${esc(appointment.id)}">
         <span class="followup-card__top">
           <span class="followup-card__icon">${icon(done ? "checkCircle" : "message", 17)}</span>
@@ -3665,7 +4141,7 @@
         </span>
         <span class="followup-card__meta">
           <span>${icon("user", 11)} ${esc(appointment.contactName)}</span>
-          <span>${icon("phone", 11)} ${esc(appointment.phone)}</span>
+          <span>${icon("phone", 11)} ${phoneLink(appointment.phone, appointment.phone)}</span>
           <span>${icon("calendar", 11)} ${formatMD(appointment.date)} ${esc(appointment.time)}</span>
         </span>
         <span class="followup-card__action">
@@ -3678,7 +4154,7 @@
           }
           ${icon("chevronRight", 11)}
         </span>
-      </button>
+      </article>
     `;
     return `
       <div class="admin-page-head">
@@ -4246,7 +4722,7 @@
             <img src="assets/logo.svg" alt="北京大学国际医院">
             <div>
               <strong>${esc(account.name)} · ${esc(roleMeta(account.role).label)}</strong>
-              <span>${esc(account.phone)} · 企业健康项目组</span>
+              <span>${phoneLink(account.phone, account.phone)} · 企业健康项目组</span>
             </div>
           </div>
           <div class="admin-topbar__actions">
@@ -4280,13 +4756,106 @@
     if (wrap) wrap.innerHTML = renderAdminListHTML();
   }
 
+  function activeProjectAccounts() {
+    return getAdminAccounts()
+      .filter((account) => account.active)
+      .sort((a, b) => {
+        if (a.role === "administrator" && b.role !== "administrator") return -1;
+        if (b.role === "administrator" && a.role !== "administrator") return 1;
+        return a.name.localeCompare(b.name, "zh-CN");
+      });
+  }
+
+  function staffSnapshot(account) {
+    if (!account) return null;
+    return {
+      username: account.username,
+      name: account.name,
+      phone: account.phone
+    };
+  }
+
+  function acceptAppointment() {
+    const appointment = getAppointments().find((item) => item.id === state.adminReviewId);
+    if (!appointment || !state.adminUser) return;
+    const existing = appointmentAssignee(appointment);
+    if (existing && existing.username !== state.adminUser.username && !isAdministrator()) {
+      showToast(`该预约已由 ${existing.name} 接单，如需调整请联系系统管理员。`);
+      return;
+    }
+    const now = new Date().toISOString();
+    const staff = staffSnapshot(state.adminUser);
+    let updated = null;
+    const items = getAppointments().map((item) => {
+      if (item.id !== appointment.id) return item;
+      updated = {
+        ...item,
+        status: item.status === "pending" ? "accepted" : item.status,
+        assignedStaff: staff,
+        acceptedAt: item.acceptedAt || now,
+        updatedAt: now
+      };
+      return updated;
+    });
+    saveAppointments(items);
+    if (updated) {
+      state.adminDraft = buildReviewDraft(updated);
+      state.adminNoteEditing = false;
+      renderOverlay();
+      showToast(`已接单，项目负责人自动设为 ${staff.name}。`);
+    }
+  }
+
+  function reassignAppointment(username) {
+    if (!isAdministrator()) {
+      showToast("仅系统管理员可以调整项目负责人。");
+      return;
+    }
+    const appointment = getAppointments().find((item) => item.id === state.adminReviewId);
+    const account = activeProjectAccounts().find((item) => item.username === username);
+    if (!appointment || !account) return;
+    const now = new Date().toISOString();
+    const staff = staffSnapshot(account);
+    let updated = null;
+    const items = getAppointments().map((item) => {
+      if (item.id !== appointment.id) return item;
+      updated = {
+        ...item,
+        status: item.status === "pending" ? "accepted" : item.status,
+        assignedStaff: staff,
+        acceptedAt: item.acceptedAt || now,
+        reply: item.reply
+          ? { ...item.reply, contact: `${staff.name} · ${staff.phone}` }
+          : null,
+        updatedAt: now
+      };
+      return updated;
+    });
+    saveAppointments(items);
+    if (updated) {
+      state.adminDraft = buildReviewDraft(updated);
+      renderOverlay();
+      showToast(`项目负责人已调整为 ${staff.name}。`);
+    }
+  }
+
   function saveAdminReply(status) {
     const appointment = getAppointments().find((item) => item.id === state.adminReviewId);
     if (!appointment) return;
+    const assignee = appointmentAssignee(appointment);
+    if (!assignee) {
+      showToast("请先接单并指定项目负责人，再确认活动方案。");
+      return;
+    }
     const fields = collectReviewFields();
     const message = fields.message || "";
     if (status === "confirmed" && !fields.topic) {
       showToast("请填写确认后的活动课题。");
+      return;
+    }
+    const locationPending = Boolean(state.adminDraft?.locationPending);
+    if (!locationPending && !fields.address) {
+      showToast("请填写活动详细地址，或将活动地点标记为待确认。");
       return;
     }
     const reply = {
@@ -4296,10 +4865,11 @@
       format: fields.format || "",
       outline: fields.outline || "",
       agenda: fields.agenda || "",
-      contact: fields.contact || "",
+      contact: `${assignee.name} · ${assignee.phone}`,
       message,
       updatedAt: new Date().toISOString()
     };
+    const now = reply.updatedAt;
     const items = getAppointments().map((item) => {
       if (item.id !== appointment.id) return item;
       const nextStatus =
@@ -4308,20 +4878,22 @@
         ...item,
         status: nextStatus,
         reply,
-        assignedStaff: state.adminUser
-          ? {
-              username: state.adminUser.username,
-              name: state.adminUser.name,
-              phone: state.adminUser.phone
-            }
-          : null,
-        updatedAt: new Date().toISOString()
+        province: normalizedProvince(fields.province || item.province),
+        city: normalizedCity(fields.province || item.province, fields.city || item.city),
+        venue: fields.venue || (locationPending ? "" : fields.address || item.venue || ""),
+        address: fields.address || "",
+        locationPending,
+        assignedStaff: assignee,
+        confirmedAt: nextStatus === "confirmed" ? item.confirmedAt || now : item.confirmedAt || null,
+        completedAt: nextStatus === "completed" ? item.completedAt || now : item.completedAt || null,
+        updatedAt: now
       };
     });
     saveAppointments(items);
     state.adminReviewId = null;
     state.adminDraft = null;
-    state.overlay = null;
+    releaseOverlayHistory();
+    clearOverlayState();
     renderApp();
     showToast(
       status === "confirmed"
@@ -4336,7 +4908,7 @@
 
   function buildReviewDraft(appointment) {
     const doctor = doctorById(appointment.doctorId);
-    const staff = state.adminUser;
+    const staff = appointmentAssignee(appointment);
     return {
       topic: appointment.reply?.topic || topicOf(appointment),
       speaker:
@@ -4350,7 +4922,15 @@
       agenda:
         appointment.reply?.agenda ||
         `${appointment.time.split("–")[0]} 签到与开场\n主题分享\n现场问答\n活动结束`,
-      contact: staff ? `${staff.name} · ${staff.phone}` : "企业健康项目组",
+      contact: staff ? `${staff.name} · ${staff.phone}` : "",
+      province: normalizedProvince(appointment.province),
+      city: normalizedCity(
+        normalizedProvince(appointment.province),
+        appointment.city
+      ),
+      venue: appointment.venue || "",
+      address: appointment.address || "",
+      locationPending: Boolean(appointment.locationPending),
       message:
         appointment.reply?.message ||
         "感谢贵司的预约与信任。院方项目组已完成专家与课题匹配，请确认活动流程与时间安排。如活动人数或场地有变化，请提前联系项目组。",
@@ -4439,7 +5019,7 @@
         ? {
             ...item,
             smsFollowUp: followUp,
-            assignedStaff: followUp.copiedBy,
+            assignedStaff: appointmentAssignee(item) || followUp.copiedBy,
             updatedAt: now
           }
         : item
@@ -4454,22 +5034,31 @@
   }
 
   function buildCustomerSmsText(appointment, fields = {}) {
-    const staff = state.adminUser;
+    const staff = appointmentAssignee(appointment);
     const topic = fields.topic || appointment.reply?.topic || topicOf(appointment);
     const schedule =
       fields.schedule ||
       appointment.reply?.schedule ||
       `${formatDateCN(appointment.date)} ${appointment.time}`;
     const speaker = fields.speaker || appointment.reply?.speaker || "院方确认专家";
-    const venue = appointment.venue || "待院方确认";
+    const locationAppointment = {
+      ...appointment,
+      province: fields.province || appointment.province,
+      city: fields.city || appointment.city,
+      venue: fields.venue ?? appointment.venue,
+      address: fields.address ?? appointment.address,
+      locationPending: fields.locationPending ?? appointment.locationPending
+    };
+    const location = appointmentLocationText(locationAppointment);
     const contact = staff ? `${staff.name} ${staff.phone}` : "院方项目组";
-    return `【北京大学国际医院】${appointment.contactName}您好，您预约的「${topic}」活动方案如下：时间 ${schedule}；地点 ${venue}；出讲专家 ${speaker}。院方联系人：${contact}。如时间地点需要调整，请直接联系我，谢谢。`;
+    return `【北京大学国际医院】${appointment.contactName}您好，您预约的「${topic}」活动方案如下：时间 ${schedule}；地点 ${location}；出讲专家 ${speaker}。院方联系人：${contact}。如时间地点需要调整，请直接联系我，谢谢。`;
   }
 
   function manualSmsPayload() {
     const appointment = getAppointments().find((item) => item.id === state.adminReviewId);
     if (!appointment) return null;
     const fields = collectReviewFields();
+    fields.locationPending = Boolean(state.adminDraft?.locationPending);
     return {
       phone: appointment.phone,
       text: buildCustomerSmsText(appointment, fields)
@@ -4551,12 +5140,48 @@
     `;
   }
 
+  function reviewWorkflowMarkup(appointment) {
+    const accepted = Boolean(appointment.acceptedAt);
+    const confirmed = appointment.status === "confirmed" || appointment.status === "completed";
+    const smsDone = Boolean(appointment.smsFollowUp?.copiedAt);
+    const completed = appointment.status === "completed";
+    const current = completed ? 4 : confirmed ? (smsDone ? 3 : 3) : accepted ? 2 : 1;
+    const steps = [
+      { step: 1, title: "接单", desc: "分配项目负责人" },
+      { step: 2, title: "确认方案", desc: "课题、流程与地点" },
+      { step: 3, title: "短信跟进", desc: "复制短信并发送客户" },
+      { step: 4, title: "完成归档", desc: "活动结束后收尾" }
+    ];
+    return `
+      <div class="workflow-strip">
+        ${steps
+          .map((item) => {
+            const done =
+              (item.step === 1 && accepted) ||
+              (item.step === 2 && confirmed) ||
+              (item.step === 3 && smsDone) ||
+              (item.step === 4 && completed);
+            const active = item.step === current && !completed;
+            return `
+              <div class="workflow-step ${done ? "is-done" : ""} ${active ? "is-active" : ""}">
+                <span>${done ? icon("check", 10) : item.step}</span>
+                <div><strong>${item.title}</strong><small>${item.desc}</small></div>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
+  }
+
   function renderReviewSheet() {
     const appointment = getAppointments().find((item) => item.id === state.adminReviewId);
     if (!appointment) return "";
     const doctor = doctorById(appointment.doctorId);
     const draft = state.adminDraft || buildReviewDraft(appointment);
-    const manualSmsText = buildCustomerSmsText(appointment, draft);
+    const assignee = appointmentAssignee(appointment);
+    const manualSmsText = assignee ? buildCustomerSmsText(appointment, draft) : "";
+    const canSendSms = appointment.status === "confirmed" || appointment.status === "completed";
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet" role="dialog" aria-modal="true" aria-label="处理预约">
@@ -4569,6 +5194,7 @@
         </div>
         <div class="sheet__body">
           <div style="padding:4px 18px 20px">
+            ${reviewWorkflowMarkup(appointment)}
             <div class="review-summary">
               <div class="review-summary__top">
                 ${
@@ -4593,7 +5219,10 @@
                 )}</strong></div>
                 <div class="review-info__row"><span>联系人</span><strong>${esc(
                   appointment.contactName
-                )} ${esc(appointment.contactTitle || "")} · ${esc(appointment.phone)}</strong></div>
+                )} ${esc(appointment.contactTitle || "")} · ${phoneLink(
+                  appointment.phone,
+                  appointment.phone
+                )}</strong></div>
                 <div class="review-info__row"><span>期望时间</span><strong>${formatDateCN(
                   appointment.date,
                   true
@@ -4604,12 +5233,14 @@
                 <div class="review-info__row"><span>活动形式</span><strong>${esc(
                   appointment.format
                 )} · ${esc(appointment.audience)}</strong></div>
-                <div class="review-info__row"><span>活动场地</span><strong>${esc(
-                  appointment.venue || "待确认"
+                <div class="review-info__row"><span>活动地点</span><strong>${appointmentLocationMarkup(
+                  appointment
                 )}</strong></div>
-                <div class="review-info__row"><span>本次对接</span><strong>${esc(
-                  state.adminUser?.name || ""
-                )} · ${esc(state.adminUser?.phone || "")}</strong></div>
+                <div class="review-info__row"><span>项目负责人</span><strong>${
+                  assignee
+                    ? assigneeContactMarkup(assignee)
+                    : '<span class="location-pending">尚未接单</span>'
+                }</strong></div>
               </div>
               ${
                 appointment.note
@@ -4619,109 +5250,216 @@
                   : ""
               }
             </div>
-            <div class="review-form">
-              <div class="form-card">
-                <div class="field">
-                  <label for="review-topic">确认课题</label>
-                  <input id="review-topic" type="text" data-review-field="topic" value="${esc(
-                    draft.topic
-                  )}">
-                </div>
-                <div class="field-row">
-                  <div class="field">
-                    <label for="review-speaker">出讲专家</label>
-                    <input id="review-speaker" type="text" data-review-field="speaker" value="${esc(
-                      draft.speaker
-                    )}">
+            ${
+              !assignee
+                ? `
+                  <section class="assignment-card">
+                    <span class="assignment-card__eyebrow">下一步 · 接单</span>
+                    <h3>由你负责这个项目吗？</h3>
+                    <p>接单后，你的姓名 ${esc(state.adminUser?.name || "")} 和手机号 ${phoneLink(
+                      state.adminUser?.phone || "",
+                      state.adminUser?.phone || ""
+                    )} 会自动带入方案与客户联系人，企业端此时才会显示具体项目对接人。</p>
+                    ${
+                      isAdministrator()
+                        ? `<div class="assignment-card__select">
+                            <span>也可直接分配给</span>
+                            <select data-assignee-select>
+                              <option value="">选择项目负责人</option>
+                              ${activeProjectAccounts()
+                                .map(
+                                  (account) =>
+                                    `<option value="${esc(account.username)}">${esc(
+                                      account.name
+                                    )} · ${esc(account.phone)}</option>`
+                                )
+                                .join("")}
+                            </select>
+                          </div>`
+                        : ""
+                    }
+                    <button class="btn btn--primary btn--block" type="button" data-action="review-accept">
+                      ${icon("user", 15)} 接单并分配给我
+                    </button>
+                  </section>
+                `
+                : `
+                  <div class="review-form">
+                    <section class="assignee-panel">
+                      <div class="assignee-panel__person">
+                        <span>${esc(initialOf(assignee.name))}</span>
+                        <div>
+                          <small>当前项目负责人</small>
+                          <strong>${esc(assignee.name)}</strong>
+                          <p>${phoneLink(assignee.phone, assignee.phone)}</p>
+                        </div>
+                      </div>
+                      ${
+                        isAdministrator()
+                          ? `<div class="assignee-panel__select">
+                              <span>调整负责人</span>
+                              <select data-assignee-select>
+                                ${activeProjectAccounts()
+                                  .map(
+                                    (account) =>
+                                      `<option value="${esc(account.username)}" ${
+                                        account.username === assignee.username ? "selected" : ""
+                                      }>${esc(account.name)} · ${esc(account.phone)}</option>`
+                                  )
+                                  .join("")}
+                              </select>
+                            </div>`
+                          : `<span class="assignee-panel__locked">${icon("lock", 11)} 由管理员调整</span>`
+                      }
+                    </section>
+                    <div class="form-card">
+                      <div class="field">
+                        <label for="review-topic">确认课题</label>
+                        <input id="review-topic" type="text" data-review-field="topic" value="${esc(
+                          draft.topic
+                        )}">
+                      </div>
+                      <div class="field-row">
+                        <div class="field">
+                          <label for="review-speaker">出讲专家</label>
+                          <input id="review-speaker" type="text" data-review-field="speaker" value="${esc(
+                            draft.speaker
+                          )}">
+                        </div>
+                        <div class="field">
+                          <label for="review-format">活动形式</label>
+                          <input id="review-format" type="text" data-review-field="format" value="${esc(
+                            draft.format
+                          )}">
+                        </div>
+                      </div>
+                      <div class="field">
+                        <label for="review-schedule">活动时间</label>
+                        <input id="review-schedule" type="text" data-review-field="schedule" value="${esc(
+                          draft.schedule
+                        )}">
+                      </div>
+                      <div class="field">
+                        <label for="review-outline">课题大纲</label>
+                        <textarea id="review-outline" data-review-field="outline">${esc(
+                          draft.outline
+                        )}</textarea>
+                      </div>
+                      <div class="field">
+                        <label for="review-agenda">活动流程</label>
+                        <textarea id="review-agenda" data-review-field="agenda">${esc(
+                          draft.agenda
+                        )}</textarea>
+                      </div>
+                      <div class="field-row">
+                        <div class="field">
+                          <label for="review-province">省份</label>
+                          <select id="review-province" data-review-field="province">
+                            ${renderProvinceOptions(draft.province)}
+                          </select>
+                        </div>
+                        <div class="field">
+                          <label for="review-city">城市</label>
+                          <select id="review-city" data-review-field="city">
+                            ${renderCityOptions(draft.province, draft.city)}
+                          </select>
+                        </div>
+                      </div>
+                      <div class="field">
+                        <label for="review-venue">活动场地</label>
+                        <input id="review-venue" type="text" data-review-field="venue" value="${esc(
+                          draft.venue
+                        )}" placeholder="场地名称">
+                      </div>
+                      <div class="field">
+                        <label for="review-address">详细地址 ${draft.locationPending ? "<span>待确认时可暂不填写</span>" : "<em>*</em>"}</label>
+                        <input id="review-address" type="text" data-review-field="address" value="${esc(
+                          draft.address
+                        )}" placeholder="活动场地详细地址">
+                      </div>
+                      <label class="switch-row">
+                        <span class="switch-row__label"><strong>活动地点待确认</strong><small>可先确认方案，地点后续再补充</small></span>
+                        <span class="switch"><input type="checkbox" data-review-location-pending ${
+                          draft.locationPending ? "checked" : ""
+                        }><span></span></span>
+                      </label>
+                      <div class="field">
+                        <label for="review-contact">项目组联系人 <span>接单后自动带入</span></label>
+                        <input id="review-contact" type="text" data-review-field="contact" value="${esc(
+                          draft.contact
+                        )}" readonly>
+                      </div>
+                      <div class="field">
+                        <label for="review-message">给企业的回复</label>
+                        <textarea id="review-message" data-review-field="message" placeholder="补充说明、需企业确认的事项等">${esc(
+                          draft.message
+                        )}</textarea>
+                      </div>
+                    </div>
+                    ${renderInternalNoteCard(appointment)}
+                    ${
+                      canSendSms
+                        ? `
+                          <section class="manual-sms-card">
+                            <div class="manual-sms-card__head">
+                              <span class="manual-sms-card__icon">${icon("message", 16)}</span>
+                              <div>
+                                <strong>手动发送客户短信</strong>
+                                <small>根据已确认课题、地点与流程生成，复制后可用手机发送</small>
+                              </div>
+                            </div>
+                            <div class="manual-sms-phone">
+                              <span>客户手机号</span>
+                              <strong>${phoneLink(appointment.phone, appointment.phone)}</strong>
+                              <button type="button" data-action="copy-customer-phone">复制号码</button>
+                            </div>
+                            <div class="manual-sms-content" id="manual-sms-content">${esc(
+                              manualSmsText
+                            )}</div>
+                            <div class="manual-sms-actions">
+                              <button class="btn btn--ghost btn--sm" type="button" data-action="copy-customer-sms">
+                                ${icon("file", 14)} 复制短信内容
+                              </button>
+                              <button class="btn btn--primary btn--sm" type="button" data-action="copy-customer-both">
+                                ${icon("send", 14)} 复制号码和内容
+                              </button>
+                            </div>
+                            <p class="manual-sms-note">
+                              只有复制短信内容或“号码和内容”才算完成发送提醒；仅复制手机号不会消除短信待办。
+                            </p>
+                            <div data-sms-followup-status>${smsFollowUpStatusMarkup(appointment)}</div>
+                          </section>
+                        `
+                        : `
+                          <section class="manual-sms-locked">
+                            ${icon("message", 16)}
+                            <div><strong>客户短信将在方案确认后生成</strong><p>先确认课题、流程与地点，再用当前方案生成短信内容，避免把未确认信息发给客户。</p></div>
+                          </section>
+                        `
+                    }
+                    <div class="review-actions ${
+                      appointment.status === "confirmed" ? "has-complete" : ""
+                    }">
+                      ${
+                        appointment.status === "confirmed"
+                          ? `<button class="btn btn--ghost" type="button" data-action="review-complete">活动结束并归档</button>`
+                          : ""
+                      }
+                      <button class="btn btn--primary" type="button" data-action="review-confirm">${
+                        appointment.reply ? "更新活动方案" : "确认方案并同步客户"
+                      }</button>
+                    </div>
+                    <p class="review-action-note">${
+                      appointment.status === "completed"
+                        ? "该项目已归档为完成。更新方案不会改变完成状态。"
+                        : appointment.status === "confirmed"
+                        ? "方案已同步。复制客户短信完成提醒后，可在活动结束后归档。"
+                        : "确认后会同步课题、流程、时间、地点与项目负责人；随后进入短信跟进。"
+                    }</p>
                   </div>
-                  <div class="field">
-                    <label for="review-format">活动形式</label>
-                    <input id="review-format" type="text" data-review-field="format" value="${esc(
-                      draft.format
-                    )}">
-                  </div>
-                </div>
-                <div class="field">
-                  <label for="review-schedule">活动时间</label>
-                  <input id="review-schedule" type="text" data-review-field="schedule" value="${esc(
-                    draft.schedule
-                  )}">
-                </div>
-                <div class="field">
-                  <label for="review-outline">课题大纲</label>
-                  <textarea id="review-outline" data-review-field="outline">${esc(
-                    draft.outline
-                  )}</textarea>
-                </div>
-                <div class="field">
-                  <label for="review-agenda">活动流程</label>
-                  <textarea id="review-agenda" data-review-field="agenda">${esc(
-                    draft.agenda
-                  )}</textarea>
-                </div>
-                <div class="field">
-                  <label for="review-contact">项目组联系人</label>
-                  <input id="review-contact" type="text" data-review-field="contact" value="${esc(
-                    draft.contact
-                  )}">
-                </div>
-                <div class="field">
-                  <label for="review-message">给企业的回复</label>
-                  <textarea id="review-message" data-review-field="message" placeholder="补充说明、需企业确认的事项等">${esc(
-                    draft.message
-                  )}</textarea>
-                </div>
-              </div>
-              ${renderInternalNoteCard(appointment)}
-              <section class="manual-sms-card">
-                <div class="manual-sms-card__head">
-                  <span class="manual-sms-card__icon">${icon("message", 16)}</span>
-                  <div>
-                    <strong>手动发送客户短信</strong>
-                    <small>根据当前课题与流程自动生成，复制后可用手机自行发送</small>
-                  </div>
-                </div>
-                <div class="manual-sms-phone">
-                  <span>客户手机号</span>
-                  <strong>${esc(appointment.phone)}</strong>
-                  <button type="button" data-action="copy-customer-phone">复制号码</button>
-                </div>
-                <div class="manual-sms-content" id="manual-sms-content">${esc(
-                  manualSmsText
-                )}</div>
-                <div class="manual-sms-actions">
-                  <button class="btn btn--ghost btn--sm" type="button" data-action="copy-customer-sms">
-                    ${icon("file", 14)} 复制短信内容
-                  </button>
-                  <button class="btn btn--primary btn--sm" type="button" data-action="copy-customer-both">
-                    ${icon("send", 14)} 复制号码和内容
-                  </button>
-                </div>
-                <p class="manual-sms-note">
-                  复制短信内容或“号码和内容”后，系统会自动视为已发送，并记录当前项目人员和时间。
-                </p>
-                <div data-sms-followup-status>${smsFollowUpStatusMarkup(appointment)}</div>
-              </section>
-              <div class="review-actions ${
-                appointment.status === "confirmed" ? "has-complete" : ""
-              }">
-                ${
-                  appointment.status === "confirmed"
-                    ? `<button class="btn btn--ghost" type="button" data-action="review-complete">活动结束并归档</button>`
-                    : ""
-                }
-                <button class="btn btn--primary" type="button" data-action="review-confirm">${
-                  appointment.reply ? "更新活动方案" : "保存方案并确认预约"
-                }</button>
-              </div>
-              <p class="review-action-note">${
-                appointment.status === "completed"
-                  ? "该项目已归档为完成。更新方案不会改变完成状态。"
-                  : appointment.status === "confirmed"
-                  ? "活动结束后可用「活动结束并归档」收尾，归档后不再进入短信待办。"
-                  : "确认后，课题、流程、时间与联系人会同步到企业客户端的预约详情。"
-              }</p>
-            </div>
+                `
+            }
+            ${!assignee ? renderInternalNoteCard(appointment) : ""}
           </div>
         </div>
       </section>
@@ -4755,8 +5493,10 @@
     `;
   }
 
-  function renderApp() {
+  function renderApp({ scrollTo = null, animate = false } = {}) {
     if (!app) return;
+    const currentScroll = window.scrollY || 0;
+    const shouldAnimate = animate || !state.renderedOnce;
     if (!state.loaded) {
       app.innerHTML = renderLoading();
       return;
@@ -4784,7 +5524,12 @@
       else content = renderHomePage();
       app.innerHTML = renderShell(state.tab, content);
     }
+    if (!shouldAnimate) {
+      app.querySelector(".app-content, .auth-screen, .admin-screen")?.classList.add("is-instant");
+    }
     renderOverlay();
+    state.renderedOnce = true;
+    restoreWindowScroll(scrollTo === null ? currentScroll : scrollTo);
   }
 
   function refreshExpertFilters() {
@@ -4797,11 +5542,12 @@
   async function handleAction(action, el) {
     switch (action) {
       case "tab": {
+        storeCurrentScroll();
+        if (state.overlay) releaseOverlayHistory();
         state.screen = "main";
         state.tab = el.dataset.tab || "home";
         state.overlay = null;
-        renderApp();
-        window.scrollTo(0, 0);
+        renderApp({ scrollTo: storedScrollForView(`main:${state.tab}`) });
         break;
       }
       case "start-login": {
@@ -4810,11 +5556,12 @@
         break;
       }
       case "auth-close": {
+        releaseAuthHistory();
         state.screen = "main";
         state.pendingAuth = null;
         state.booking = null;
         state.login.step = 1;
-        renderApp();
+        renderApp({ scrollTo: storedScrollForView(`main:${state.tab}`) });
         break;
       }
       case "auth-step-back": {
@@ -4846,7 +5593,9 @@
         break;
       case "auth-org-type":
         state.login.orgType = el.dataset.value || "保险公司";
-        renderApp();
+        document.querySelectorAll('[data-action="auth-org-type"]').forEach((button) => {
+          button.classList.toggle("is-selected", button.dataset.value === state.login.orgType);
+        });
         break;
       case "auth-complete-profile":
         completeProfile();
@@ -4857,8 +5606,7 @@
       }
       case "booking-close": {
         state.booking = null;
-        state.overlay = null;
-        renderApp();
+        dismissOverlay();
         break;
       }
       case "booking-back": {
@@ -4933,6 +5681,7 @@
       }
       case "success-appointments":
         state.booking = null;
+        releaseOverlayHistory();
         state.overlay = null;
         state.tab = "appointments";
         renderApp();
@@ -4954,15 +5703,7 @@
         openAppointmentSheet(el.dataset.appointmentId);
         break;
       case "close-overlay":
-        state.overlay = null;
-        state.adminReviewId = null;
-        state.adminDraft = null;
-        state.adminNoteEditing = false;
-        state.adminAccountDraft = null;
-        state.adminDoctorDraft = null;
-        state.profileDraft = null;
-        if (state.screen === "admin") renderApp();
-        else renderOverlay();
+        dismissOverlay();
         break;
       case "expert-filter":
         state.expertFilter = el.dataset.value || "elite";
@@ -4970,7 +5711,10 @@
         break;
       case "expert-clear":
         state.expertSearch = "";
-        renderApp();
+        const expertSearch = document.getElementById("expert-search");
+        if (expertSearch) expertSearch.value = "";
+        refreshExpertResults();
+        document.querySelector('[data-action="expert-clear"]')?.setAttribute("hidden", "");
         break;
       case "appointment-filter":
         state.appointmentFilter = el.dataset.value || "all";
@@ -4996,6 +5740,7 @@
         showToast("已退出登录。");
         break;
       case "reset-demo": {
+        releaseOverlayHistory();
         Object.values(STORAGE).forEach((key) => {
           try {
             localStorage.removeItem(key);
@@ -5022,11 +5767,11 @@
         openAdmin();
         break;
       case "admin-close":
+        releaseAdminHistory();
         setLastPortal("client");
         state.screen = "main";
         state.tab = "home";
-        renderApp();
-        window.scrollTo(0, 0);
+        renderApp({ scrollTo: storedScrollForView("main:home") });
         break;
       case "admin-demo":
         state.adminLogin.username = DEFAULT_ADMIN_ACCOUNTS[0].username;
@@ -5038,6 +5783,7 @@
         submitAdminLogin();
         break;
       case "admin-logout":
+        releaseAdminHistory();
         clearAdminSession();
         setLastPortal("client");
         state.adminLogin = { username: "", password: "", error: "" };
@@ -5051,9 +5797,11 @@
           showToast("仅系统管理员可以访问该配置。");
           return;
         }
+        storeCurrentScroll();
         state.adminTab = el.dataset.value || "appointments";
-        renderApp();
-        window.scrollTo(0, 0);
+        state.adminSearch = "";
+        state.adminFilter = "all";
+        renderApp({ scrollTo: storedScrollForView(`admin:${state.adminTab}`) });
         break;
       case "admin-account-new":
         openAdminAccountEditor();
@@ -5136,7 +5884,10 @@
         break;
       case "admin-filter":
         state.adminFilter = el.dataset.value || "all";
-        renderApp();
+        refreshAdminList();
+        document.querySelectorAll('[data-action="admin-filter"]').forEach((button) => {
+          button.classList.toggle("is-active", button.dataset.value === state.adminFilter);
+        });
         break;
       case "open-review": {
         const id = el.dataset.appointmentId;
@@ -5149,6 +5900,9 @@
         renderOverlay();
         break;
       }
+      case "review-accept":
+        acceptAppointment();
+        break;
       case "review-confirm": {
         saveAdminReply("confirmed");
         break;
@@ -5169,6 +5923,20 @@
         break;
       case "review-complete":
         saveAdminReply("completed");
+        break;
+      case "edit-location":
+        openLocationEditor(el.dataset.appointmentId || state.overlay?.appointmentId || "");
+        break;
+      case "close-location": {
+        const id = state.locationDraft?.appointmentId || state.overlay?.appointmentId;
+        state.locationDraft = null;
+        if (state.overlayHistoryDepth > 1) releaseOverlayHistory(1);
+        state.overlay = id ? { type: "appointment", appointmentId: id } : null;
+        renderOverlay();
+        break;
+      }
+      case "save-location":
+        saveLocation();
         break;
       case "copy-customer-phone": {
         const payload = manualSmsPayload();
@@ -5257,6 +6025,11 @@
 
   function handleChange(event) {
     const target = event.target;
+    if (target.matches("[data-assignee-select]")) {
+      const username = target.value;
+      if (username) reassignAppointment(username);
+      return;
+    }
     if (target.matches("[data-login-agree]")) {
       state.login.agree = target.checked;
       return;
@@ -5278,6 +6051,56 @@
       }
       return;
     }
+    if (target.matches("[data-review-location-pending]") && state.adminDraft) {
+      state.adminDraft.locationPending = target.checked;
+      renderOverlay();
+      return;
+    }
+    if (
+      target.matches('[data-review-field="province"]') &&
+      state.adminDraft
+    ) {
+      state.adminDraft.province = target.value;
+      state.adminDraft.city = citiesForProvince(target.value)[0];
+      const citySelect = document.getElementById("review-city");
+      if (citySelect) {
+        citySelect.innerHTML = renderCityOptions(
+          state.adminDraft.province,
+          state.adminDraft.city
+        );
+      }
+      refreshManualSmsPreview();
+      return;
+    }
+    if (
+      target.matches('[data-review-field="city"]') &&
+      state.adminDraft
+    ) {
+      state.adminDraft.city = target.value;
+      refreshManualSmsPreview();
+      return;
+    }
+    if (target.matches("[data-location-pending]") && state.locationDraft) {
+      state.locationDraft.locationPending = target.checked;
+      renderOverlay();
+      return;
+    }
+    if (target.matches('[data-location-field="province"]') && state.locationDraft) {
+      state.locationDraft.province = target.value;
+      state.locationDraft.city = citiesForProvince(target.value)[0];
+      const citySelect = document.getElementById("location-city");
+      if (citySelect) {
+        citySelect.innerHTML = renderCityOptions(
+          state.locationDraft.province,
+          state.locationDraft.city
+        );
+      }
+      return;
+    }
+    if (target.matches('[data-location-field="city"]') && state.locationDraft) {
+      state.locationDraft.city = target.value;
+      return;
+    }
     if (target.matches("[data-account-active]") && state.adminAccountDraft) {
       state.adminAccountDraft.active = target.checked;
       return;
@@ -5293,6 +6116,8 @@
 
   function bindEvents() {
     document.addEventListener("click", (event) => {
+      const nativeLink = event.target.closest("a[href]");
+      if (nativeLink && !nativeLink.dataset.action) return;
       const target = event.target.closest("[data-action]");
       if (!target) return;
       event.preventDefault();
@@ -5301,15 +6126,144 @@
     document.addEventListener("input", handleInput);
     document.addEventListener("change", handleChange);
     document.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || !state.overlay) return;
-      state.overlay = null;
-      state.adminReviewId = null;
-      state.adminDraft = null;
-      state.adminNoteEditing = false;
-      state.adminAccountDraft = null;
-      state.adminDoctorDraft = null;
-      state.profileDraft = null;
-      renderOverlay();
+      if (event.key === "Escape" && state.overlay) {
+        dismissOverlay();
+        return;
+      }
+      if (event.key === "Enter" || event.key === " ") {
+        const roleButton = event.target.closest('[role="button"][data-action]');
+        if (roleButton && !event.target.closest("a,button,input,textarea,select")) {
+          event.preventDefault();
+          handleAction(roleButton.dataset.action, roleButton);
+        }
+      }
+    });
+
+    let sheetDrag = null;
+    document.addEventListener(
+      "touchstart",
+      (event) => {
+        const touch = event.touches[0];
+        if (!touch) return;
+        const sheet = event.target.closest(".sheet");
+        if (!sheet) return;
+        if (!event.target.closest(".sheet__grabber, .sheet__bar, .doctor-hero__grabber")) return;
+        if (event.target.closest("button, a, input, textarea, select, label")) return;
+        sheetDrag = {
+          sheet,
+          startY: touch.clientY,
+          startX: touch.clientX,
+          lastY: touch.clientY,
+          startedAt: performance.now(),
+          dy: 0,
+          dx: 0,
+          dragging: false
+        };
+      },
+      { passive: true }
+    );
+    document.addEventListener(
+      "touchmove",
+      (event) => {
+        if (!sheetDrag) return;
+        const touch = event.touches[0];
+        if (!touch) return;
+        sheetDrag.dy = Math.max(0, touch.clientY - sheetDrag.startY);
+        sheetDrag.dx = touch.clientX - sheetDrag.startX;
+        sheetDrag.lastY = touch.clientY;
+        if (!sheetDrag.dragging) {
+          if (Math.abs(sheetDrag.dy) < 6 && Math.abs(sheetDrag.dx) < 6) return;
+          if (Math.abs(sheetDrag.dx) > Math.abs(sheetDrag.dy)) {
+            sheetDrag = null;
+            return;
+          }
+          sheetDrag.dragging = true;
+          sheetDrag.sheet.style.transition = "none";
+        }
+        event.preventDefault();
+        const sheet = sheetDrag.sheet;
+        const dy = sheetDrag.dy;
+        const backdrop = overlayRoot.querySelector(".sheet-backdrop");
+        sheet.style.transform = `translate(-50%, ${dy}px)`;
+        sheet.style.borderRadius = `${28 + Math.min(10, dy / 18)}px ${28 + Math.min(10, dy / 18)}px 0 0`;
+        if (backdrop) backdrop.style.opacity = String(Math.max(0, 1 - dy / 420));
+      },
+      { passive: false }
+    );
+    const finishSheetDrag = () => {
+      if (!sheetDrag) return;
+      const drag = sheetDrag;
+      sheetDrag = null;
+      if (!drag.dragging) return;
+      const elapsed = Math.max(1, performance.now() - drag.startedAt);
+      const velocity = drag.dy / elapsed;
+      const sheet = drag.sheet;
+      const backdrop = overlayRoot.querySelector(".sheet-backdrop");
+      if (drag.dy >= 90 || (drag.dy >= 32 && velocity >= 0.35)) {
+        sheet.style.transition = "transform 0.22s cubic-bezier(0.4, 0, 0.6, 1)";
+        sheet.style.transform = "translate(-50%, 105%)";
+        if (backdrop) {
+          backdrop.style.transition = "opacity 0.18s";
+          backdrop.style.opacity = "0";
+        }
+        window.setTimeout(() => dismissOverlay(), 190);
+      } else {
+        sheet.style.transition = "transform 0.28s cubic-bezier(0.22, 0.8, 0.24, 1)";
+        sheet.style.transform = "translate(-50%, 0)";
+        sheet.style.borderRadius = "";
+        if (backdrop) backdrop.style.opacity = "";
+      }
+    };
+    document.addEventListener("touchend", finishSheetDrag);
+    document.addEventListener("touchcancel", finishSheetDrag);
+
+    window.addEventListener("popstate", () => {
+      if (state.suppressPopCount > 0) {
+        state.suppressPopCount -= 1;
+        return;
+      }
+      if (state.overlay) {
+        state.historyDepth = Math.max(0, state.historyDepth - 1);
+        state.overlayHistoryDepth = Math.max(0, state.overlayHistoryDepth - 1);
+        if (state.overlay.type === "location" && state.overlayHistoryDepth > 0) {
+          const id = state.locationDraft?.appointmentId || state.overlay.appointmentId;
+          state.locationDraft = null;
+          state.overlay = id ? { type: "appointment", appointmentId: id } : null;
+          renderOverlay();
+          return;
+        }
+        state.overlayHistoryDepth = 0;
+        clearOverlayState();
+        if (state.screen === "admin" || state.screen === "admin-login") renderApp();
+        else renderOverlay();
+        document.body.classList.remove("is-locked");
+        return;
+      }
+      if (state.screen === "auth") {
+        state.historyDepth = Math.max(0, state.historyDepth - 1);
+        state.overlayHistoryDepth = 0;
+        state.authHistory = false;
+        state.screen = "main";
+        state.pendingAuth = null;
+        state.booking = null;
+        state.login.step = 1;
+        renderApp({ scrollTo: storedScrollForView(`main:${state.tab}`) });
+        return;
+      }
+      if (state.screen === "admin-login" || state.screen === "admin") {
+        state.historyDepth = 0;
+        state.overlayHistoryDepth = 0;
+        state.adminHistory = false;
+        setLastPortal("client");
+        state.screen = "main";
+        state.tab = "home";
+        renderApp({ scrollTo: storedScrollForView("main:home") });
+        return;
+      }
+      if (state.historyDepth > 0) {
+        state.historyDepth = Math.max(0, state.historyDepth - 1);
+        state.overlayHistoryDepth = Math.max(0, state.overlayHistoryDepth - 1);
+      }
     });
   }
 
@@ -5350,6 +6304,14 @@
         state.screen = "admin";
       } else {
         state.screen = "main";
+      }
+      if (state.screen === "admin" || state.screen === "admin-login") {
+        state.adminHistory = true;
+        if (window.history.state?.pkuihLayer === "admin") {
+          state.historyDepth = Math.max(1, state.historyDepth);
+        } else {
+          pushAppHistory("admin");
+        }
       }
       renderApp();
     } catch (error) {

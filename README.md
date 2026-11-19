@@ -31,6 +31,8 @@ https://baoweidong.github.io/pkuih-enterprise-health/
 - 院方入口：已从「我的」移动到首页最下方
 - 全部演示数据保存在浏览器 `localStorage`，无需后端即可演示预约闭环
 - 页面不展示价格、报价或费用信息
+- 支持安卓微信边缘滑动返回：弹层、登录页、院方工作台与二级地点编辑均按层级返回，不会直接退出业务页面
+- 登录、筛选、切换层级、选择日期与专家均使用局部刷新，不重建整页，并保留当前浏览位置
 
 ## 演示账号
 
@@ -74,3 +76,17 @@ https://baoweidong.github.io/pkuih-enterprise-health/
 ```bash
 python3 -m http.server 8080
 ```
+
+## 技术说明
+
+- 当前演示仍为原生 JavaScript 单页实现，业务状态集中在 `assets/app.js`，样式在 `assets/styles.css`
+- 技术团队已确定正式版本采用 Vue 3。当前阶段优先稳定业务闭环与移动端交互，Vue 3 组件化迁移作为下一阶段单独实施
+- `index.html` 加载压缩后的 `assets/app.min.js` 与 `assets/styles.min.css`；源码修改后执行：
+
+```bash
+npx esbuild assets/app.js --minify --legal-comments=none --outfile=assets/app.min.js
+npx esbuild assets/styles.css --minify --legal-comments=none --outfile=assets/styles.min.css
+```
+
+- 专家与城市数据分别来自 `assets/doctors.json`、`assets/china-cities.json`，图片按卡片图与详情图分层存放
+- 正式版本建议由后端提供登录鉴权、号源库存与并发控制、预约状态机、短信发送记录与图片对象存储
