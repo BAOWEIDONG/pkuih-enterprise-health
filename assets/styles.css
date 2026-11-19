@@ -5627,6 +5627,7 @@ input[type="checkbox"] {
     width: calc(100% - 40px);
   }
 
+  .brand__divider,
   .brand__tagline,
   .site-nav,
   .header-admin {
