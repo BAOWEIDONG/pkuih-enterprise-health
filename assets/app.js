@@ -4804,7 +4804,7 @@
               poster.id
             )}">
               <span class="poster-card__visual">
-                <img src="${esc(poster.thumb)}" alt="${esc(poster.title)}宣传海报" loading="lazy" decoding="async">
+                <img src="${esc(poster.thumb)}" alt="${esc(poster.title)}宣传海报" loading="eager" decoding="async">
                 <span class="poster-card__badge">${esc(poster.eyebrow)}</span>
               </span>
               <span class="poster-card__copy">
