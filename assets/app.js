@@ -12,7 +12,10 @@
     smsSettings: "pkuih_h5_sms_settings_v2",
     smsLogs: "pkuih_h5_sms_logs_v2",
     adminAccounts: "pkuih_h5_admin_accounts_v3",
-    adminSession: "pkuih_h5_admin_session_v3"
+    adminSession: "pkuih_h5_admin_session_v3",
+    slotInventory: "pkuih_h5_slot_inventory_v4",
+    doctorConfig: "pkuih_h5_doctor_config_v4",
+    lastPortal: "pkuih_h5_last_portal_v4"
   };
 
   const DEMO_CODE = "888888";
@@ -30,15 +33,11 @@
   const ADMIN_ROLES = {
     administrator: {
       label: "系统管理员",
-      desc: "管理预约、短信配置与项目账号"
+      desc: "全部权限，可配置号源、专家与项目账号"
     },
     manager: {
       label: "项目负责人",
-      desc: "处理预约并确认活动方案"
-    },
-    member: {
-      label: "项目专员",
-      desc: "跟进预约与客户联络"
+      desc: "确认预约、跟进项目并发送客户短信"
     }
   };
 
@@ -58,7 +57,7 @@
       password: "pkuih2026",
       name: "周老师",
       phone: "13800001111",
-      role: "member",
+      role: "manager",
       active: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -136,33 +135,20 @@
     { id: "evening", label: "19:00–21:00", sub: "晚间场" }
   ];
 
-  const SMS_TRIGGERS = [
-    { id: "created", label: "预约提交时", help: "提醒院方项目组及时跟进" },
-    { id: "confirmed", label: "院方确认时", help: "通知联系人方案已确认" },
-    { id: "before3", label: "活动前 3 天", help: "发送到场与时间提醒" },
-    { id: "before1", label: "活动前 1 天", help: "最终场地与流程确认" }
-  ];
-
-  const DEFAULT_SMS_SETTINGS = {
-    enabled: true,
-    recipients: "项目组 A：138 0000 0001\n项目组 B：138 0000 0002",
-    triggers: {
-      created: true,
-      confirmed: true,
-      before3: true,
-      before1: true
-    },
-    template:
-      "【北京大学国际医院】企业健康预约提醒：{org}已提交「{topic}」预约，拟于 {date} {time} 在 {venue} 进行，预约号 {id}。请项目组及时跟进。",
-    updatedAt: ""
+  const DEFAULT_SLOT_CAPACITY = {
+    elite: 1,
+    director: 2,
+    specialist: 3
   };
 
   const state = {
     doctors: [],
+    baseDoctors: [],
     loaded: false,
     loadError: false,
     tab: "home",
     screen: "main",
+    lastPortal: "client",
     session: null,
     adminAuthed: false,
     adminUser: null,
@@ -197,6 +183,9 @@
     adminReviewId: null,
     adminDraft: null,
     adminAccountDraft: null,
+    adminDoctorDraft: null,
+    adminSlotTier: "elite",
+    adminSlotDate: "",
     profileDraft: null
   };
 
@@ -302,21 +291,14 @@
     return `${clean.slice(0, 3)}****${clean.slice(-3)}`;
   }
 
-  function hashString(value) {
-    let hash = 2166136261;
-    for (let index = 0; index < value.length; index += 1) {
-      hash ^= value.charCodeAt(index);
-      hash = Math.imul(hash, 16777619);
-    }
-    return Math.abs(hash);
-  }
-
   function slotById(id) {
     return TIME_SLOTS.find((slot) => slot.id === id) || TIME_SLOTS[1];
   }
 
   function doctorById(id) {
-    return state.doctors.find((doctor) => String(doctor.id) === String(id)) || null;
+    const active = state.doctors.find((doctor) => String(doctor.id) === String(id));
+    if (active) return active;
+    return configuredDoctors().find((doctor) => String(doctor.id) === String(id)) || null;
   }
 
   function doctorsForTier(tierId) {
@@ -407,8 +389,19 @@
   }
 
   function ensureAdminAccounts() {
-    if (!readJSON(STORAGE.adminAccounts, null)) {
+    const stored = readJSON(STORAGE.adminAccounts, null);
+    if (!stored) {
       saveAdminAccounts(clone(DEFAULT_ADMIN_ACCOUNTS));
+      return;
+    }
+    let changed = false;
+    const normalized = stored.map((account) => {
+      if (ADMIN_ROLES[account.role]) return account;
+      changed = true;
+      return { ...account, role: "manager", updatedAt: new Date().toISOString() };
+    });
+    if (changed) {
+      saveAdminAccounts(normalized);
     }
   }
 
@@ -432,6 +425,78 @@
     return state.adminUser?.role === "administrator";
   }
 
+  function setLastPortal(portal) {
+    state.lastPortal = portal === "admin" ? "admin" : "client";
+    writeJSON(STORAGE.lastPortal, state.lastPortal);
+  }
+
+  function getDoctorConfig() {
+    const saved = readJSON(STORAGE.doctorConfig, null);
+    return {
+      overrides: saved?.overrides || {},
+      custom: Array.isArray(saved?.custom) ? saved.custom : []
+    };
+  }
+
+  function saveDoctorConfig(config) {
+    writeJSON(STORAGE.doctorConfig, config);
+  }
+
+  function mergeDoctorConfig(baseDoctors, includeInactive = false) {
+    const config = getDoctorConfig();
+    const merged = baseDoctors.map((doctor) => ({
+      ...doctor,
+      ...(config.overrides[String(doctor.id)] || {})
+    }));
+    config.custom.forEach((doctor) => {
+      const index = merged.findIndex((item) => String(item.id) === String(doctor.id));
+      if (index === -1) merged.push(doctor);
+      else merged[index] = { ...merged[index], ...doctor };
+    });
+    return includeInactive ? merged : merged.filter((doctor) => doctor.active !== false);
+  }
+
+  function refreshDoctors() {
+    state.doctors = mergeDoctorConfig(state.baseDoctors, false);
+  }
+
+  function configuredDoctors() {
+    return mergeDoctorConfig(state.baseDoctors, true);
+  }
+
+  function getSlotInventory() {
+    return readJSON(STORAGE.slotInventory, {}) || {};
+  }
+
+  function saveSlotInventory(inventory) {
+    writeJSON(STORAGE.slotInventory, inventory);
+  }
+
+  function getSlotCapacity(tierId, dateIso, slotId) {
+    const value = getSlotInventory()?.[dateIso]?.[tierId]?.[slotId];
+    const fallback = DEFAULT_SLOT_CAPACITY[tierId] ?? 1;
+    if (value === undefined || value === null || value === "") return fallback;
+    return Math.max(0, Math.min(9, Number(value) || 0));
+  }
+
+  function setSlotCapacity(tierId, dateIso, slotId, capacity) {
+    const inventory = getSlotInventory();
+    if (!inventory[dateIso]) inventory[dateIso] = {};
+    if (!inventory[dateIso][tierId]) inventory[dateIso][tierId] = {};
+    inventory[dateIso][tierId][slotId] = Math.max(0, Math.min(9, Number(capacity) || 0));
+    saveSlotInventory(inventory);
+  }
+
+  function bookedSlotCount(tierId, dateIso, slotId) {
+    return getAppointments().filter(
+      (item) =>
+        item.tier === tierId &&
+        item.date === dateIso &&
+        item.slot === slotId &&
+        item.status !== "cancelled"
+    ).length;
+  }
+
   function getAppointments() {
     return readJSON(STORAGE.appointments, []);
   }
@@ -447,19 +512,28 @@
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
-  function getSmsSettings() {
-    const saved = readJSON(STORAGE.smsSettings, null);
-    const base = clone(DEFAULT_SMS_SETTINGS);
-    if (!saved) return base;
-    return {
-      ...base,
-      ...saved,
-      triggers: { ...base.triggers, ...(saved.triggers || {}) }
-    };
+  function appointmentNeedsSmsFollowUp(appointment) {
+    return (
+      Boolean(appointment?.phone) &&
+      appointment.status === "confirmed" &&
+      !appointment.smsFollowUp?.copiedAt
+    );
   }
 
-  function saveSmsSettings(settings) {
-    writeJSON(STORAGE.smsSettings, settings);
+  function pendingSmsFollowUps() {
+    return getAppointments()
+      .filter(appointmentNeedsSmsFollowUp)
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+  }
+
+  function completedSmsFollowUps() {
+    return getAppointments()
+      .filter((item) => item.smsFollowUp?.copiedAt)
+      .sort(
+        (a, b) =>
+          new Date(b.smsFollowUp.copiedAt).getTime() -
+          new Date(a.smsFollowUp.copiedAt).getTime()
+      );
   }
 
   function getSmsLogs() {
@@ -478,53 +552,6 @@
     writeJSON(STORAGE.smsLogs, logs.slice(0, 50));
   }
 
-  function parseRecipients(raw) {
-    return String(raw || "")
-      .split(/\n|；|;/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const separator = line.match(/[:：]/);
-        if (separator) {
-          return {
-            name: line.slice(0, separator.index).trim() || "项目组成员",
-            phone: line.slice(separator.index + 1).trim()
-          };
-        }
-        if (/^1[3-9]\d{9}$/.test(line.replace(/\s/g, ""))) {
-          return { name: "项目组成员", phone: line };
-        }
-        return { name: line, phone: "" };
-      });
-  }
-
-  function recipientSummary(raw) {
-    const recipients = parseRecipients(raw);
-    if (!recipients.length) return "未配置接收人";
-    const first = recipients[0];
-    return recipients.length > 1
-      ? `${first.name}${first.phone ? ` ${first.phone}` : ""} 等 ${recipients.length} 人`
-      : `${first.name}${first.phone ? ` ${first.phone}` : ""}`;
-  }
-
-  function sampleSmsData() {
-    return {
-      org: "示例保险 · 高客健康服务部",
-      topic: "职场久坐人群的脊柱健康",
-      date: formatDateCN(isoDate(addDays(startOfDay(new Date()), 18))),
-      time: "14:00–16:00",
-      venue: "企业总部多功能厅",
-      id: "BD-20261218-108"
-    };
-  }
-
-  function fillTemplate(template, data = {}) {
-    const values = { ...sampleSmsData(), ...data };
-    return String(template || "").replace(/\{(\w+)\}/g, (match, key) => {
-      return Object.prototype.hasOwnProperty.call(values, key) ? String(values[key]) : match;
-    });
-  }
-
   function buildDateOptions(tierId, count = 12) {
     const tier = TIERS[tierId] || TIERS.elite;
     const start = addDays(startOfDay(new Date()), tier.leadDays);
@@ -541,14 +568,21 @@
     });
   }
 
-  function buildTimeSlots(tierId, dateIso, leadDays = 0) {
-    const seed = hashString(`${tierId}-${dateIso}-${leadDays}`);
-    return TIME_SLOTS.map((slot, index) => {
-      const value = (seed + index * 17) % 13;
+  function buildTimeSlots(tierId, dateIso) {
+    return TIME_SLOTS.map((slot) => {
+      const capacity = getSlotCapacity(tierId, dateIso, slot.id);
+      const booked = bookedSlotCount(tierId, dateIso, slot.id);
+      const remaining = Math.max(0, capacity - booked);
       return {
         ...slot,
-        full: value === 0,
-        tight: value !== 0 && value < 3
+        capacity,
+        booked,
+        remaining,
+        full: capacity === 0 || remaining === 0,
+        tight:
+          capacity > 1 &&
+          remaining > 0 &&
+          remaining <= Math.max(1, Math.ceil(capacity * 0.34))
       };
     });
   }
@@ -714,9 +748,6 @@
     if (!readJSON(STORAGE.appointments, null)) {
       saveAppointments(seedAppointments());
     }
-    if (!readJSON(STORAGE.smsSettings, null)) {
-      saveSmsSettings(clone(DEFAULT_SMS_SETTINGS));
-    }
     if (!readJSON(STORAGE.smsLogs, null)) {
       writeJSON(STORAGE.smsLogs, defaultSmsLogs);
     }
@@ -877,7 +908,7 @@
               <i class="availability-card__dot ${tierId === "elite" ? "is-amber" : tierId === "specialist" ? "is-green" : ""}"></i>
               <div>
                 <strong>${tier.name}</strong>
-                <small> · ${tier.count} 位</small>
+                <small> · ${doctorsForTier(tierId).length} 位</small>
               </div>
             </div>
             <span class="availability-card__lead">${tier.leadLabel}</span>
@@ -909,6 +940,13 @@
               <button class="btn btn--glass" type="button" data-action="tab" data-tab="experts">
                 浏览专家
               </button>
+              ${
+                session
+                  ? ""
+                  : `<button class="btn btn--wechat" type="button" data-action="auth-wechat">
+                       ${icon("wechat", 16)} 微信一键登录
+                     </button>`
+              }
             </div>
             <div class="hero-metrics">
               <div class="hero-metric"><strong>${state.doctors.length}<span>位</span></strong><small>精选入企专家</small></div>
@@ -947,7 +985,7 @@
                     <span class="tier-card__badge">${tier.badge}</span>
                   </div>
                   <h3>${tier.name}</h3>
-                  <div class="tier-card__meta"><span>${tier.count} 位专家</span><span>·</span><span>${tier.leadLabel}</span></div>
+                  <div class="tier-card__meta"><span>${doctorsForTier(tierId).length} 位专家</span><span>·</span><span>${tier.leadLabel}</span></div>
                   <p>${tier.desc}</p>
                   <span class="tier-card__cta">查看可预约档期 ${icon("chevronRight", 13)}</span>
                 </button>
@@ -1054,6 +1092,16 @@
           专家照片、科室与擅长方向来自北京大学国际医院官网公开资料，仅用于本演示。
           实际出讲专家、活动排期与授权以院方最终确认为准。
         </p>
+        <section class="hospital-entry-section">
+          <button class="hospital-entry" type="button" data-action="open-admin">
+            <span class="hospital-entry__icon">${icon("shield", 19)}</span>
+            <span class="hospital-entry__copy">
+              <strong>北京大学国际医院 · 院方工作台</strong>
+              <small>管理员与项目负责人登录入口</small>
+            </span>
+            ${icon("arrowRight", 16)}
+          </button>
+        </section>
       </div>
     `;
   }
@@ -1317,11 +1365,6 @@
             </button>
           </div>
           <div class="menu-group">
-            <button class="menu-row" type="button" data-action="open-admin">
-              <span class="menu-row__icon is-blue">${icon("shield", 16)}</span>
-              <span class="menu-row__label"><strong>院方工作台</strong><small>北京大学国际医院项目组入口</small></span>
-              <span class="menu-row__chevron">${icon("chevronRight", 14)}</span>
-            </button>
             <a class="menu-row" href="tel:01069006666">
               <span class="menu-row__icon is-orange">${icon("phone", 16)}</span>
               <span class="menu-row__label"><strong>联系项目组</strong><small>010-6900 6666</small></span>
@@ -1376,11 +1419,6 @@
             <span class="menu-row__icon">${icon("calendar", 16)}</span>
             <span class="menu-row__label"><strong>我的预约</strong><small>查看状态与院方回复</small></span>
             <span class="menu-row__value">${appointments.length} 条</span>
-            <span class="menu-row__chevron">${icon("chevronRight", 14)}</span>
-          </button>
-          <button class="menu-row" type="button" data-action="open-admin">
-            <span class="menu-row__icon is-blue">${icon("shield", 16)}</span>
-            <span class="menu-row__label"><strong>院方工作台</strong><small>医院项目组专用入口</small></span>
             <span class="menu-row__chevron">${icon("chevronRight", 14)}</span>
           </button>
           <button class="menu-row" type="button" data-action="reset-demo">
@@ -1468,6 +1506,11 @@
           step === 1
             ? `
               <div class="auth-card">
+                <button class="wechat-button wechat-button--hero" type="button" data-action="auth-wechat">
+                  ${icon("wechat", 20)} 微信授权登录
+                </button>
+                <p class="wechat-login-note">在微信中可使用当前微信身份快速登录，演示环境会进入示例企业账号。</p>
+                <div class="auth-divider">或使用手机号</div>
                 <h2>手机号登录 / 注册</h2>
                 <p class="auth-card__hint">未注册手机号验证后将自动创建企业账号，登录状态会保存在当前设备。</p>
                 <div class="field">
@@ -1497,10 +1540,6 @@
                 <button class="btn btn--primary auth-submit" type="button" data-action="auth-submit">
                   登录 / 注册 ${icon("arrowRight", 16)}
                 </button>
-                <div class="auth-divider">或</div>
-                <button class="wechat-button" type="button" data-action="auth-wechat">
-                  ${icon("wechat", 18)} 微信快捷登录（演示）
-                </button>
                 <button class="btn btn--soft btn--block" type="button" data-action="auth-demo" style="margin-top:9px;min-height:42px">
                   填入演示账号
                 </button>
@@ -1508,7 +1547,7 @@
               <div class="demo-box">
                 <strong>演示账号</strong><br>
                 手机号：138 0000 0001 · 验证码：888888<br>
-                “微信快捷登录”将直接进入该演示账号。
+                “微信授权登录”演示会直接进入该示例账号；正式版本需接入公众号网页授权。
               </div>
             `
             : `
@@ -1572,6 +1611,7 @@
 
   function finishLogin(user) {
     const pending = state.pendingAuth;
+    setLastPortal("client");
     setSession(user);
     state.pendingAuth = null;
     state.screen = "main";
@@ -1589,7 +1629,7 @@
       renderOverlay();
       return;
     }
-    state.tab = pending?.tab || "me";
+    state.tab = pending?.tab || "home";
     state.overlay = null;
     renderApp();
     window.scrollTo(0, 0);
@@ -1703,8 +1743,6 @@
       email: "",
       address: "",
       note: "",
-      smsHospital: true,
-      smsContact: true,
       agree: false
     };
   }
@@ -1762,7 +1800,7 @@
                   <span class="tier-option__num">0${index + 1}</span>
                   <span>
                     <strong>${tier.name}</strong>
-                    <small>${tier.count} 位 · ${tier.position} · ${tier.leadLabel}</small>
+                    <small>${doctorsForTier(tierId).length} 位 · ${tier.position} · ${tier.leadLabel}</small>
                   </span>
                   <span class="tier-option__check">${icon("check", 12)}</span>
                 </button>
@@ -1786,7 +1824,13 @@
                 <button class="slot-button ${booking.slot === slot.id ? "is-selected" : ""}" type="button"
                   data-action="booking-slot" data-value="${slot.id}" ${slot.full ? "disabled" : ""}>
                   <span>${slot.label}</span>
-                  <small>${slot.full ? "已约满" : slot.sub}</small>
+                  <small>${
+                    slot.capacity === 0
+                      ? "未开放"
+                      : slot.full
+                      ? "已约满"
+                      : `余 ${slot.remaining} 席`
+                  }</small>
                 </button>
               `
             )
@@ -1970,7 +2014,7 @@
             )}" placeholder="请输入活动场地详细地址">
           </div>
           <div class="field">
-            <label for="booking-note">活动需求说明</label>
+            <label for="booking-note">活动备注 / 需求说明</label>
             <textarea id="booking-note" data-booking-field="note" placeholder="可填写人群特点、希望重点讲解的内容、现场条件等">${esc(
               booking.note
             )}</textarea>
@@ -1978,25 +2022,12 @@
         </div>
       </section>
       <section class="flow-block">
-        <div class="flow-block__head"><h2>短信提醒</h2><span>演示记录，不会真实发送</span></div>
-        <div class="sms-card">
-          <div class="sms-card__head">
-            <span class="sms-card__icon">${icon("bell", 17)}</span>
-            <div><strong>预约进度提醒</strong><small>院方可在工作台统一配置短信模板与触发节点</small></div>
-          </div>
-          <div style="margin-top:8px">
-            <label class="switch-row">
-              <span class="switch-row__label"><strong>提醒院方项目组</strong><small>提交后登记一条内部提醒</small></span>
-              <span class="switch"><input type="checkbox" data-booking-switch="smsHospital" ${
-                booking.smsHospital ? "checked" : ""
-              }><span></span></span>
-            </label>
-            <label class="switch-row">
-              <span class="switch-row__label"><strong>提醒活动联系人</strong><small>确认后登记联系人通知</small></span>
-              <span class="switch"><input type="checkbox" data-booking-switch="smsContact" ${
-                booking.smsContact ? "checked" : ""
-              }><span></span></span>
-            </label>
+        <div class="flow-block__head"><h2>项目跟进</h2><span>院方项目负责人专属服务</span></div>
+        <div class="booking-followup-card">
+          <span class="booking-followup-card__icon">${icon("message", 18)}</span>
+          <div>
+            <strong>院方确认方案后，将由项目负责人短信联系您</strong>
+            <p>短信会使用确认后的课题、活动时间、场地和院方联系人信息生成，并由院方项目人员通过手机发送。</p>
           </div>
         </div>
       </section>
@@ -2050,7 +2081,7 @@
         </div>
         <div class="success-reminder">
           ${icon("bell", 16)}
-          <p>${appointment.sms?.hospital ? "已登记一条院方内部短信提醒（演示）。" : "未开启短信提醒。"} 院方也可在工作台配置确认、活动前 3 天与前 1 天的提醒。</p>
+          <p>院方确认活动方案后，项目负责人会通过手机短信联系您。也可以在「我的预约」查看最新进度。</p>
         </div>
         <div class="success-actions">
           <button class="btn btn--primary" type="button" data-action="success-appointment" data-appointment-id="${esc(
@@ -2142,6 +2173,15 @@
       startLogin({ type: "booking" });
       return;
     }
+    const availableSlot = buildTimeSlots(booking.tier, booking.date).find(
+      (item) => item.id === booking.slot
+    );
+    if (!availableSlot || availableSlot.full) {
+      showToast("该时段号源刚刚被约满，请重新选择可预约时段。");
+      state.booking.slot = "";
+      renderOverlay();
+      return;
+    }
     const slot = slotById(booking.slot);
     const appointment = {
       id: generateAppointmentId(),
@@ -2169,27 +2209,13 @@
       email: booking.email.trim(),
       address: booking.address.trim(),
       note: booking.note.trim(),
-      sms: { hospital: booking.smsHospital, contact: booking.smsContact },
+      internalNote: "",
+      smsFollowUp: null,
       reply: null
     };
     const items = getAppointments();
     items.unshift(appointment);
     saveAppointments(items);
-    if (booking.smsHospital) {
-      const settings = getSmsSettings();
-      addSmsLog({
-        appointmentId: appointment.id,
-        recipient: recipientSummary(settings.recipients),
-        content: fillTemplate(settings.template, {
-          org: appointment.orgName,
-          topic: topicOf(appointment),
-          date: formatDateCN(appointment.date),
-          time: appointment.time,
-          venue: appointment.venue || "待确认",
-          id: appointment.id
-        })
-      });
-    }
     state.lastAppointmentId = appointment.id;
     state.booking.step = "done";
     renderOverlay();
@@ -2201,34 +2227,42 @@
      ========================================================= */
   function renderOverlay() {
     if (!overlayRoot) return;
-    if (state.overlay?.type === "booking") {
-      overlayRoot.innerHTML = renderBookingFlow();
+    const hadOverlay = Boolean(overlayRoot.querySelector(".sheet, .flow"));
+    const paint = (content) => {
+      overlayRoot.innerHTML = content;
       document.body.classList.add("is-locked");
+      if (hadOverlay) {
+        overlayRoot
+          .querySelectorAll(".sheet, .sheet-backdrop, .flow")
+          .forEach((element) => element.classList.add("is-instant"));
+      }
+    };
+    if (state.overlay?.type === "booking") {
+      paint(renderBookingFlow());
       return;
     }
     if (state.overlay?.type === "doctor") {
-      overlayRoot.innerHTML = renderDoctorSheet();
-      document.body.classList.add("is-locked");
+      paint(renderDoctorSheet());
       return;
     }
     if (state.overlay?.type === "appointment") {
-      overlayRoot.innerHTML = renderAppointmentSheet();
-      document.body.classList.add("is-locked");
+      paint(renderAppointmentSheet());
       return;
     }
     if (state.overlay?.type === "profile") {
-      overlayRoot.innerHTML = renderProfileSheet();
-      document.body.classList.add("is-locked");
+      paint(renderProfileSheet());
       return;
     }
     if (state.overlay?.type === "review") {
-      overlayRoot.innerHTML = renderReviewSheet();
-      document.body.classList.add("is-locked");
+      paint(renderReviewSheet());
       return;
     }
     if (state.overlay?.type === "account") {
-      overlayRoot.innerHTML = renderAdminAccountSheet();
-      document.body.classList.add("is-locked");
+      paint(renderAdminAccountSheet());
+      return;
+    }
+    if (state.overlay?.type === "doctor-admin") {
+      paint(renderAdminDoctorSheet());
       return;
     }
     overlayRoot.innerHTML = "";
@@ -2249,7 +2283,8 @@
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet" role="dialog" aria-modal="true" aria-label="${esc(doctor.name)}专家详情">
         <div class="doctor-hero">
-          <img src="${esc(doctor.photo)}" alt="${esc(doctor.name)}">
+          <img class="doctor-hero__backdrop" src="${esc(doctor.photo)}" alt="" aria-hidden="true">
+          <img class="doctor-hero__portrait" src="${esc(doctor.photo)}" alt="${esc(doctor.name)}">
           <button class="doctor-hero__close" type="button" data-action="close-overlay" aria-label="关闭">
             ${icon("close", 15)}
           </button>
@@ -2284,9 +2319,16 @@
             </section>
             <div class="source-row">
               <span>资料来自北京大学国际医院官网公开信息</span>
-              <a href="${esc(
+              ${
                 doctor.profileUrl
-              )}" target="_blank" rel="noopener noreferrer">查看官网 ${icon("arrowUpRight", 12)}</a>
+                  ? `<a href="${esc(
+                      doctor.profileUrl
+                    )}" target="_blank" rel="noopener noreferrer">查看官网 ${icon(
+                      "arrowUpRight",
+                      12
+                    )}</a>`
+                  : ""
+              }
             </div>
           </div>
         </div>
@@ -2404,7 +2446,7 @@
             }
             <div class="reminder-note">
               ${icon("bell", 14)}
-              <p>短信提醒为演示记录。正式版本可在院方工作台配置预约提交、院方确认、活动前 3 天与活动前 1 天的短信节点。</p>
+              <p>院方确认活动方案后，项目负责人会通过手机短信或电话与您联系。演示环境不会调用自动短信网关。</p>
             </div>
             <p class="source-note" style="padding:12px 0 0">最后更新：${
               appointment.updatedAt ? formatDateTime(appointment.updatedAt) : formatDateTime(appointment.createdAt)
@@ -2522,6 +2564,7 @@
   function openAdmin() {
     state.overlay = null;
     state.screen = state.adminAuthed ? "admin" : "admin-login";
+    if (state.adminAuthed) setLastPortal("admin");
     state.adminLogin.error = "";
     renderApp();
     window.scrollTo(0, 0);
@@ -2572,7 +2615,7 @@
         <div class="demo-box">
           <strong>演示账号</strong><br>
           管理员：admin / pkuih2026<br>
-          项目专员：consultant / pkuih2026<br>
+          项目负责人：consultant / pkuih2026<br>
           两位演示人员的姓名与手机号会自动带入预约回复。
         </div>
         <p class="auth-foot">本演示的账号鉴权仅用于界面展示，正式版本需接入医院统一身份认证。</p>
@@ -2602,6 +2645,7 @@
     }
     state.adminLogin.error = "";
     setAdminSession(account);
+    setLastPortal("admin");
     state.screen = "admin";
     state.adminTab = "appointments";
     renderApp();
@@ -2635,9 +2679,28 @@
   function renderAdminTabs() {
     const tabs = [
       { id: "appointments", label: "预约管理", count: getAppointments().length },
-      { id: "sms", label: "短信提醒", count: SMS_TRIGGERS.length }
+      { id: "reminders", label: "短信跟进", count: pendingSmsFollowUps().length }
     ];
     if (isAdministrator()) {
+      tabs.push({
+        id: "slots",
+        label: "号源配置",
+        count: TIER_ORDER.reduce((total, tierId) => {
+          return (
+            total +
+            buildDateOptions(tierId, 1).reduce(
+              (sum, option) =>
+                sum + option.slots.reduce((slotSum, slot) => slotSum + slot.capacity, 0),
+              0
+            )
+          );
+        }, 0)
+      });
+      tabs.push({
+        id: "doctors",
+        label: "专家配置",
+        count: configuredDoctors().filter((doctor) => doctor.active !== false).length
+      });
       tabs.push({
         id: "accounts",
         label: "账号分配",
@@ -2645,7 +2708,7 @@
       });
     }
     return `
-      <div class="segmented admin-tabs">
+      <div class="segmented admin-tabs admin-tabs--scroll horizontal-scroll">
         ${tabs
           .map(
             (tab) => `
@@ -2659,7 +2722,7 @@
   }
 
   function roleMeta(role) {
-    return ADMIN_ROLES[role] || ADMIN_ROLES.member;
+    return ADMIN_ROLES[role] || ADMIN_ROLES.manager;
   }
 
   function renderAdminAccountsPage() {
@@ -2679,7 +2742,7 @@
       <div class="account-overview">
         <div>
           <strong>只有已分配并启用的账号才能登录工作台</strong>
-          <p>管理员可分配项目负责人、项目专员账号。停用账号后将立即失去工作台访问权限。</p>
+          <p>系统只有管理员和项目负责人两种角色。停用账号后，该人员将立即失去工作台访问权限。</p>
         </div>
         <button class="btn btn--primary btn--sm" type="button" data-action="admin-account-new">
           ${icon("plus", 14)} 分配账号
@@ -2728,7 +2791,7 @@
       password: "",
       name: "",
       phone: "",
-      role: "member",
+      role: "manager",
       active: true
     };
   }
@@ -2930,6 +2993,250 @@
     showToast(draft.isNew ? "项目账号已创建并分配。" : "账号信息已更新。");
   }
 
+  function emptyAdminDoctorDraft() {
+    return {
+      isNew: true,
+      id: "",
+      name: "",
+      tier: "director",
+      dept: "",
+      title: "主任医师",
+      specialty: "",
+      intro: "",
+      tagsText: "",
+      profileUrl: "",
+      photo: "",
+      active: true
+    };
+  }
+
+  function openAdminDoctorEditor(id = "") {
+    if (!isAdministrator()) {
+      showToast("仅系统管理员可以配置专家。");
+      return;
+    }
+    const doctor = id
+      ? configuredDoctors().find((item) => String(item.id) === String(id))
+      : null;
+    state.adminDoctorDraft = doctor
+      ? {
+          ...clone(doctor),
+          isNew: false,
+          tier: TIERS[doctor.tier] ? doctor.tier : "specialist",
+          tagsText: (doctor.tags || []).join("、")
+        }
+      : emptyAdminDoctorDraft();
+    state.overlay = { type: "doctor-admin" };
+    renderOverlay();
+  }
+
+  function renderAdminDoctorSheet() {
+    const draft = state.adminDoctorDraft || emptyAdminDoctorDraft();
+    return `
+      <div class="sheet-backdrop" data-action="close-overlay"></div>
+      <section class="sheet" role="dialog" aria-modal="true" aria-label="配置专家">
+        <div class="sheet__grabber"></div>
+        <div class="sheet__bar">
+          <h2>${draft.isNew ? "新增专家" : "编辑专家"}</h2>
+          <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">
+            ${icon("close", 15)}
+          </button>
+        </div>
+        <div class="sheet__body">
+          <div style="padding:8px 18px 22px">
+            <label class="doctor-photo-upload">
+              <span class="doctor-photo-upload__preview" data-doctor-photo-preview>
+                ${
+                  draft.photo
+                    ? `<img src="${esc(draft.photo)}" alt="专家照片预览">`
+                    : `<span>${icon("experts", 26)}<small>上传照片</small></span>`
+                }
+              </span>
+              <span class="doctor-photo-upload__copy">
+                <strong>专家照片</strong>
+                <small>建议上传正面半身或全身照，系统会自动压缩</small>
+                <span>选择图片</span>
+              </span>
+              <input type="file" accept="image/*" data-doctor-photo hidden>
+            </label>
+            <div class="form-card" style="margin-top:14px">
+              <div class="field-row">
+                <div class="field">
+                  <label for="doctor-name">专家姓名 <em>*</em></label>
+                  <input id="doctor-name" type="text" data-doctor-field="name" value="${esc(
+                    draft.name
+                  )}" placeholder="如：刘老师">
+                </div>
+                <div class="field">
+                  <label for="doctor-tier">专家层级</label>
+                  <select id="doctor-tier" data-doctor-field="tier">
+                    ${TIER_ORDER.map(
+                      (tierId) =>
+                        `<option value="${tierId}" ${
+                          draft.tier === tierId ? "selected" : ""
+                        }>${TIERS[tierId].name}</option>`
+                    ).join("")}
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="doctor-dept">科室 / 中心 <em>*</em></label>
+                <input id="doctor-dept" type="text" data-doctor-field="dept" value="${esc(
+                  draft.dept
+                )}" placeholder="如：骨科 · 骨与关节中心">
+              </div>
+              <div class="field">
+                <label for="doctor-title">职称 / 头衔 <em>*</em></label>
+                <input id="doctor-title" type="text" data-doctor-field="title" value="${esc(
+                  draft.title
+                )}" placeholder="如：主任医师 · 教授">
+              </div>
+              <div class="field">
+                <label for="doctor-specialty">擅长方向 <em>*</em></label>
+                <textarea id="doctor-specialty" data-doctor-field="specialty" placeholder="用于专家列表卡片展示">${esc(
+                  draft.specialty
+                )}</textarea>
+              </div>
+              <div class="field">
+                <label for="doctor-intro">专家简介</label>
+                <textarea id="doctor-intro" data-doctor-field="intro" style="min-height:110px" placeholder="介绍从业经历、专业方向与代表性成果">${esc(
+                  draft.intro
+                )}</textarea>
+              </div>
+              <div class="field">
+                <label for="doctor-tags">健康主题 <span>用顿号或逗号分隔</span></label>
+                <input id="doctor-tags" type="text" data-doctor-field="tagsText" value="${esc(
+                  draft.tagsText
+                )}" placeholder="如：脊柱健康、久坐防护、颈肩腰腿痛">
+              </div>
+              <div class="field">
+                <label for="doctor-profile-url">官网链接 <span>选填</span></label>
+                <input id="doctor-profile-url" type="url" data-doctor-field="profileUrl" value="${esc(
+                  draft.profileUrl || ""
+                )}" placeholder="https://">
+              </div>
+              <label class="switch-row" style="margin-top:10px">
+                <span class="switch-row__label"><strong>在客户端展示</strong><small>关闭后该专家不会出现在专家库与预约选择中</small></span>
+                <span class="switch"><input type="checkbox" data-doctor-active ${
+                  draft.active !== false ? "checked" : ""
+                }><span></span></span>
+              </label>
+            </div>
+            <p class="form-hint">保存后客户端专家库、首页专家讲堂与预约专家列表会立即更新。</p>
+          </div>
+        </div>
+        <div class="sheet__footer">
+          <button class="btn btn--ghost" type="button" data-action="close-overlay">取消</button>
+          <button class="btn btn--primary" type="button" data-action="admin-doctor-save">
+            ${draft.isNew ? "保存并上架" : "保存专家信息"}
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
+  function handleDoctorPhotoUpload(file) {
+    if (!file || !state.adminDoctorDraft) return;
+    if (!file.type.startsWith("image/")) {
+      showToast("请选择图片文件。");
+      return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      showToast("图片不能超过 12MB。");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const maxSize = 1200;
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const context = canvas.getContext("2d");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.84);
+        state.adminDoctorDraft.photo = dataUrl;
+        const preview = document.querySelector("[data-doctor-photo-preview]");
+        if (preview) preview.innerHTML = `<img src="${dataUrl}" alt="专家照片预览">`;
+        showToast("照片已上传并压缩。");
+      };
+      image.onerror = () => showToast("图片读取失败，请更换图片重试。");
+      image.src = String(reader.result);
+    };
+    reader.onerror = () => showToast("图片读取失败，请更换图片重试。");
+    reader.readAsDataURL(file);
+  }
+
+  function saveAdminDoctor() {
+    if (!isAdministrator() || !state.adminDoctorDraft) return;
+    const draft = { ...state.adminDoctorDraft };
+    document.querySelectorAll("[data-doctor-field]").forEach((input) => {
+      draft[input.dataset.doctorField] = input.value.trim();
+    });
+    const activeBox = document.querySelector("[data-doctor-active]");
+    if (activeBox) draft.active = activeBox.checked;
+    if (!draft.name) {
+      showToast("请填写专家姓名。");
+      return;
+    }
+    if (!draft.dept) {
+      showToast("请填写科室或中心。");
+      return;
+    }
+    if (!draft.title) {
+      showToast("请填写职称或头衔。");
+      return;
+    }
+    if (!draft.specialty) {
+      showToast("请填写擅长方向。");
+      return;
+    }
+    if (!draft.photo) {
+      showToast("请上传专家照片。");
+      return;
+    }
+    const now = new Date().toISOString();
+    const doctor = {
+      id: draft.isNew ? `custom-${Date.now()}` : draft.id,
+      name: draft.name,
+      tier: TIERS[draft.tier] ? draft.tier : "specialist",
+      dept: draft.dept,
+      title: draft.title,
+      specialty: draft.specialty,
+      intro: draft.intro,
+      tags: String(draft.tagsText || "")
+        .split(/[,，、\n]/)
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      profileUrl: draft.profileUrl || "",
+      photo: draft.photo,
+      active: draft.active !== false,
+      updatedAt: now,
+      createdAt: draft.createdAt || now
+    };
+    const config = getDoctorConfig();
+    const customIndex = config.custom.findIndex(
+      (item) => String(item.id) === String(doctor.id)
+    );
+    if (draft.isNew || customIndex >= 0) {
+      if (customIndex >= 0) config.custom[customIndex] = doctor;
+      else config.custom.push(doctor);
+    } else {
+      config.overrides[String(doctor.id)] = doctor;
+    }
+    saveDoctorConfig(config);
+    refreshDoctors();
+    state.adminDoctorDraft = null;
+    state.overlay = null;
+    state.adminTab = "doctors";
+    renderApp();
+    showToast(draft.isNew ? "专家已新增并上架。" : "专家信息已更新。");
+  }
+
   function filteredAdminAppointments() {
     const query = state.adminSearch.trim().toLowerCase();
     return getAppointments()
@@ -3040,111 +3347,224 @@
     `;
   }
 
-  function renderSmsSettingsPage() {
-    const settings = getSmsSettings();
-    const logs = getSmsLogs();
+  function renderFollowUpPage() {
+    const pending = pendingSmsFollowUps();
+    const completed = completedSmsFollowUps();
+    const renderCard = (appointment, done = false) => `
+      <button class="followup-card ${done ? "is-done" : ""}" type="button"
+        data-action="open-review" data-appointment-id="${esc(appointment.id)}">
+        <span class="followup-card__top">
+          <span class="followup-card__icon">${icon(done ? "checkCircle" : "message", 17)}</span>
+          <span class="followup-card__title">
+            <strong>${esc(appointment.orgName)}</strong>
+            <small>${esc(topicOf(appointment))}</small>
+          </span>
+          ${statusPill(appointment.status)}
+        </span>
+        <span class="followup-card__meta">
+          <span>${icon("user", 11)} ${esc(appointment.contactName)}</span>
+          <span>${icon("phone", 11)} ${esc(appointment.phone)}</span>
+          <span>${icon("calendar", 11)} ${formatMD(appointment.date)} ${esc(appointment.time)}</span>
+        </span>
+        <span class="followup-card__action">
+          ${
+            done
+              ? `${esc(appointment.smsFollowUp?.copiedBy?.name || "项目人员")} · ${formatDateTime(
+                  appointment.smsFollowUp?.copiedAt
+                )} 已复制`
+              : "去生成并复制客户短信"
+          }
+          ${icon("chevronRight", 11)}
+        </span>
+      </button>
+    `;
     return `
       <div class="admin-page-head">
-        <div><h1>短信提醒</h1><p>配置预约节点、接收人与提醒模板</p></div>
-        <span class="admin-page-head__date">演示模式</span>
+        <div><h1>短信跟进</h1><p>不再统一配置模板，项目人员复制客户短信后自动视为已发送</p></div>
+        <span class="admin-page-head__date">${pending.length} 条待提醒</span>
       </div>
       ${renderAdminTabs()}
-      <div class="sms-settings">
-        <section class="settings-card">
-          <div class="settings-card__head">
-            <div><h2>提醒总开关</h2><p>关闭后不登记任何短信提醒记录</p></div>
-            <label class="switch">
-              <input id="sms-enabled" type="checkbox" ${settings.enabled ? "checked" : ""}>
-              <span></span>
-            </label>
-          </div>
-          <div class="field">
-            <label for="sms-recipients">接收人 <span>每行一位，可填写“姓名：手机号”</span></label>
-            <textarea id="sms-recipients" style="min-height:76px" placeholder="项目组 A：138 0000 0001">${esc(
-              settings.recipients
-            )}</textarea>
-          </div>
-        </section>
-        <section class="settings-card">
-          <div class="settings-card__head">
-            <div><h2>触发节点</h2><p>选择需要登记的预约提醒场景</p></div>
-          </div>
-          <div class="trigger-list">
-            ${SMS_TRIGGERS.map(
-              (trigger) => `
-                <label class="trigger-row">
-                  <span><strong>${trigger.label}</strong><small>${trigger.help}</small></span>
-                  <span class="switch"><input type="checkbox" data-sms-trigger="${trigger.id}" ${
-                    settings.triggers[trigger.id] ? "checked" : ""
-                  }><span></span></span>
-                </label>
-              `
-            ).join("")}
-          </div>
-        </section>
-        <section class="settings-card">
-          <div class="settings-card__head">
-            <div><h2>提醒模板</h2><p>使用变量自动填充预约信息</p></div>
-          </div>
-          <div class="field">
-            <textarea id="sms-template" style="min-height:112px">${esc(settings.template)}</textarea>
-            <div class="template-vars">
-              ${["{org}", "{topic}", "{date}", "{time}", "{venue}", "{id}"]
-                .map((item) => `<span>${item}</span>`)
-                .join("")}
-            </div>
-          </div>
-        </section>
-        <div class="sms-preview">
-          <div class="sms-preview__label"><span>SMS PREVIEW</span><i></i></div>
-          <div class="sms-bubble" id="sms-preview-bubble">${esc(
-            fillTemplate(settings.template)
-          )}</div>
-          <div class="sms-preview__meta">${icon("phone", 10)} 预览号码 · ${
-            parseRecipients(settings.recipients).length
-          } 位接收人</div>
+      <section class="followup-summary">
+        <span class="followup-summary__icon">${icon("bell", 18)}</span>
+        <div>
+          <strong>${pending.length ? `${pending.length} 个已确认项目还未复制短信` : "所有已确认项目均已完成短信跟进"}</strong>
+          <p>在预约处理页复制“短信内容”或“号码和内容”后，系统会自动记录发送人和发送时间。</p>
         </div>
-        <div class="settings-actions">
-          <button class="btn btn--ghost" type="button" data-action="sms-preview">刷新预览</button>
-          <button class="btn btn--primary" type="button" data-action="sms-save">保存配置</button>
-        </div>
-        <button class="btn btn--soft btn--block" type="button" data-action="sms-test">登记一条测试提醒</button>
-        <p class="settings-note">演示环境不会调用短信网关，也不会向真实手机号发送消息。正式上线需接入医院短信服务并完成模板报备。</p>
-        <section class="settings-card">
-          <div class="settings-card__head">
-            <div><h2>最近提醒记录</h2><p>最近 ${Math.min(logs.length, 8)} 条演示记录</p></div>
-          </div>
-          ${
-            logs.length
-              ? `<div class="log-list">
-                  ${logs
-                    .slice(0, 8)
-                    .map(
-                      (log) => `
-                        <div class="log-row">
-                          <div><strong>${esc(log.recipient || "项目组成员")}</strong><small>${esc(
-                            log.content || ""
-                          )}</small><small>${formatDateTime(log.createdAt)} · ${esc(
-                            log.appointmentId || "测试"
-                          )}</small></div>
-                          <span>${esc(log.status || "已登记")}</span>
-                        </div>
-                      `
-                    )
-                    .join("")}
-                </div>`
-              : `<p class="settings-note" style="margin-top:12px">暂无提醒记录。</p>`
-          }
-        </section>
+      </section>
+      <div class="followup-section">
+        <div class="followup-section__head"><h2>待提醒</h2><span>${pending.length} 条</span></div>
+        ${
+          pending.length
+            ? `<div class="followup-list">${pending.map((item) => renderCard(item)).join("")}</div>`
+            : `<div class="followup-empty">${icon("checkCircle", 22)}<strong>暂无待提醒项目</strong><p>院方确认预约后，未复制短信的项目会自动出现在这里。</p></div>`
+        }
       </div>
+      <div class="followup-section">
+        <div class="followup-section__head"><h2>已复制记录</h2><span>${completed.length} 条</span></div>
+        ${
+          completed.length
+            ? `<div class="followup-list">${completed
+                .slice(0, 12)
+                .map((item) => renderCard(item, true))
+                .join("")}</div>`
+            : `<p class="settings-note">暂无已复制记录。复制客户短信后会自动留痕。</p>`
+        }
+      </div>
+      <p class="source-note" style="padding:18px 22px 0">
+        仅复制客户手机号不会标记为已发送；复制短信内容或号码和内容后才会完成跟进。演示环境不会调用真实短信网关。
+      </p>
+    `;
+  }
+
+  function adminSlotDates() {
+    const tier = TIERS[state.adminSlotTier] || TIERS.elite;
+    const start = addDays(startOfDay(new Date()), tier.leadDays);
+    return Array.from({ length: 21 }, (_, index) => addDays(start, index));
+  }
+
+  function selectedAdminSlotDate() {
+    const dates = adminSlotDates();
+    return dates.find((date) => isoDate(date) === state.adminSlotDate) || dates[0];
+  }
+
+  function renderSlotConfigContent() {
+    const date = selectedAdminSlotDate();
+    const dateIso = isoDate(date);
+    const slots = buildTimeSlots(state.adminSlotTier, dateIso);
+    return `
+      <div class="slot-config-tier segmented">
+        ${TIER_ORDER.map(
+          (tierId) => `
+            <button class="${state.adminSlotTier === tierId ? "is-active" : ""}" type="button"
+              data-action="admin-slot-tier" data-value="${tierId}">
+              ${TIERS[tierId].shortName}<span>${TIERS[tierId].leadDays} 天</span>
+            </button>
+          `
+        ).join("")}
+      </div>
+      <div class="slot-date-rail horizontal-scroll">
+        ${adminSlotDates()
+          .map(
+            (item) => `
+              <button class="slot-date-pill ${isoDate(item) === dateIso ? "is-active" : ""}" type="button"
+                data-action="admin-slot-date" data-value="${isoDate(item)}">
+                <strong>${formatMD(item)}</strong><span>${weekday(item)}</span>
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+      <div class="slot-config-head">
+        <div><strong>${formatDateCN(dateIso, true)}</strong><small>${TIERS[state.adminSlotTier].name}号源</small></div>
+        <span>0 表示关闭该时段</span>
+      </div>
+      <div class="slot-config-list">
+        ${slots
+          .map(
+            (slot) => `
+              <div class="slot-config-card ${slot.capacity === 0 ? "is-closed" : ""}">
+                <div class="slot-config-card__main">
+                  <strong>${slot.label}</strong>
+                  <small>${slot.sub} · 已约 ${slot.booked} · 剩余 ${slot.remaining}</small>
+                </div>
+                <div class="capacity-stepper">
+                  <button type="button" data-action="slot-capacity" data-tier="${state.adminSlotTier}"
+                    data-date="${dateIso}" data-slot="${slot.id}" data-delta="-1" aria-label="减少号源">−</button>
+                  <strong>${slot.capacity}</strong>
+                  <button type="button" data-action="slot-capacity" data-tier="${state.adminSlotTier}"
+                    data-date="${dateIso}" data-slot="${slot.id}" data-delta="1" aria-label="增加号源">+</button>
+                </div>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  function refreshSlotConfig() {
+    const content = document.getElementById("slot-config-content");
+    if (content) content.innerHTML = renderSlotConfigContent();
+  }
+
+  function renderSlotConfigPage() {
+    if (!isAdministrator()) return renderAdminAppointmentsPage();
+    return `
+      <div class="admin-page-head">
+        <div><h1>号源配置</h1><p>按专家层级、日期和时段设置可预约数量</p></div>
+        <span class="admin-page-head__date">实时扣减</span>
+      </div>
+      ${renderAdminTabs()}
+      <section class="slot-config-note">
+        ${icon("calendar", 16)}
+        <p>客户预约成功后，号源会按预约记录自动扣减。将数量调为 0 可关闭该时段；已预约数量不会被强制清空。</p>
+      </section>
+      <div id="slot-config-content">${renderSlotConfigContent()}</div>
+    `;
+  }
+
+  function renderDoctorAdminPage() {
+    if (!isAdministrator()) return renderAdminAppointmentsPage();
+    const doctors = configuredDoctors().sort((a, b) => {
+      if (a.active === false && b.active !== false) return 1;
+      if (b.active === false && a.active !== false) return -1;
+      return TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier);
+    });
+    return `
+      <div class="admin-page-head">
+        <div><h1>专家配置</h1><p>新增专家、维护简介与照片，保存后客户端立即生效</p></div>
+        <button class="btn btn--primary btn--sm" type="button" data-action="admin-doctor-new">
+          ${icon("plus", 14)} 新增专家
+        </button>
+      </div>
+      ${renderAdminTabs()}
+      <section class="doctor-admin-summary">
+        <div><strong>可配置大咖医生、主任专家与专业医生</strong><p>照片建议使用正面半身或全身照，上传后会自动压缩保存在浏览器本地。</p></div>
+        <span>${doctors.filter((item) => item.active !== false).length} 位启用</span>
+      </section>
+      <div class="doctor-admin-list">
+        ${doctors
+          .map(
+            (doctor) => `
+              <button class="doctor-admin-card ${doctor.active === false ? "is-disabled" : ""}" type="button"
+                data-action="admin-doctor-edit" data-doctor-id="${esc(doctor.id)}">
+                <span class="doctor-admin-card__photo">
+                  ${
+                    doctor.photo
+                      ? `<img src="${esc(doctor.photo)}" alt="${esc(doctor.name)}">`
+                      : `<span>${icon("experts", 20)}</span>`
+                  }
+                </span>
+                <span class="doctor-admin-card__main">
+                  <span class="doctor-admin-card__heading">
+                    <strong>${esc(doctor.name)}</strong>
+                    <span class="pill ${doctor.active === false ? "pill--needs_info" : "pill--completed"}">
+                      ${doctor.active === false ? "已停用" : tierOf(doctor).name}
+                    </span>
+                  </span>
+                  <span class="doctor-admin-card__role">${esc(doctor.dept)} · ${esc(doctor.title)}</span>
+                  <span class="doctor-admin-card__intro">${esc(
+                    cleanDoctorText(doctor.specialty) || cleanDoctorText(doctor.intro) || "暂无简介"
+                  )}</span>
+                </span>
+                <span class="doctor-admin-card__edit">编辑 ${icon("chevronRight", 11)}</span>
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+      <p class="source-note" style="padding:18px 22px 0">演示环境的专家配置与上传图片保存在浏览器本地，正式版本需接入对象存储与医院内容审核流程。</p>
     `;
   }
 
   function renderAdminScreen() {
     const account = state.adminUser;
     if (!account) return renderAdminLogin();
+    const adminOnlyTabs = ["accounts", "slots", "doctors"];
     const tab =
-      state.adminTab === "accounts" && !isAdministrator() ? "appointments" : state.adminTab;
+      adminOnlyTabs.includes(state.adminTab) && !isAdministrator()
+        ? "appointments"
+        : state.adminTab;
     return `
       <div class="admin-screen">
         <header class="admin-topbar">
@@ -3166,8 +3586,12 @@
         </header>
         <main class="admin-content">
           ${
-            tab === "sms"
-              ? renderSmsSettingsPage()
+            tab === "reminders"
+              ? renderFollowUpPage()
+              : tab === "slots"
+              ? renderSlotConfigPage()
+              : tab === "doctors"
+              ? renderDoctorAdminPage()
               : tab === "accounts"
               ? renderAdminAccountsPage()
               : renderAdminAppointmentsPage()
@@ -3180,39 +3604,6 @@
   function refreshAdminList() {
     const wrap = document.getElementById("admin-list");
     if (wrap) wrap.innerHTML = renderAdminListHTML();
-  }
-
-  function readSmsForm() {
-    const enabled = document.getElementById("sms-enabled");
-    const recipients = document.getElementById("sms-recipients");
-    const template = document.getElementById("sms-template");
-    const triggers = {};
-    SMS_TRIGGERS.forEach((trigger) => {
-      const input = document.querySelector(`[data-sms-trigger="${trigger.id}"]`);
-      triggers[trigger.id] = Boolean(input?.checked);
-    });
-    return {
-      enabled: enabled ? enabled.checked : true,
-      recipients: recipients ? recipients.value.trim() : "",
-      triggers,
-      template: template ? template.value.trim() : "",
-      updatedAt: new Date().toISOString()
-    };
-  }
-
-  function saveSmsFromForm(showMessage = true) {
-    const settings = readSmsForm();
-    if (!settings.recipients) {
-      showToast("请至少配置一位短信接收人。");
-      return false;
-    }
-    if (!settings.template) {
-      showToast("短信模板不能为空。");
-      return false;
-    }
-    saveSmsSettings(settings);
-    if (showMessage) showToast("短信提醒配置已保存。");
-    return true;
   }
 
   function saveAdminReply(status) {
@@ -3245,6 +3636,7 @@
         ...item,
         status,
         reply,
+        internalNote: fields.internalNote || "",
         assignedStaff: state.adminUser
           ? {
               username: state.adminUser.username,
@@ -3256,24 +3648,6 @@
       };
     });
     saveAppointments(items);
-    if (status === "confirmed") {
-      const settings = getSmsSettings();
-      if (settings.enabled && state.reviewSendSms) {
-        addSmsLog({
-          appointmentId: appointment.id,
-          recipient: recipientSummary(settings.recipients),
-          content: fillTemplate(settings.template, {
-            org: appointment.orgName,
-            topic: reply.topic || topicOf(appointment),
-            date: formatDateCN(appointment.date),
-            time: appointment.time,
-            venue: appointment.venue || "待确认",
-            id: appointment.id
-          })
-        });
-      }
-    }
-    state.reviewSendSms = false;
     state.adminReviewId = null;
     state.adminDraft = null;
     state.overlay = null;
@@ -3308,7 +3682,8 @@
       contact: staff ? `${staff.name} · ${staff.phone}` : "企业健康项目组",
       message:
         appointment.reply?.message ||
-        "感谢贵司的预约与信任。院方项目组已完成专家与课题匹配，请确认活动流程与时间安排。如活动人数或场地有变化，请提前联系项目组。"
+        "感谢贵司的预约与信任。院方项目组已完成专家与课题匹配，请确认活动流程与时间安排。如活动人数或场地有变化，请提前联系项目组。",
+      internalNote: appointment.internalNote || ""
     };
   }
 
@@ -3318,6 +3693,86 @@
       fields[input.dataset.reviewField] = input.value.trim();
     });
     return fields;
+  }
+
+  function saveInternalNote() {
+    const appointment = getAppointments().find((item) => item.id === state.adminReviewId);
+    if (!appointment) return;
+    const fields = collectReviewFields();
+    const items = getAppointments().map((item) =>
+      item.id === appointment.id
+        ? {
+            ...item,
+            internalNote: fields.internalNote || "",
+            updatedAt: new Date().toISOString()
+          }
+        : item
+    );
+    saveAppointments(items);
+    if (state.adminDraft) state.adminDraft.internalNote = fields.internalNote || "";
+    showToast("院方内部备注已保存，客户端不可见。");
+  }
+
+  function smsFollowUpStatusMarkup(appointment) {
+    const followUp = appointment.smsFollowUp;
+    if (!followUp?.copiedAt) {
+      return `
+        <span class="sms-followup-state is-pending">
+          ${icon("clock", 12)}
+          尚未复制短信内容，复制后将自动视为已发送
+        </span>
+      `;
+    }
+    return `
+      <span class="sms-followup-state is-done">
+        ${icon("checkCircle", 12)}
+        ${esc(followUp.copiedBy?.name || "项目人员")} 已于 ${formatDateTime(
+          followUp.copiedAt
+        )} 复制，自动视为已发送
+      </span>
+    `;
+  }
+
+  function refreshManualSmsStatus() {
+    const status = document.querySelector("[data-sms-followup-status]");
+    const appointment = getAppointments().find((item) => item.id === state.adminReviewId);
+    if (status && appointment) status.innerHTML = smsFollowUpStatusMarkup(appointment);
+  }
+
+  function markSmsCopied(method, content) {
+    const appointment = getAppointments().find((item) => item.id === state.adminReviewId);
+    if (!appointment) return;
+    const now = new Date().toISOString();
+    const followUp = {
+      copiedAt: now,
+      phone: appointment.phone,
+      content,
+      method,
+      copiedBy: state.adminUser
+        ? {
+            username: state.adminUser.username,
+            name: state.adminUser.name,
+            phone: state.adminUser.phone
+          }
+        : null
+    };
+    const items = getAppointments().map((item) =>
+      item.id === appointment.id
+        ? {
+            ...item,
+            smsFollowUp: followUp,
+            assignedStaff: followUp.copiedBy,
+            updatedAt: now
+          }
+        : item
+    );
+    saveAppointments(items);
+    addSmsLog({
+      appointmentId: appointment.id,
+      recipient: `${appointment.contactName} ${appointment.phone}`,
+      content,
+      status: "已复制，视为已发送"
+    });
   }
 
   function buildCustomerSmsText(appointment, fields = {}) {
@@ -3434,7 +3889,9 @@
               </div>
               ${
                 appointment.note
-                  ? `<div class="review-note">${esc(appointment.note)}</div>`
+                  ? `<div class="review-note"><strong>企业活动备注</strong><br>${esc(
+                      appointment.note
+                    )}</div>`
                   : ""
               }
             </div>
@@ -3490,6 +3947,15 @@
                     draft.message
                   )}</textarea>
                 </div>
+                <div class="field internal-note-field">
+                  <label for="review-internal-note">院方内部备注 <span>仅院方可见，不同步给客户</span></label>
+                  <textarea id="review-internal-note" data-review-field="internalNote" placeholder="可记录沟通情况、特殊要求、内部协作事项等">${esc(
+                    draft.internalNote || ""
+                  )}</textarea>
+                  <button class="btn btn--soft btn--sm internal-note-save" type="button" data-action="review-save-note">
+                    保存内部备注
+                  </button>
+                </div>
               </div>
               <section class="manual-sms-card">
                 <div class="manual-sms-card__head">
@@ -3516,13 +3982,10 @@
                   </button>
                 </div>
                 <p class="manual-sms-note">
-                  这是独立于自动提醒的发送方式。复制后请前往手机短信应用，将号码和内容粘贴发送。
+                  复制短信内容或“号码和内容”后，系统会自动视为已发送，并记录当前项目人员和时间。
                 </p>
+                <div data-sms-followup-status>${smsFollowUpStatusMarkup(appointment)}</div>
               </section>
-              <label class="review-send-row">
-                <input type="checkbox" id="review-sms" ${getSmsSettings().triggers.confirmed ? "checked" : ""}>
-                <span>确认方案时登记一条客户短信通知（演示，不真实发送）</span>
-              </label>
               <div class="review-actions">
                 <button class="btn btn--ghost" type="button" data-action="review-needs">标记待补充</button>
                 <button class="btn btn--soft" type="button" data-action="review-complete">标记已完成</button>
@@ -3775,8 +4238,10 @@
         state.adminReviewId = null;
         state.adminDraft = null;
         state.adminAccountDraft = null;
+        state.adminDoctorDraft = null;
         state.profileDraft = null;
-        renderOverlay();
+        if (state.screen === "admin") renderApp();
+        else renderOverlay();
         break;
       case "expert-filter":
         state.expertFilter = el.dataset.value || "elite";
@@ -3820,6 +4285,7 @@
         ensureSeedData();
         clearSession();
         clearAdminSession();
+        setLastPortal("client");
         state.tab = "home";
         state.screen = "main";
         state.overlay = null;
@@ -3835,6 +4301,7 @@
         openAdmin();
         break;
       case "admin-close":
+        setLastPortal("client");
         state.screen = "main";
         state.tab = "home";
         renderApp();
@@ -3851,6 +4318,7 @@
         break;
       case "admin-logout":
         clearAdminSession();
+        setLastPortal("client");
         state.adminLogin = { username: "", password: "", error: "" };
         state.screen = "main";
         state.tab = "me";
@@ -3858,8 +4326,8 @@
         showToast("已退出院方工作台。");
         break;
       case "admin-tab":
-        if (el.dataset.value === "accounts" && !isAdministrator()) {
-          showToast("仅系统管理员可以查看账号分配。");
+        if (["accounts", "slots", "doctors"].includes(el.dataset.value) && !isAdministrator()) {
+          showToast("仅系统管理员可以访问该配置。");
           return;
         }
         state.adminTab = el.dataset.value || "appointments";
@@ -3874,6 +4342,41 @@
         break;
       case "admin-account-save":
         saveAdminAccount();
+        break;
+      case "admin-slot-tier":
+        if (!isAdministrator()) return;
+        state.adminSlotTier = el.dataset.value || "elite";
+        refreshSlotConfig();
+        break;
+      case "admin-slot-date":
+        if (!isAdministrator()) return;
+        state.adminSlotDate = el.dataset.value || "";
+        refreshSlotConfig();
+        break;
+      case "slot-capacity": {
+        if (!isAdministrator()) return;
+        const current = getSlotCapacity(
+          el.dataset.tier,
+          el.dataset.date,
+          el.dataset.slot
+        );
+        setSlotCapacity(
+          el.dataset.tier,
+          el.dataset.date,
+          el.dataset.slot,
+          current + Number(el.dataset.delta || 0)
+        );
+        refreshSlotConfig();
+        break;
+      }
+      case "admin-doctor-new":
+        openAdminDoctorEditor();
+        break;
+      case "admin-doctor-edit":
+        openAdminDoctorEditor(el.dataset.doctorId || "");
+        break;
+      case "admin-doctor-save":
+        saveAdminDoctor();
         break;
       case "admin-filter":
         state.adminFilter = el.dataset.value || "all";
@@ -3890,11 +4393,12 @@
         break;
       }
       case "review-confirm": {
-        const smsBox = document.getElementById("review-sms");
-        state.reviewSendSms = Boolean(smsBox?.checked);
         saveAdminReply("confirmed");
         break;
       }
+      case "review-save-note":
+        saveInternalNote();
+        break;
       case "review-needs":
         saveAdminReply("needs_info");
         break;
@@ -3912,6 +4416,10 @@
         const payload = manualSmsPayload();
         if (!payload) return;
         const copied = await copyText(payload.text);
+        if (copied) {
+          markSmsCopied("content", payload.text);
+          refreshManualSmsStatus();
+        }
         showToast(copied ? "短信内容已复制。" : "复制失败，请手动复制内容。");
         break;
       }
@@ -3919,32 +4427,13 @@
         const payload = manualSmsPayload();
         if (!payload) return;
         const copied = await copyText(`手机号：${payload.phone}\n\n${payload.text}`);
+        if (copied) {
+          markSmsCopied("both", payload.text);
+          refreshManualSmsStatus();
+        }
         showToast(copied ? "客户号码和短信内容已复制。" : "复制失败，请手动复制。");
         break;
       }
-      case "sms-preview": {
-        const settings = readSmsForm();
-        const bubble = document.getElementById("sms-preview-bubble");
-        if (bubble) bubble.textContent = fillTemplate(settings.template);
-        showToast("已根据当前模板刷新预览。");
-        break;
-      }
-      case "sms-save":
-        saveSmsFromForm();
-        break;
-      case "sms-test":
-        if (saveSmsFromForm(false)) {
-          const settings = readSmsForm();
-          addSmsLog({
-            appointmentId: "SMS-TEST",
-            recipient: recipientSummary(settings.recipients),
-            content: fillTemplate(settings.template),
-            status: "测试记录（演示）"
-          });
-          renderApp();
-          showToast("测试提醒已登记（未真实发送）。");
-        }
-        break;
       case "reload-page":
         window.location.reload();
         break;
@@ -3988,6 +4477,10 @@
       state.adminAccountDraft[target.dataset.accountField] = target.value;
       return;
     }
+    if (target.matches("[data-doctor-field]") && state.adminDoctorDraft) {
+      state.adminDoctorDraft[target.dataset.doctorField] = target.value;
+      return;
+    }
     if (target.id === "admin-username") {
       state.adminLogin.username = target.value;
       return;
@@ -4013,6 +4506,14 @@
     }
     if (target.matches("[data-account-active]") && state.adminAccountDraft) {
       state.adminAccountDraft.active = target.checked;
+      return;
+    }
+    if (target.matches("[data-doctor-active]") && state.adminDoctorDraft) {
+      state.adminDoctorDraft.active = target.checked;
+      return;
+    }
+    if (target.matches("[data-doctor-photo]")) {
+      handleDoctorPhotoUpload(target.files?.[0]);
     }
   }
 
@@ -4031,6 +4532,7 @@
       state.adminReviewId = null;
       state.adminDraft = null;
       state.adminAccountDraft = null;
+      state.adminDoctorDraft = null;
       state.profileDraft = null;
       renderOverlay();
     });
@@ -4044,9 +4546,11 @@
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const doctors = await response.json();
       if (!Array.isArray(doctors) || !doctors.length) throw new Error("empty doctors");
-      state.doctors = doctors;
+      state.baseDoctors = doctors;
+      refreshDoctors();
       ensureSeedData();
       state.session = readJSON(STORAGE.session, null);
+      state.lastPortal = readJSON(STORAGE.lastPortal, "client");
       const adminSession = readJSON(STORAGE.adminSession, null);
       const assignedAdmin = adminSession?.username
         ? getAdminAccounts().find(
@@ -4059,6 +4563,10 @@
       state.loadError = false;
       if (location.hash === "#/admin") {
         state.screen = state.adminAuthed ? "admin" : "admin-login";
+      } else if (state.adminAuthed && state.lastPortal === "admin") {
+        state.screen = "admin";
+      } else {
+        state.screen = "main";
       }
       renderApp();
     } catch (error) {
