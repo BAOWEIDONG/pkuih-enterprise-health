@@ -148,6 +148,23 @@
       thumb: "assets/posters/thumbs/poster-care.webp"
     }
   ];
+  let marketingPosterWarmup = false;
+
+  function warmMarketingPosters() {
+    if (marketingPosterWarmup) return;
+    marketingPosterWarmup = true;
+    const load = () =>
+      MARKETING_POSTERS.forEach((poster) => {
+        const image = new Image();
+        image.decoding = "async";
+        image.src = poster.image;
+      });
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(load, { timeout: 2500 });
+    } else {
+      window.setTimeout(load, 900);
+    }
+  }
 
   const STATUS = {
     pending: {
@@ -4839,7 +4856,12 @@
         </div>
         <div class="sheet__body">
           <div class="poster-sheet__frame">
-            <img src="${esc(poster.image)}" alt="${esc(poster.title)}高清宣传海报" decoding="async">
+            <img
+              src="${esc(poster.image)}"
+              alt="${esc(poster.title)}高清宣传海报"
+              decoding="async"
+              style="background-image:url('${esc(poster.thumb)}')"
+            >
           </div>
           <div class="poster-sheet__meta">
             <span class="poster-sheet__tags">${poster.tags
@@ -5696,6 +5718,9 @@
       app.querySelector(".app-content, .auth-screen, .admin-screen")?.classList.add("is-instant");
     }
     renderOverlay();
+    if (state.screen === "admin" && state.adminAuthed && state.tab === "marketing") {
+      warmMarketingPosters();
+    }
     state.renderedOnce = true;
     restoreWindowScroll(scrollTo === null ? currentScroll : scrollTo);
   }
