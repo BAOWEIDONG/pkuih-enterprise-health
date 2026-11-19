@@ -18,6 +18,7 @@
   const DEMO_PHONE = "13800000001";
   const DEMO_USER = {
     phone: DEMO_PHONE,
+    contactPhone: DEMO_PHONE,
     name: "王女士",
     orgName: "示例保险 · 高客健康服务部",
     orgType: "保险公司",
@@ -141,7 +142,8 @@
       name: "",
       orgName: "",
       orgType: "保险公司",
-      title: ""
+      title: "",
+      contactPhone: ""
     },
     pendingAuth: null,
     codeTimer: null,
@@ -910,11 +912,17 @@
               .map(
                 (doctor) => `
                   <button class="doctor-rail-card" type="button" data-action="open-doctor" data-doctor-id="${esc(doctor.id)}">
-                    <img src="${esc(doctor.photo)}" alt="${esc(doctor.name)}" loading="lazy">
-                    <span class="doctor-rail-card__badge">${tierOf(doctor).name}</span>
-                    <span class="doctor-rail-card__body">
+                    <span class="doctor-rail-card__photo">
+                      <img src="${esc(doctor.photo)}" alt="${esc(doctor.name)}" loading="lazy">
+                    </span>
+                    <span class="doctor-rail-card__content">
+                      <span class="doctor-rail-card__badge">${tierOf(doctor).name}</span>
                       <h3>${esc(doctor.name)}</h3>
                       <p>${esc(doctor.dept)}</p>
+                      <span class="doctor-rail-card__intro">${esc(
+                        cleanDoctorText(doctor.specialty)
+                      )}</span>
+                      <span class="doctor-rail-card__more">查看专家详情 ${icon("chevronRight", 11)}</span>
                     </span>
                   </button>
                 `
@@ -1017,9 +1025,20 @@
                         <span class="expert-tile__tier">${tierOf(doctor).name}</span>
                       </span>
                       <span class="expert-tile__body">
-                        <h3>${esc(doctor.name)}</h3>
-                        <p>${esc(doctor.dept)}</p>
-                        <span class="expert-tile__tag">${esc(doctor.tags?.[0] || "专家健康讲堂")}</span>
+                        <span class="expert-tile__heading">
+                          <h3>${esc(doctor.name)}</h3>
+                          <span class="expert-tile__more">详情 ${icon("chevronRight", 11)}</span>
+                        </span>
+                        <span class="expert-tile__role">${esc(doctor.dept)} · ${esc(doctor.title)}</span>
+                        <span class="expert-tile__intro">${esc(
+                          cleanDoctorText(doctor.specialty) || cleanDoctorText(doctor.intro)
+                        )}</span>
+                        <span class="expert-tile__tags">
+                          ${(doctor.tags || [])
+                            .slice(0, 2)
+                            .map((tag) => `<span class="expert-tile__tag">${esc(tag)}</span>`)
+                            .join("")}
+                        </span>
                       </span>
                     </button>
                   `
@@ -1462,6 +1481,13 @@
                     state.login.title
                   )}" placeholder="如：客户健康负责人">
                 </div>
+                <div class="field">
+                  <label for="profile-contact-phone">联系手机号 <span>默认登录手机号，可修改</span></label>
+                  <input id="profile-contact-phone" type="tel" inputmode="numeric" maxlength="11"
+                    data-login-field="contactPhone" value="${esc(
+                      state.login.contactPhone || state.login.phone
+                    )}" placeholder="用于院方项目组联络">
+                </div>
                 <button class="btn btn--primary auth-submit" type="button" data-action="auth-complete-profile">
                   完成并继续 ${icon("arrowRight", 16)}
                 </button>
@@ -1489,7 +1515,7 @@
       state.booking.orgType = state.booking.orgType || user.orgType || "保险公司";
       state.booking.contactName = state.booking.contactName || user.name || "";
       state.booking.contactTitle = state.booking.contactTitle || user.title || "";
-      state.booking.phone = state.booking.phone || user.phone || "";
+      state.booking.phone = state.booking.phone || user.contactPhone || user.phone || "";
       state.overlay = { type: "booking" };
       renderApp();
       renderOverlay();
@@ -1524,6 +1550,7 @@
     }
     state.login.step = 2;
     if (!state.login.orgType) state.login.orgType = "保险公司";
+    state.login.contactPhone = state.login.contactPhone || phone;
     renderApp();
     window.scrollTo(0, 0);
   }
@@ -1532,9 +1559,13 @@
     const name = document.getElementById("profile-name");
     const orgName = document.getElementById("profile-org");
     const title = document.getElementById("profile-title");
+    const contactPhone = document.getElementById("profile-contact-phone");
     if (name) state.login.name = name.value.trim();
     if (orgName) state.login.orgName = orgName.value.trim();
     if (title) state.login.title = title.value.trim();
+    if (contactPhone) {
+      state.login.contactPhone = contactPhone.value.replace(/\D/g, "").slice(0, 11);
+    }
     if (!state.login.name) {
       showToast("请填写联系人姓名。");
       return;
@@ -1543,9 +1574,15 @@
       showToast("请填写企业或机构名称。");
       return;
     }
+    if (!state.login.contactPhone) state.login.contactPhone = state.login.phone;
+    if (!/^1[3-9]\d{9}$/.test(state.login.contactPhone)) {
+      showToast("请填写正确的联系手机号。");
+      return;
+    }
     const now = new Date().toISOString();
     const user = upsertUser({
       phone: state.login.phone,
+      contactPhone: state.login.contactPhone,
       name: state.login.name,
       orgName: state.login.orgName,
       orgType: state.login.orgType,
@@ -1594,7 +1631,7 @@
       orgName: session.orgName || "",
       contactName: session.name || "",
       contactTitle: session.title || "",
-      phone: session.phone || "",
+      phone: session.contactPhone || session.phone || "",
       email: "",
       address: "",
       note: "",
@@ -1836,7 +1873,7 @@
           </div>
           <div class="field-row">
             <div class="field">
-              <label for="booking-phone">联系电话 <em>*</em></label>
+              <label for="booking-phone">联系手机号 <em>*</em> <span>默认登录手机号，可修改</span></label>
               <input id="booking-phone" type="tel" inputmode="numeric" maxlength="11"
                 data-booking-field="phone" value="${esc(booking.phone)}" placeholder="手机号码">
             </div>
@@ -2355,6 +2392,13 @@
                 )}">
               </div>
               <div class="field">
+                <label for="edit-profile-contact">联系手机号 <span>默认登录手机号，可修改</span></label>
+                <input id="edit-profile-contact" type="tel" inputmode="numeric" maxlength="11"
+                  data-profile-field="contactPhone" value="${esc(
+                    draft.contactPhone || draft.phone || ""
+                  )}">
+              </div>
+              <div class="field">
                 <label>登录手机号</label>
                 <div class="input-shell" style="opacity:.65">
                   <span class="input-shell__prefix">+86</span>
@@ -2385,6 +2429,10 @@
     }
     if (!draft.orgName) {
       showToast("企业或机构名称不能为空。");
+      return;
+    }
+    if (!/^1[3-9]\d{9}$/.test(draft.contactPhone || "")) {
+      showToast("请填写正确的联系手机号。");
       return;
     }
     const user = upsertUser({ ...draft, updatedAt: new Date().toISOString() });
