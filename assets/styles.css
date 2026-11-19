@@ -133,6 +133,7 @@ select {
   min-height: 100dvh;
   margin: 0 auto;
   overflow-x: hidden;
+  overflow-x: clip;
   background: var(--bg);
   box-shadow: 0 40px 120px rgba(6, 20, 48, 0.22);
 }
@@ -1342,10 +1343,21 @@ select {
 }
 
 .expert-controls {
+  position: sticky;
+  z-index: 35;
+  top: calc(53px + var(--safe-top));
   display: grid;
   gap: 10px;
-  padding: 0 18px;
-  margin-top: 12px;
+  margin-top: 7px;
+  padding: 9px 18px 10px;
+  background: linear-gradient(
+    180deg,
+    rgba(242, 244, 248, 0.98) 0%,
+    rgba(242, 244, 248, 0.94) 78%,
+    rgba(242, 244, 248, 0.82) 100%
+  );
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
 }
 
 .expert-result-meta {
@@ -2647,6 +2659,24 @@ select {
 .doctor-options {
   display: grid;
   gap: 7px;
+}
+
+.doctor-options__divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 2px 1px;
+  color: var(--ink-3);
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.doctor-options__divider::before,
+.doctor-options__divider::after {
+  height: 1px;
+  flex: 1;
+  background: var(--line-strong);
+  content: "";
 }
 
 .doctor-option {
@@ -4912,6 +4942,191 @@ select {
   font-size: 7.5px;
 }
 
+.slot-batch-card {
+  margin: 14px 18px 0;
+  padding: 14px;
+  border: 1px solid rgba(11, 49, 143, 0.11);
+  border-radius: 20px;
+  background:
+    radial-gradient(220px 110px at 100% 0%, rgba(75, 132, 255, 0.14), transparent 72%),
+    linear-gradient(150deg, #ffffff, #f4f8ff);
+  box-shadow: 0 10px 30px rgba(20, 48, 105, 0.07);
+}
+
+.slot-batch-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.slot-batch-card__head strong {
+  display: block;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.slot-batch-card__head small {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-3);
+  font-size: 8.5px;
+}
+
+.slot-batch-card__head > span {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: rgba(11, 49, 143, 0.07);
+  color: var(--brand);
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.slot-batch-scope {
+  margin-top: 12px;
+}
+
+.slot-batch-scope button {
+  min-width: 0;
+  padding-inline: 5px;
+  font-size: 9px;
+}
+
+.slot-batch-scope__hint {
+  margin: 8px 0 0;
+  color: var(--ink-3);
+  font-size: 8.5px;
+  line-height: 1.5;
+}
+
+.slot-batch-card__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(17, 19, 24, 0.055);
+}
+
+.slot-batch-card__row > span {
+  flex: 0 0 auto;
+  color: var(--ink-2);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.slot-batch-presets {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.slot-batch-presets button {
+  display: inline-flex;
+  height: 29px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(11, 49, 143, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 720;
+  box-shadow: 0 1px 2px rgba(20, 45, 100, 0.05);
+}
+
+.slot-batch-presets button:active {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #fff;
+  transform: scale(0.94);
+}
+
+.slot-batch-card > p {
+  margin: 10px 0 0;
+  color: var(--ink-3);
+  font-size: 8px;
+  line-height: 1.55;
+}
+
+.slot-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 18px 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.slot-save-bar > div:first-child {
+  min-width: 0;
+}
+
+.slot-save-bar strong {
+  display: block;
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.slot-save-bar small {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slot-save-bar.is-dirty {
+  position: fixed;
+  z-index: 70;
+  right: 0;
+  bottom: 0;
+  left: 50%;
+  width: min(100%, var(--app-width));
+  margin: 0;
+  padding: 10px 16px calc(10px + var(--safe-bottom));
+  border: 0;
+  border-top: 1px solid rgba(17, 19, 24, 0.08);
+  border-radius: 0;
+  background: rgba(250, 251, 253, 0.94);
+  box-shadow: 0 -12px 35px rgba(14, 34, 74, 0.11);
+  transform: translateX(-50%);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.slot-save-bar.is-dirty strong {
+  color: var(--brand);
+}
+
+.slot-save-bar__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.slot-save-bar__actions .btn {
+  min-height: 38px;
+  padding-inline: 11px;
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+
+.slot-save-spacer {
+  height: calc(74px + var(--safe-bottom));
+}
+
 .slot-date-rail {
   display: flex;
   gap: 7px;
@@ -5006,6 +5221,27 @@ select {
   opacity: 0.72;
 }
 
+.slot-config-card.has-draft {
+  border-color: rgba(10, 108, 255, 0.3);
+  background: linear-gradient(145deg, #ffffff, #f4f8ff);
+  box-shadow:
+    0 0 0 1px rgba(10, 108, 255, 0.05),
+    var(--shadow-card);
+}
+
+.slot-draft-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 7px;
+  font-weight: 650;
+  vertical-align: 1px;
+}
+
 .slot-config-card__main strong {
   display: block;
   font-size: 11.5px;
@@ -5041,6 +5277,14 @@ select {
   font-size: 16px;
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(17, 19, 24, 0.08);
+}
+
+.capacity-stepper button:disabled {
+  background: transparent;
+  color: var(--ink-3);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .capacity-stepper strong {
@@ -5434,6 +5678,10 @@ select {
   .topbar,
   .admin-topbar {
     padding-top: 13px;
+  }
+
+  .expert-controls {
+    top: calc(57px + var(--safe-top));
   }
 
   .tabbar {
