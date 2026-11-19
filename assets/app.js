@@ -301,6 +301,15 @@
     return configuredDoctors().find((doctor) => String(doctor.id) === String(id)) || null;
   }
 
+  function doctorPhoto(photoOrDoctor, variant = "card") {
+    const photo =
+      typeof photoOrDoctor === "string" ? photoOrDoctor : photoOrDoctor?.photo || "";
+    if (!photo) return "";
+    const match = String(photo).match(/^assets\/doctors\/([^/]+)\.webp$/i);
+    if (!match) return photo;
+    return `assets/doctors/${variant === "detail" ? "details" : "cards"}/${match[1]}.jpg`;
+  }
+
   function doctorsForTier(tierId) {
     return state.doctors.filter((doctor) => doctor.tier === tierId);
   }
@@ -802,8 +811,6 @@
     edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/>',
     file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h6"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/>',
-    wechat:
-      '<path d="M8.5 18.2c-3.7-.4-6.5-2.6-6.5-5.5 0-3.3 3.5-6 7.8-6s7.7 2.7 7.7 6c0 1.7-1 3.3-2.7 4.4l.4 2.4-2.3-1.2c-1.3.4-2.9.5-4.4.3Z"/><path d="M14.6 15.9c1.1 2.9 4.1 4.6 7.1 3.4"/><circle cx="7.8" cy="11.9" r=".8" fill="currentColor" stroke="none"/><circle cx="11.8" cy="11.9" r=".8" fill="currentColor" stroke="none"/>',
     lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
     send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>'
   };
@@ -924,7 +931,8 @@
       <div class="screen">
         <section class="hero-card">
           <div class="hero-card__media">
-            <img src="assets/hero-campus.webp" alt="北京大学国际医院园区">
+            <img src="assets/hero-campus-960.jpg" alt="北京大学国际医院园区" width="960" height="411"
+              fetchpriority="high" decoding="async">
           </div>
           <div class="hero-card__content">
             <span class="hero-card__kicker"><i></i> 白大褂到企 · 名医入企计划</span>
@@ -940,13 +948,6 @@
               <button class="btn btn--glass" type="button" data-action="tab" data-tab="experts">
                 浏览专家
               </button>
-              ${
-                session
-                  ? ""
-                  : `<button class="btn btn--wechat" type="button" data-action="auth-wechat">
-                       ${icon("wechat", 16)} 微信一键登录
-                     </button>`
-              }
             </div>
             <div class="hero-metrics">
               <div class="hero-metric"><strong>${state.doctors.length}<span>位</span></strong><small>精选入企专家</small></div>
@@ -1019,7 +1020,8 @@
                 (doctor) => `
                   <button class="doctor-rail-card" type="button" data-action="open-doctor" data-doctor-id="${esc(doctor.id)}">
                     <span class="doctor-rail-card__photo">
-                      <img src="${esc(doctor.photo)}" alt="${esc(doctor.name)}" loading="lazy">
+                      <img src="${esc(doctorPhoto(doctor))}" alt="${esc(doctor.name)}"
+                        loading="lazy" decoding="async">
                     </span>
                     <span class="doctor-rail-card__content">
                       <span class="doctor-rail-card__badge">${tierOf(doctor).name}</span>
@@ -1137,7 +1139,8 @@
                   (doctor) => `
                     <button class="expert-tile" type="button" data-action="open-doctor" data-doctor-id="${esc(doctor.id)}">
                       <span class="expert-tile__media">
-                        <img src="${esc(doctor.photo)}" alt="${esc(doctor.name)}" loading="lazy">
+                        <img src="${esc(doctorPhoto(doctor))}" alt="${esc(doctor.name)}"
+                          loading="lazy" decoding="async">
                         <span class="expert-tile__tier">${tierOf(doctor).name}</span>
                       </span>
                       <span class="expert-tile__body">
@@ -1506,13 +1509,8 @@
           step === 1
             ? `
               <div class="auth-card">
-                <button class="wechat-button wechat-button--hero" type="button" data-action="auth-wechat">
-                  ${icon("wechat", 20)} 微信授权登录
-                </button>
-                <p class="wechat-login-note">在微信中可使用当前微信身份快速登录，演示环境会进入示例企业账号。</p>
-                <div class="auth-divider">或使用手机号</div>
                 <h2>手机号登录 / 注册</h2>
-                <p class="auth-card__hint">未注册手机号验证后将自动创建企业账号，登录状态会保存在当前设备。</p>
+                <p class="auth-card__hint">无需关注公众号，直接使用手机号验证登录。未注册手机号验证后将自动创建企业账号，登录状态会保存在当前设备。</p>
                 <div class="field">
                   <label for="login-phone">手机号码</label>
                   <div class="input-shell">
@@ -1546,8 +1544,7 @@
               </div>
               <div class="demo-box">
                 <strong>演示账号</strong><br>
-                手机号：138 0000 0001 · 验证码：888888<br>
-                “微信授权登录”演示会直接进入该示例账号；正式版本需接入公众号网页授权。
+                手机号：138 0000 0001 · 验证码：888888
               </div>
             `
             : `
@@ -1881,9 +1878,9 @@
               (doctor) => `
                 <button class="doctor-option ${booking.doctorId === String(doctor.id) ? "is-selected" : ""}" type="button"
                   data-action="booking-doctor" data-value="${esc(doctor.id)}">
-                  <span class="doctor-option__photo"><img src="${esc(doctor.photo)}" alt="${esc(
+                  <span class="doctor-option__photo"><img src="${esc(doctorPhoto(doctor))}" alt="${esc(
                     doctor.name
-                  )}" loading="lazy"></span>
+                  )}" loading="lazy" decoding="async"></span>
                   <span>
                     <strong>${esc(doctor.name)}</strong>
                     <small>${esc(doctor.dept)} · ${esc(doctor.title)}</small>
@@ -2283,8 +2280,11 @@
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet" role="dialog" aria-modal="true" aria-label="${esc(doctor.name)}专家详情">
         <div class="doctor-hero">
-          <img class="doctor-hero__backdrop" src="${esc(doctor.photo)}" alt="" aria-hidden="true">
-          <img class="doctor-hero__portrait" src="${esc(doctor.photo)}" alt="${esc(doctor.name)}">
+          <img class="doctor-hero__backdrop" src="${esc(doctorPhoto(doctor, "detail"))}" alt=""
+            aria-hidden="true" decoding="async">
+          <img class="doctor-hero__portrait" src="${esc(doctorPhoto(doctor, "detail"))}" alt="${esc(
+            doctor.name
+          )}" decoding="async">
           <button class="doctor-hero__close" type="button" data-action="close-overlay" aria-label="关闭">
             ${icon("close", 15)}
           </button>
@@ -3048,7 +3048,7 @@
               <span class="doctor-photo-upload__preview" data-doctor-photo-preview>
                 ${
                   draft.photo
-                    ? `<img src="${esc(draft.photo)}" alt="专家照片预览">`
+                    ? `<img src="${esc(doctorPhoto(draft.photo, "detail"))}" alt="专家照片预览" decoding="async">`
                     : `<span>${icon("experts", 26)}<small>上传照片</small></span>`
                 }
               </span>
@@ -3149,7 +3149,7 @@
     reader.onload = () => {
       const image = new Image();
       image.onload = () => {
-        const maxSize = 1200;
+        const maxSize = 900;
         const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(image.width * scale));
@@ -3158,7 +3158,7 @@
         context.fillStyle = "#ffffff";
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.84);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
         state.adminDoctorDraft.photo = dataUrl;
         const preview = document.querySelector("[data-doctor-photo-preview]");
         if (preview) preview.innerHTML = `<img src="${dataUrl}" alt="专家照片预览">`;
@@ -3531,7 +3531,8 @@
                 <span class="doctor-admin-card__photo">
                   ${
                     doctor.photo
-                      ? `<img src="${esc(doctor.photo)}" alt="${esc(doctor.name)}">`
+                      ? `<img src="${esc(doctorPhoto(doctor))}" alt="${esc(doctor.name)}"
+                          loading="lazy" decoding="async">`
                       : `<span>${icon("experts", 20)}</span>`
                   }
                 </span>
@@ -3849,7 +3850,7 @@
               <div class="review-summary__top">
                 ${
                   doctor
-                    ? `<img src="${esc(doctor.photo)}" alt="${esc(doctor.name)}">`
+                    ? `<img src="${esc(doctorPhoto(doctor))}" alt="${esc(doctor.name)}" decoding="async">`
                     : `<span style="display:inline-flex;width:42px;height:48px;align-items:center;justify-content:center;border-radius:10px;background:var(--blue-soft);color:var(--blue)">${icon(
                         "experts",
                         19
@@ -4109,18 +4110,6 @@
         state.login.agree = true;
         renderApp();
         showToast("已填入演示账号，点击登录即可。");
-        break;
-      }
-      case "auth-wechat": {
-        const user =
-          getUser(DEMO_PHONE) ||
-          upsertUser({
-            ...clone(DEMO_USER),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-        finishLogin(user);
-        showToast("已通过微信快捷登录（演示）。");
         break;
       }
       case "auth-submit":
@@ -4542,7 +4531,7 @@
     bindEvents();
     renderApp();
     try {
-      const response = await fetch("assets/doctors.json", { cache: "no-store" });
+      const response = await fetch("assets/doctors.json");
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const doctors = await response.json();
       if (!Array.isArray(doctors) || !doctors.length) throw new Error("empty doctors");
