@@ -11,7 +11,8 @@
     appointments: "pkuih_h5_appointments_v2",
     smsSettings: "pkuih_h5_sms_settings_v2",
     smsLogs: "pkuih_h5_sms_logs_v2",
-    adminAuth: "pkuih_h5_admin_auth_v2"
+    adminAccounts: "pkuih_h5_admin_accounts_v3",
+    adminSession: "pkuih_h5_admin_session_v3"
   };
 
   const DEMO_CODE = "888888";
@@ -26,8 +27,43 @@
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
-  const ADMIN_USER = "admin";
-  const ADMIN_PASSWORD = "pkuih2026";
+  const ADMIN_ROLES = {
+    administrator: {
+      label: "系统管理员",
+      desc: "管理预约、短信配置与项目账号"
+    },
+    manager: {
+      label: "项目负责人",
+      desc: "处理预约并确认活动方案"
+    },
+    member: {
+      label: "项目专员",
+      desc: "跟进预约与客户联络"
+    }
+  };
+
+  const DEFAULT_ADMIN_ACCOUNTS = [
+    {
+      username: "admin",
+      password: "pkuih2026",
+      name: "李老师",
+      phone: "13800009999",
+      role: "administrator",
+      active: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      username: "consultant",
+      password: "pkuih2026",
+      name: "周老师",
+      phone: "13800001111",
+      role: "member",
+      active: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ];
 
   const TIERS = {
     elite: {
@@ -129,6 +165,7 @@
     screen: "main",
     session: null,
     adminAuthed: false,
+    adminUser: null,
     expertFilter: "elite",
     expertSearch: "",
     appointmentFilter: "all",
@@ -159,6 +196,7 @@
     adminSearch: "",
     adminReviewId: null,
     adminDraft: null,
+    adminAccountDraft: null,
     profileDraft: null
   };
 
@@ -360,9 +398,38 @@
     }
   }
 
-  function setAdminAuth(value) {
-    state.adminAuthed = Boolean(value);
-    writeJSON(STORAGE.adminAuth, Boolean(value));
+  function getAdminAccounts() {
+    return readJSON(STORAGE.adminAccounts, []);
+  }
+
+  function saveAdminAccounts(accounts) {
+    writeJSON(STORAGE.adminAccounts, accounts);
+  }
+
+  function ensureAdminAccounts() {
+    if (!readJSON(STORAGE.adminAccounts, null)) {
+      saveAdminAccounts(clone(DEFAULT_ADMIN_ACCOUNTS));
+    }
+  }
+
+  function setAdminSession(account) {
+    state.adminUser = account;
+    state.adminAuthed = true;
+    writeJSON(STORAGE.adminSession, { username: account.username });
+  }
+
+  function clearAdminSession() {
+    state.adminUser = null;
+    state.adminAuthed = false;
+    try {
+      localStorage.removeItem(STORAGE.adminSession);
+    } catch {
+      /* no-op */
+    }
+  }
+
+  function isAdministrator() {
+    return state.adminUser?.role === "administrator";
   }
 
   function getAppointments() {
@@ -638,6 +705,7 @@
   }
 
   function ensureSeedData() {
+    ensureAdminAccounts();
     const users = getUsers();
     if (!users.some((user) => user.phone === DEMO_PHONE)) {
       users.push(clone(DEMO_USER));
@@ -2158,6 +2226,11 @@
       document.body.classList.add("is-locked");
       return;
     }
+    if (state.overlay?.type === "account") {
+      overlayRoot.innerHTML = renderAdminAccountSheet();
+      document.body.classList.add("is-locked");
+      return;
+    }
     overlayRoot.innerHTML = "";
     document.body.classList.remove("is-locked");
   }
@@ -2467,11 +2540,11 @@
         <div class="admin-login-hero">
           <img src="assets/logo.svg" alt="北京大学国际医院">
           <h1>院方项目组<br>工作台</h1>
-          <p>处理企业预约需求、回复活动课题与流程，并统一维护预约短信提醒策略。</p>
+          <p>仅限系统管理员已分配并启用的项目账号登录，用于处理预约、回复方案与发送客户提醒。</p>
         </div>
         <div class="auth-card" style="margin-top:26px">
           <h2>内部账号登录</h2>
-          <p class="auth-card__hint">仅限北京大学国际医院企业健康项目组使用。</p>
+          <p class="auth-card__hint">账号与角色由院方系统管理员统一分配，未分配账号无法进入工作台。</p>
           <div class="field">
             <label for="admin-username">账号</label>
             <input id="admin-username" type="text" value="${esc(
@@ -2498,8 +2571,9 @@
         </div>
         <div class="demo-box">
           <strong>演示账号</strong><br>
-          账号：admin · 密码：pkuih2026<br>
-          工作台数据与客户端预约记录实时联动。
+          管理员：admin / pkuih2026<br>
+          项目专员：consultant / pkuih2026<br>
+          两位演示人员的姓名与手机号会自动带入预约回复。
         </div>
         <p class="auth-foot">本演示的账号鉴权仅用于界面展示，正式版本需接入医院统一身份认证。</p>
       </div>
@@ -2511,20 +2585,27 @@
     const password = document.getElementById("admin-password");
     state.adminLogin.username = username?.value.trim() || "";
     state.adminLogin.password = password?.value || "";
-    if (
-      state.adminLogin.username !== ADMIN_USER ||
-      state.adminLogin.password !== ADMIN_PASSWORD
-    ) {
-      state.adminLogin.error = "账号或密码不正确，请使用演示账号登录。";
+    const account = getAdminAccounts().find(
+      (item) =>
+        item.username === state.adminLogin.username &&
+        item.password === state.adminLogin.password
+    );
+    if (!account) {
+      state.adminLogin.error = "账号或密码不正确，请确认账号已由管理员分配。";
+      renderApp();
+      return;
+    }
+    if (!account.active) {
+      state.adminLogin.error = "该账号已停用，请联系院方系统管理员。";
       renderApp();
       return;
     }
     state.adminLogin.error = "";
-    setAdminAuth(true);
+    setAdminSession(account);
     state.screen = "admin";
     state.adminTab = "appointments";
     renderApp();
-    showToast("已进入院方工作台。");
+    showToast(`欢迎，${account.name}。`);
   }
 
   function adminDoctorsCount() {
@@ -2549,6 +2630,304 @@
       { id: "confirmed", label: "已确认" },
       { id: "completed", label: "已完成" }
     ];
+  }
+
+  function renderAdminTabs() {
+    const tabs = [
+      { id: "appointments", label: "预约管理", count: getAppointments().length },
+      { id: "sms", label: "短信提醒", count: SMS_TRIGGERS.length }
+    ];
+    if (isAdministrator()) {
+      tabs.push({
+        id: "accounts",
+        label: "账号分配",
+        count: getAdminAccounts().filter((item) => item.active).length
+      });
+    }
+    return `
+      <div class="segmented admin-tabs">
+        ${tabs
+          .map(
+            (tab) => `
+              <button class="${state.adminTab === tab.id ? "is-active" : ""}" type="button"
+                data-action="admin-tab" data-value="${tab.id}">${tab.label}<span>${tab.count}</span></button>
+            `
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  function roleMeta(role) {
+    return ADMIN_ROLES[role] || ADMIN_ROLES.member;
+  }
+
+  function renderAdminAccountsPage() {
+    if (!isAdministrator()) return renderAdminAppointmentsPage();
+    const accounts = getAdminAccounts().sort((a, b) => {
+      if (a.role === "administrator" && b.role !== "administrator") return -1;
+      if (b.role === "administrator" && a.role !== "administrator") return 1;
+      return Number(b.active) - Number(a.active);
+    });
+    const activeCount = accounts.filter((item) => item.active).length;
+    return `
+      <div class="admin-page-head">
+        <div><h1>账号分配</h1><p>为院方项目人员分配登录账号与角色</p></div>
+        <span class="admin-page-head__date">${activeCount} 个启用</span>
+      </div>
+      ${renderAdminTabs()}
+      <div class="account-overview">
+        <div>
+          <strong>只有已分配并启用的账号才能登录工作台</strong>
+          <p>管理员可分配项目负责人、项目专员账号。停用账号后将立即失去工作台访问权限。</p>
+        </div>
+        <button class="btn btn--primary btn--sm" type="button" data-action="admin-account-new">
+          ${icon("plus", 14)} 分配账号
+        </button>
+      </div>
+      <div class="admin-account-list">
+        ${accounts
+          .map(
+            (account) => `
+              <button class="admin-account-card ${account.active ? "" : "is-disabled"}" type="button"
+                data-action="admin-account-edit" data-username="${esc(account.username)}">
+                <span class="admin-account-card__avatar">${esc(initialOf(account.name))}</span>
+                <span class="admin-account-card__main">
+                  <span class="admin-account-card__heading">
+                    <strong>${esc(account.name)}</strong>
+                    ${account.username === state.adminUser?.username ? `<span class="account-current">当前登录</span>` : ""}
+                  </span>
+                  <span class="admin-account-card__role">${esc(
+                    roleMeta(account.role).label
+                  )} · ${esc(roleMeta(account.role).desc)}</span>
+                  <span class="admin-account-card__meta">${icon("user", 11)} ${esc(
+                    account.username
+                  )} · ${icon("phone", 11)} ${esc(account.phone)}</span>
+                </span>
+                <span class="admin-account-card__side">
+                  <span class="pill ${account.active ? "pill--completed" : "pill--needs_info"}">${
+                    account.active ? "启用" : "已停用"
+                  }</span>
+                  <span>编辑 ${icon("chevronRight", 11)}</span>
+                </span>
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+      <p class="source-note" style="padding:20px 22px 0">
+        当前为演示账号体系，账号与密码保存在浏览器本地。正式版本需接入医院统一身份认证与权限审计。
+      </p>
+    `;
+  }
+
+  function emptyAdminAccountDraft() {
+    return {
+      isNew: true,
+      username: "",
+      password: "",
+      name: "",
+      phone: "",
+      role: "member",
+      active: true
+    };
+  }
+
+  function openAdminAccountEditor(username = "") {
+    if (!isAdministrator()) {
+      showToast("仅系统管理员可以分配账号。");
+      return;
+    }
+    const account = username
+      ? getAdminAccounts().find((item) => item.username === username)
+      : null;
+    state.adminAccountDraft = account
+      ? { ...clone(account), isNew: false, password: "" }
+      : emptyAdminAccountDraft();
+    state.overlay = { type: "account" };
+    renderOverlay();
+  }
+
+  function renderAdminAccountSheet() {
+    const draft = state.adminAccountDraft || emptyAdminAccountDraft();
+    const editingSelf = !draft.isNew && draft.username === state.adminUser?.username;
+    return `
+      <div class="sheet-backdrop" data-action="close-overlay"></div>
+      <section class="sheet" role="dialog" aria-modal="true" aria-label="分配院方账号">
+        <div class="sheet__grabber"></div>
+        <div class="sheet__bar">
+          <h2>${draft.isNew ? "分配项目账号" : "编辑项目账号"}</h2>
+          <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">
+            ${icon("close", 15)}
+          </button>
+        </div>
+        <div class="sheet__body">
+          <div style="padding:8px 18px 22px">
+            <div class="form-card" style="margin-top:0">
+              <div class="field">
+                <label for="account-name">人员姓名 <em>*</em></label>
+                <input id="account-name" type="text" data-account-field="name" value="${esc(
+                  draft.name
+                )}" placeholder="如：周老师">
+              </div>
+              <div class="field">
+                <label for="account-phone">联系手机号 <em>*</em></label>
+                <input id="account-phone" type="tel" inputmode="numeric" maxlength="11"
+                  data-account-field="phone" value="${esc(draft.phone)}" placeholder="处理预约时自动带入">
+              </div>
+              <div class="field">
+                <label for="account-role">角色权限</label>
+                <select id="account-role" data-account-field="role">
+                  ${Object.entries(ADMIN_ROLES)
+                    .map(
+                      ([key, meta]) =>
+                        `<option value="${key}" ${draft.role === key ? "selected" : ""}>${meta.label} · ${meta.desc}</option>`
+                    )
+                    .join("")}
+                </select>
+              </div>
+              <div class="field">
+                <label for="account-username">登录账号 <em>*</em> ${
+                  draft.isNew ? "" : "<span>账号创建后不可修改</span>"
+                }</label>
+                <input id="account-username" type="text" data-account-field="username"
+                  value="${esc(draft.username)}" placeholder="英文、数字或下划线，至少 4 位"
+                  autocomplete="off" ${draft.isNew ? "" : "disabled"}>
+              </div>
+              <div class="field">
+                <label for="account-password">登录密码 <em>${draft.isNew ? "*" : ""}</em> ${
+                  draft.isNew ? "" : "<span>留空则保持原密码</span>"
+                }</label>
+                <input id="account-password" type="password" data-account-field="password"
+                  value="" placeholder="${draft.isNew ? "至少 6 位" : "如需修改请输入新密码"}"
+                  autocomplete="new-password">
+              </div>
+              <label class="switch-row" style="margin-top:10px">
+                <span class="switch-row__label"><strong>账号启用</strong><small>停用后该人员无法登录院方工作台</small></span>
+                <span class="switch"><input type="checkbox" data-account-active ${
+                  draft.active ? "checked" : ""
+                } ${editingSelf ? "disabled" : ""}><span></span></span>
+              </label>
+            </div>
+            <p class="form-hint">
+              分配后，该人员处理预约时，姓名和联系手机号会自动带入院方回复。
+              ${editingSelf ? "当前登录的管理员账号不能被停用或降级。" : ""}
+            </p>
+          </div>
+        </div>
+        <div class="sheet__footer">
+          <button class="btn btn--ghost" type="button" data-action="close-overlay">取消</button>
+          <button class="btn btn--primary" type="button" data-action="admin-account-save">
+            ${draft.isNew ? "创建并启用账号" : "保存账号信息"}
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
+  function saveAdminAccount() {
+    if (!isAdministrator() || !state.adminAccountDraft) return;
+    const draft = { ...state.adminAccountDraft };
+    document.querySelectorAll("[data-account-field]").forEach((input) => {
+      if (input.disabled) return;
+      let value = input.value;
+      if (input.dataset.accountField === "phone") {
+        value = value.replace(/\D/g, "").slice(0, 11);
+      }
+      if (input.dataset.accountField === "username") value = value.trim().toLowerCase();
+      draft[input.dataset.accountField] = value.trim();
+    });
+    const activeBox = document.querySelector("[data-account-active]");
+    if (activeBox) draft.active = activeBox.checked;
+    if (!draft.name) {
+      showToast("请填写人员姓名。");
+      return;
+    }
+    if (!/^1[3-9]\d{9}$/.test(draft.phone)) {
+      showToast("请填写正确的联系手机号。");
+      return;
+    }
+    if (!ADMIN_ROLES[draft.role]) {
+      showToast("请选择有效的角色。");
+      return;
+    }
+    if (!/^[a-z0-9_]{4,20}$/.test(draft.username)) {
+      showToast("账号需为 4–20 位英文、数字或下划线。");
+      return;
+    }
+    const accounts = getAdminAccounts();
+    if (draft.isNew && accounts.some((item) => item.username === draft.username)) {
+      showToast("该登录账号已存在。");
+      return;
+    }
+    if (!draft.isNew && draft.username === state.adminUser?.username && !draft.active) {
+      showToast("不能停用当前登录账号。");
+      return;
+    }
+    if (!draft.isNew && draft.username === state.adminUser?.username && draft.role !== "administrator") {
+      showToast("管理员不能将当前登录账号降级。");
+      return;
+    }
+    const target = accounts.find((item) => item.username === draft.username);
+    if (!draft.isNew && target) {
+      const activeAdmins = accounts.filter(
+        (item) => item.active && item.role === "administrator"
+      ).length;
+      if (
+        target.active &&
+        target.role === "administrator" &&
+        (!draft.active || draft.role !== "administrator") &&
+        activeAdmins <= 1
+      ) {
+        showToast("必须至少保留一个已启用的系统管理员。");
+        return;
+      }
+    }
+    if (draft.isNew && draft.password.length < 6) {
+      showToast("请设置至少 6 位登录密码。");
+      return;
+    }
+    if (!draft.isNew && draft.password && draft.password.length < 6) {
+      showToast("新密码至少需要 6 位。");
+      return;
+    }
+    const now = new Date().toISOString();
+    if (draft.isNew) {
+      const account = {
+        username: draft.username,
+        password: draft.password,
+        name: draft.name,
+        phone: draft.phone,
+        role: draft.role,
+        active: draft.active,
+        createdAt: now,
+        updatedAt: now
+      };
+      accounts.push(account);
+      saveAdminAccounts(accounts);
+    } else {
+      const index = accounts.findIndex((item) => item.username === draft.username);
+      if (index === -1) return;
+      const next = {
+        ...accounts[index],
+        name: draft.name,
+        phone: draft.phone,
+        role: draft.role,
+        active: draft.active,
+        updatedAt: now
+      };
+      if (draft.password) next.password = draft.password;
+      accounts[index] = next;
+      saveAdminAccounts(accounts);
+      if (draft.username === state.adminUser?.username) {
+        setAdminSession(next);
+      }
+    }
+    state.adminAccountDraft = null;
+    state.overlay = null;
+    state.adminTab = "accounts";
+    renderApp();
+    showToast(draft.isNew ? "项目账号已创建并分配。" : "账号信息已更新。");
   }
 
   function filteredAdminAppointments() {
@@ -2639,10 +3018,7 @@
           10
         )} 等待企业回复</span></div>
       </div>
-      <div class="segmented admin-tabs">
-        <button class="${state.adminTab === "appointments" ? "is-active" : ""}" type="button" data-action="admin-tab" data-value="appointments">预约管理<span>${stats.total}</span></button>
-        <button class="${state.adminTab === "sms" ? "is-active" : ""}" type="button" data-action="admin-tab" data-value="sms">短信提醒<span>${SMS_TRIGGERS.length}</span></button>
-      </div>
+      ${renderAdminTabs()}
       <div class="admin-search">
         ${icon("search", 16)}
         <input id="admin-search-input" type="search" value="${esc(
@@ -2672,10 +3048,7 @@
         <div><h1>短信提醒</h1><p>配置预约节点、接收人与提醒模板</p></div>
         <span class="admin-page-head__date">演示模式</span>
       </div>
-      <div class="segmented admin-tabs">
-        <button class="${state.adminTab === "appointments" ? "is-active" : ""}" type="button" data-action="admin-tab" data-value="appointments">预约管理<span>${getAppointments().length}</span></button>
-        <button class="${state.adminTab === "sms" ? "is-active" : ""}" type="button" data-action="admin-tab" data-value="sms">短信提醒<span>${SMS_TRIGGERS.length}</span></button>
-      </div>
+      ${renderAdminTabs()}
       <div class="sms-settings">
         <section class="settings-card">
           <div class="settings-card__head">
@@ -2768,12 +3141,19 @@
   }
 
   function renderAdminScreen() {
+    const account = state.adminUser;
+    if (!account) return renderAdminLogin();
+    const tab =
+      state.adminTab === "accounts" && !isAdministrator() ? "appointments" : state.adminTab;
     return `
       <div class="admin-screen">
         <header class="admin-topbar">
           <div class="admin-topbar__brand">
             <img src="assets/logo.svg" alt="北京大学国际医院">
-            <div><strong>院方工作台</strong><span>企业健康项目组</span></div>
+            <div>
+              <strong>${esc(account.name)} · ${esc(roleMeta(account.role).label)}</strong>
+              <span>${esc(account.phone)} · 企业健康项目组</span>
+            </div>
           </div>
           <div class="admin-topbar__actions">
             <button class="icon-button" type="button" data-action="admin-close" aria-label="返回客户端">
@@ -2785,7 +3165,13 @@
           </div>
         </header>
         <main class="admin-content">
-          ${state.adminTab === "sms" ? renderSmsSettingsPage() : renderAdminAppointmentsPage()}
+          ${
+            tab === "sms"
+              ? renderSmsSettingsPage()
+              : tab === "accounts"
+              ? renderAdminAccountsPage()
+              : renderAdminAppointmentsPage()
+          }
         </main>
       </div>
     `;
@@ -2832,24 +3218,24 @@
   function saveAdminReply(status) {
     const appointment = getAppointments().find((item) => item.id === state.adminReviewId);
     if (!appointment) return;
-    const get = (name) => document.querySelector(`[data-review-field="${name}"]`)?.value.trim() || "";
-    const message = get("message");
+    const fields = collectReviewFields();
+    const message = fields.message || "";
     if (status === "needs_info" && !message) {
       showToast("请填写需要企业补充的信息。");
       return;
     }
-    if (status === "confirmed" && !get("topic")) {
+    if (status === "confirmed" && !fields.topic) {
       showToast("请填写确认后的活动课题。");
       return;
     }
     const reply = {
-      topic: get("topic"),
-      speaker: get("speaker"),
-      schedule: get("schedule"),
-      format: get("format"),
-      outline: get("outline"),
-      agenda: get("agenda"),
-      contact: get("contact"),
+      topic: fields.topic || "",
+      speaker: fields.speaker || "",
+      schedule: fields.schedule || "",
+      format: fields.format || "",
+      outline: fields.outline || "",
+      agenda: fields.agenda || "",
+      contact: fields.contact || "",
       message,
       updatedAt: new Date().toISOString()
     };
@@ -2859,6 +3245,13 @@
         ...item,
         status,
         reply,
+        assignedStaff: state.adminUser
+          ? {
+              username: state.adminUser.username,
+              name: state.adminUser.name,
+              phone: state.adminUser.phone
+            }
+          : null,
         updatedAt: new Date().toISOString()
       };
     });
@@ -2898,6 +3291,7 @@
 
   function buildReviewDraft(appointment) {
     const doctor = doctorById(appointment.doctorId);
+    const staff = state.adminUser;
     return {
       topic: appointment.reply?.topic || topicOf(appointment),
       speaker:
@@ -2911,13 +3305,71 @@
       agenda:
         appointment.reply?.agenda ||
         `${appointment.time.split("–")[0]} 签到与开场\n主题分享\n现场问答\n活动结束`,
-      contact:
-        appointment.reply?.contact ||
-        "企业健康项目组 · 李老师 010-6900 6666",
+      contact: staff ? `${staff.name} · ${staff.phone}` : "企业健康项目组",
       message:
         appointment.reply?.message ||
         "感谢贵司的预约与信任。院方项目组已完成专家与课题匹配，请确认活动流程与时间安排。如活动人数或场地有变化，请提前联系项目组。"
     };
+  }
+
+  function collectReviewFields() {
+    const fields = {};
+    document.querySelectorAll("[data-review-field]").forEach((input) => {
+      fields[input.dataset.reviewField] = input.value.trim();
+    });
+    return fields;
+  }
+
+  function buildCustomerSmsText(appointment, fields = {}) {
+    const staff = state.adminUser;
+    const topic = fields.topic || appointment.reply?.topic || topicOf(appointment);
+    const schedule =
+      fields.schedule ||
+      appointment.reply?.schedule ||
+      `${formatDateCN(appointment.date)} ${appointment.time}`;
+    const speaker = fields.speaker || appointment.reply?.speaker || "院方确认专家";
+    const venue = appointment.venue || "待院方确认";
+    const contact = staff ? `${staff.name} ${staff.phone}` : "院方项目组";
+    return `【北京大学国际医院】${appointment.contactName}您好，您预约的「${topic}」活动方案如下：时间 ${schedule}；地点 ${venue}；出讲专家 ${speaker}。院方联系人：${contact}。如时间地点需要调整，请直接联系我，谢谢。`;
+  }
+
+  function manualSmsPayload() {
+    const appointment = getAppointments().find((item) => item.id === state.adminReviewId);
+    if (!appointment) return null;
+    const fields = collectReviewFields();
+    return {
+      phone: appointment.phone,
+      text: buildCustomerSmsText(appointment, fields)
+    };
+  }
+
+  function refreshManualSmsPreview() {
+    const content = document.getElementById("manual-sms-content");
+    if (!content) return;
+    const payload = manualSmsPayload();
+    if (payload) content.textContent = payload.text;
+  }
+
+  async function copyText(text) {
+    const value = String(text || "");
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return true;
+      }
+    } catch {
+      /* fall through to legacy copy */
+    }
+    const field = document.createElement("textarea");
+    field.value = value;
+    field.setAttribute("readonly", "");
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.appendChild(field);
+    field.select();
+    const copied = document.execCommand("copy");
+    document.body.removeChild(field);
+    return copied;
   }
 
   function renderReviewSheet() {
@@ -2925,6 +3377,7 @@
     if (!appointment) return "";
     const doctor = doctorById(appointment.doctorId);
     const draft = state.adminDraft || buildReviewDraft(appointment);
+    const manualSmsText = buildCustomerSmsText(appointment, draft);
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet" role="dialog" aria-modal="true" aria-label="处理预约">
@@ -2975,6 +3428,9 @@
                 <div class="review-info__row"><span>活动场地</span><strong>${esc(
                   appointment.venue || "待确认"
                 )}</strong></div>
+                <div class="review-info__row"><span>本次对接</span><strong>${esc(
+                  state.adminUser?.name || ""
+                )} · ${esc(state.adminUser?.phone || "")}</strong></div>
               </div>
               ${
                 appointment.note
@@ -3035,6 +3491,34 @@
                   )}</textarea>
                 </div>
               </div>
+              <section class="manual-sms-card">
+                <div class="manual-sms-card__head">
+                  <span class="manual-sms-card__icon">${icon("message", 16)}</span>
+                  <div>
+                    <strong>手动发送客户短信</strong>
+                    <small>根据当前课题与流程自动生成，复制后可用手机自行发送</small>
+                  </div>
+                </div>
+                <div class="manual-sms-phone">
+                  <span>客户手机号</span>
+                  <strong>${esc(appointment.phone)}</strong>
+                  <button type="button" data-action="copy-customer-phone">复制号码</button>
+                </div>
+                <div class="manual-sms-content" id="manual-sms-content">${esc(
+                  manualSmsText
+                )}</div>
+                <div class="manual-sms-actions">
+                  <button class="btn btn--ghost btn--sm" type="button" data-action="copy-customer-sms">
+                    ${icon("file", 14)} 复制短信内容
+                  </button>
+                  <button class="btn btn--primary btn--sm" type="button" data-action="copy-customer-both">
+                    ${icon("send", 14)} 复制号码和内容
+                  </button>
+                </div>
+                <p class="manual-sms-note">
+                  这是独立于自动提醒的发送方式。复制后请前往手机短信应用，将号码和内容粘贴发送。
+                </p>
+              </section>
               <label class="review-send-row">
                 <input type="checkbox" id="review-sms" ${getSmsSettings().triggers.confirmed ? "checked" : ""}>
                 <span>确认方案时登记一条客户短信通知（演示，不真实发送）</span>
@@ -3117,7 +3601,7 @@
     refreshExpertResults();
   }
 
-  function handleAction(action, el) {
+  async function handleAction(action, el) {
     switch (action) {
       case "tab": {
         state.screen = "main";
@@ -3290,6 +3774,7 @@
         state.overlay = null;
         state.adminReviewId = null;
         state.adminDraft = null;
+        state.adminAccountDraft = null;
         state.profileDraft = null;
         renderOverlay();
         break;
@@ -3334,7 +3819,7 @@
         });
         ensureSeedData();
         clearSession();
-        setAdminAuth(false);
+        clearAdminSession();
         state.tab = "home";
         state.screen = "main";
         state.overlay = null;
@@ -3356,8 +3841,8 @@
         window.scrollTo(0, 0);
         break;
       case "admin-demo":
-        state.adminLogin.username = ADMIN_USER;
-        state.adminLogin.password = ADMIN_PASSWORD;
+        state.adminLogin.username = DEFAULT_ADMIN_ACCOUNTS[0].username;
+        state.adminLogin.password = DEFAULT_ADMIN_ACCOUNTS[0].password;
         state.adminLogin.error = "";
         renderApp();
         break;
@@ -3365,7 +3850,7 @@
         submitAdminLogin();
         break;
       case "admin-logout":
-        setAdminAuth(false);
+        clearAdminSession();
         state.adminLogin = { username: "", password: "", error: "" };
         state.screen = "main";
         state.tab = "me";
@@ -3373,9 +3858,22 @@
         showToast("已退出院方工作台。");
         break;
       case "admin-tab":
+        if (el.dataset.value === "accounts" && !isAdministrator()) {
+          showToast("仅系统管理员可以查看账号分配。");
+          return;
+        }
         state.adminTab = el.dataset.value || "appointments";
         renderApp();
         window.scrollTo(0, 0);
+        break;
+      case "admin-account-new":
+        openAdminAccountEditor();
+        break;
+      case "admin-account-edit":
+        openAdminAccountEditor(el.dataset.username || "");
+        break;
+      case "admin-account-save":
+        saveAdminAccount();
         break;
       case "admin-filter":
         state.adminFilter = el.dataset.value || "all";
@@ -3403,6 +3901,27 @@
       case "review-complete":
         saveAdminReply("completed");
         break;
+      case "copy-customer-phone": {
+        const payload = manualSmsPayload();
+        if (!payload) return;
+        const copied = await copyText(payload.phone);
+        showToast(copied ? "客户手机号已复制。" : "复制失败，请手动选择号码。");
+        break;
+      }
+      case "copy-customer-sms": {
+        const payload = manualSmsPayload();
+        if (!payload) return;
+        const copied = await copyText(payload.text);
+        showToast(copied ? "短信内容已复制。" : "复制失败，请手动复制内容。");
+        break;
+      }
+      case "copy-customer-both": {
+        const payload = manualSmsPayload();
+        if (!payload) return;
+        const copied = await copyText(`手机号：${payload.phone}\n\n${payload.text}`);
+        showToast(copied ? "客户号码和短信内容已复制。" : "复制失败，请手动复制。");
+        break;
+      }
       case "sms-preview": {
         const settings = readSmsForm();
         const bubble = document.getElementById("sms-preview-bubble");
@@ -3462,6 +3981,11 @@
     }
     if (target.matches("[data-review-field]") && state.adminDraft) {
       state.adminDraft[target.dataset.reviewField] = target.value;
+      refreshManualSmsPreview();
+      return;
+    }
+    if (target.matches("[data-account-field]") && state.adminAccountDraft) {
+      state.adminAccountDraft[target.dataset.accountField] = target.value;
       return;
     }
     if (target.id === "admin-username") {
@@ -3485,6 +4009,10 @@
     }
     if (target.matches("[data-booking-switch]")) {
       state.booking[target.dataset.bookingSwitch] = target.checked;
+      return;
+    }
+    if (target.matches("[data-account-active]") && state.adminAccountDraft) {
+      state.adminAccountDraft.active = target.checked;
     }
   }
 
@@ -3502,6 +4030,7 @@
       state.overlay = null;
       state.adminReviewId = null;
       state.adminDraft = null;
+      state.adminAccountDraft = null;
       state.profileDraft = null;
       renderOverlay();
     });
@@ -3518,7 +4047,14 @@
       state.doctors = doctors;
       ensureSeedData();
       state.session = readJSON(STORAGE.session, null);
-      state.adminAuthed = Boolean(readJSON(STORAGE.adminAuth, false));
+      const adminSession = readJSON(STORAGE.adminSession, null);
+      const assignedAdmin = adminSession?.username
+        ? getAdminAccounts().find(
+            (account) => account.username === adminSession.username && account.active
+          )
+        : null;
+      if (assignedAdmin) setAdminSession(assignedAdmin);
+      else clearAdminSession();
       state.loaded = true;
       state.loadError = false;
       if (location.hash === "#/admin") {
