@@ -6221,57 +6221,32 @@ select {
   line-height: 1.72;
 }
 
-.marketing-hero__contact {
+.marketing-hero__facts {
   position: relative;
   z-index: 1;
   display: flex;
-  align-items: center;
-  gap: 9px;
+  gap: 6px;
   margin-top: 15px;
   padding-top: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 
-.marketing-hero__avatar {
-  display: inline-flex;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.13);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 750;
-}
-
-.marketing-hero__person {
-  display: grid;
-  min-width: 0;
-  gap: 1px;
-}
-
-.marketing-hero__person small {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 7.5px;
-}
-
-.marketing-hero__person strong {
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.marketing-hero .marketing-tel {
-  margin-left: auto;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 720;
-  text-decoration-color: rgba(255, 255, 255, 0.72);
-  text-underline-offset: 3px;
+.marketing-hero__facts span {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 4px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 8px;
+  font-weight: 550;
   white-space: nowrap;
+}
+
+.marketing-hero__facts b {
+  color: #ffd0b8;
+  font-size: 16px;
+  font-weight: 780;
+  letter-spacing: -0.03em;
 }
 
 .poster-section-head {
@@ -6484,42 +6459,12 @@ select {
   box-shadow: 0 14px 32px rgba(7, 24, 58, 0.18);
 }
 
-.poster-sheet__frame.is-personalized {
-  box-shadow:
-    0 0 0 2px rgba(10, 108, 255, 0.16),
-    0 14px 32px rgba(7, 24, 58, 0.18);
-}
-
 .poster-sheet__frame img {
   display: block;
   width: 100%;
   max-height: 60vh;
   margin: 0 auto;
   object-fit: contain;
-}
-
-.poster-sheet__busy {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: rgba(5, 20, 52, 0.82);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 650;
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
-}
-
-.poster-sheet__busy i {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.28);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: posterSpin 0.8s linear infinite;
 }
 
 .poster-sheet__meta {
@@ -6541,36 +6486,6 @@ select {
   color: var(--ink-2);
   font-size: 8.5px;
   line-height: 1.6;
-}
-
-.poster-sheet__contact {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 10px;
-  padding-top: 9px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-2);
-  font-size: 8.5px;
-  font-weight: 650;
-}
-
-.poster-sheet__contact > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.poster-sheet__contact svg {
-  width: 13px;
-  height: 13px;
-  color: var(--blue-text);
-}
-
-.poster-sheet__tel {
-  color: var(--blue-text);
-  font-weight: 720;
 }
 
 .poster-sheet__footer .btn {
@@ -6693,14 +6608,6 @@ select {
     font-size: 25px;
   }
 
-  .marketing-hero__contact {
-    gap: 7px;
-  }
-
-  .marketing-hero .marketing-tel {
-    font-size: 9px;
-  }
-
   .poster-card__copy {
     padding-inline: 11px;
   }
@@ -6788,8 +6695,3 @@ select {
   }
 }
 
-@keyframes posterSpin {
-  to {
-    transform: rotate(360deg);
-  }
-}

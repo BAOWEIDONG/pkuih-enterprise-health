@@ -113,39 +113,39 @@
   const MARKETING_POSTERS = [
     {
       id: "brand",
-      eyebrow: "品牌主视觉",
-      title: "把医学专家请到企业身边",
-      desc: "适合朋友圈、活动预热与公众号头图，突出 40 位专家、3 级资源与院方全程跟进。",
-      tags: ["品牌传播", "专家资源", "扫码预约"],
-      image: "assets/posters/poster-brand.jpg",
-      thumb: "assets/posters/thumbs/poster-brand.jpg"
+      eyebrow: "权威主视觉",
+      title: "让权威医疗，走近企业",
+      desc: "以医院品牌、名医团队与三级专家资源为核心，适合活动预热、朋友圈和公众号传播。",
+      tags: ["医院权威", "名医资源", "品牌传播"],
+      image: "assets/posters/poster-brand.webp",
+      thumb: "assets/posters/thumbs/poster-brand.webp"
     },
     {
       id: "lecture",
-      eyebrow: "企业健康讲堂",
-      title: "专家上门开讲健康",
-      desc: "适合企业健康日、员工讲堂与部门培训，清楚呈现三级专家与申请周期。",
-      tags: ["企业讲堂", "员工关怀", "三级专家"],
-      image: "assets/posters/poster-lecture.jpg",
-      thumb: "assets/posters/thumbs/poster-lecture.jpg"
+      eyebrow: "专家阵容",
+      title: "院士级资源，为企业开讲",
+      desc: "突出临床专家阵容、重点学科覆盖与分层匹配能力，适合向企业客户介绍服务实力。",
+      tags: ["专家阵容", "重点学科", "三级资源"],
+      image: "assets/posters/poster-lecture.webp",
+      thumb: "assets/posters/thumbs/poster-lecture.webp"
     },
     {
       id: "premium",
       eyebrow: "保险高客答谢",
-      title: "名医面对面，送客户一份健康",
-      desc: "适合保险开门红、高客沙龙与客户答谢会，强调专属策划与院方一站式执行。",
+      title: "把名医，请到客户身边",
+      desc: "面向保险高客沙龙与客户答谢会，强调名医面对面、专属策划与高端健康体验。",
       tags: ["保险高客", "客户答谢", "专属策划"],
-      image: "assets/posters/poster-premium.jpg",
-      thumb: "assets/posters/thumbs/poster-premium.jpg"
+      image: "assets/posters/poster-premium.webp",
+      thumb: "assets/posters/thumbs/poster-premium.webp"
     },
     {
       id: "care",
-      eyebrow: "员工健康关怀",
-      title: "员工健康关怀，从一场讲座开始",
-      desc: "适合 HR 健康月、工会活动与员工福利计划，覆盖颈腰椎、睡眠、慢病与女性健康。",
-      tags: ["员工福利", "健康讲座", "HR 活动"],
-      image: "assets/posters/poster-care.jpg",
-      thumb: "assets/posters/thumbs/poster-care.jpg"
+      eyebrow: "企业健康价值",
+      title: "一场讲座，四重价值",
+      desc: "从员工健康素养、组织活力到雇主品牌与客户连接，清楚说明企业健康活动的价值。",
+      tags: ["企业价值", "员工关怀", "雇主品牌"],
+      image: "assets/posters/poster-care.webp",
+      thumb: "assets/posters/thumbs/poster-care.webp"
     }
   ];
 
@@ -239,8 +239,6 @@
     adminSlotDraft: null,
     adminSlotBatchScope: "all",
     posterId: "",
-    posterDataUrl: "",
-    posterBusy: false,
     profileDraft: null,
     locationDraft: null,
     viewScroll: {
@@ -902,8 +900,6 @@
     state.adminAccountDraft = null;
     state.adminDoctorDraft = null;
     state.posterId = "";
-    state.posterDataUrl = "";
-    state.posterBusy = false;
     state.profileDraft = null;
     state.locationDraft = null;
   }
@@ -4763,30 +4759,26 @@
   }
 
   function renderMarketingPage() {
-    const account = state.adminUser;
-    if (!account) return "";
+    if (!state.adminUser) return "";
     return `
       <div class="admin-page-head">
-        <div><h1>展业物料</h1><p>生成专属海报，分享给企业客户与保险团队</p></div>
-        <span class="admin-page-head__date">${MARKETING_POSTERS.length} 套模板</span>
+        <div><h1>展业物料</h1><p>院方统一宣传海报，打开即可保存转发</p></div>
+        <span class="admin-page-head__date">${MARKETING_POSTERS.length} 套场景</span>
       </div>
       ${renderAdminTabs()}
       <section class="marketing-hero">
-        <span class="marketing-hero__badge">${icon("send", 14)} 项目展业工具</span>
-        <h2>让专业服务，先被看见</h2>
-        <p>选择一套海报，系统会带上你的姓名和手机号。保存图片后可发朋友圈、客户群或直接私聊，客户扫码即可进入预约平台。</p>
-        <div class="marketing-hero__contact">
-          <span class="marketing-hero__avatar">${esc(initialOf(account.name))}</span>
-          <span class="marketing-hero__person">
-            <small>当前专属项目顾问</small>
-            <strong>${esc(account.name)}</strong>
-          </span>
-          ${phoneLink(account.phone, account.phone, "marketing-tel")}
+        <span class="marketing-hero__badge">${icon("send", 14)} 项目展业物料库</span>
+        <h2>把专业服务，变成可分享的邀请</h2>
+        <p>四套海报由院方统一设计，突出名医资源、医院权威、服务价值与入企场景。无需生成，打开高清海报即可保存或转发。</p>
+        <div class="marketing-hero__facts">
+          <span><b>4</b>套场景</span>
+          <span><b>1080</b>×1920</span>
+          <span><b>1</b>个预约二维码</span>
         </div>
       </section>
       <div class="poster-section-head">
-        <h2>精选海报</h2>
-        <span>点开预览并生成专属版本</span>
+        <h2>宣传海报</h2>
+        <span>已做轻量化，打开更快</span>
       </div>
       <div class="poster-list">
         ${MARKETING_POSTERS.map(
@@ -4804,18 +4796,18 @@
                 <span class="poster-card__tags">${poster.tags
                   .map((tag) => `<span>${esc(tag)}</span>`)
                   .join("")}</span>
-                <span class="poster-card__cta">生成专属海报 ${icon("arrowRight", 13)}</span>
+                <span class="poster-card__cta">查看并保存 ${icon("arrowRight", 13)}</span>
               </span>
             </button>
           `
         ).join("")}
       </div>
       <section class="marketing-guide" aria-label="海报使用步骤">
-        <div><span>01</span><strong>选一套模板</strong><p>按客户类型选择品牌、讲堂、高客或员工关怀版本。</p></div>
-        <div><span>02</span><strong>生成专属海报</strong><p>自动加入你的姓名和手机号，二维码保持完整可扫。</p></div>
-        <div><span>03</span><strong>保存并发送</strong><p>长按图片保存到相册，发送朋友圈、客户群或私聊即可。</p></div>
+        <div><span>01</span><strong>按客户场景选择</strong><p>品牌、专家阵容、企业价值与保险高客四套海报。</p></div>
+        <div><span>02</span><strong>打开高清海报</strong><p>海报已由院方统一完成设计，无需等待生成。</p></div>
+        <div><span>03</span><strong>保存后直接发送</strong><p>长按图片保存到相册，发朋友圈、客户群或私聊即可。</p></div>
       </section>
-      <p class="source-note" style="padding:18px 22px 0">海报为 1080×1920 竖版图片，二维码统一指向企业健康服务平台。正式版本可接入个人渠道参数与分享效果统计。</p>
+      <p class="source-note" style="padding:18px 22px 0">海报为 1080×1920 竖版图片，二维码统一指向企业健康服务平台，不展示项目人员姓名与联系方式。</p>
     `;
   }
 
@@ -4823,17 +4815,13 @@
     const poster = marketingPosterById(id);
     if (!poster) return;
     state.posterId = poster.id;
-    state.posterDataUrl = "";
-    state.posterBusy = false;
     state.overlay = { type: "poster", posterId: poster.id };
     renderOverlay();
   }
 
   function renderPosterSheet() {
     const poster = marketingPosterById(state.posterId);
-    const account = state.adminUser;
-    if (!poster || !account) return "";
-    const preview = state.posterDataUrl || poster.image;
+    if (!poster || !state.adminUser) return "";
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet poster-sheet" role="dialog" aria-modal="true" aria-label="${esc(
@@ -4843,44 +4831,27 @@
         <div class="sheet__bar">
           <div>
             <h2>${esc(poster.eyebrow)}</h2>
-            <p>${state.posterDataUrl ? "专属海报已生成" : "长按图片可查看细节，生成后再保存"}</p>
+            <p>高清宣传海报 · 无需生成 · 打开即可保存</p>
           </div>
           <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">
             ${icon("close", 15)}
           </button>
         </div>
         <div class="sheet__body">
-          <div class="poster-sheet__frame ${state.posterDataUrl ? "is-personalized" : ""}">
-            <img src="${esc(preview)}" alt="${esc(poster.title)}${
-              state.posterDataUrl ? ` · ${esc(account.name)}专属海报` : "完整预览"
-            }" decoding="async">
-            ${
-              state.posterBusy
-                ? `<span class="poster-sheet__busy"><i></i>正在生成专属海报…</span>`
-                : ""
-            }
+          <div class="poster-sheet__frame">
+            <img src="${esc(poster.image)}" alt="${esc(poster.title)}高清宣传海报" decoding="async">
           </div>
           <div class="poster-sheet__meta">
             <span class="poster-sheet__tags">${poster.tags
               .map((tag) => `<span>${esc(tag)}</span>`)
               .join("")}</span>
-            <p>${
-              state.posterDataUrl
-                ? `已在海报底部加入「项目顾问 · ${esc(account.name)}」与手机号，二维码区域完整保留。`
-                : "生成专属版本后，海报底部会自动加入你的项目顾问名片与联系电话。"
-            }</p>
-            <div class="poster-sheet__contact">
-              <span>${icon("user", 14)} ${esc(account.name)}</span>
-              ${phoneLink(account.phone, account.phone, "poster-sheet__tel")}
-            </div>
+            <p>海报由院方统一设计，突出医院权威、专家资源与服务价值，客户扫码即可进入企业健康服务平台。</p>
+            <p>在微信中可直接长按图片保存到相册，再发送朋友圈、客户群或私聊。</p>
           </div>
         </div>
         <div class="sheet__footer poster-sheet__footer">
-          <button class="btn btn--primary" type="button"
-            data-action="${state.posterDataUrl ? "save-poster" : "generate-poster"}"
-            ${state.posterBusy ? "disabled" : ""}>
-            ${icon(state.posterDataUrl ? "checkCircle" : "spark", 16)}
-            ${state.posterBusy ? "正在生成…" : state.posterDataUrl ? "保存专属海报" : "生成专属海报"}
+          <button class="btn btn--primary" type="button" data-action="save-poster">
+            ${icon("checkCircle", 16)} 保存高清海报
           </button>
           <button class="btn btn--ghost" type="button" data-action="copy-poster-link">
             ${icon("send", 15)} 复制活动链接
@@ -4890,117 +4861,16 @@
     `;
   }
 
-  function loadImageSource(src) {
-    return new Promise((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error(`图片加载失败：${src}`));
-      image.src = src;
-    });
-  }
-
-  function canvasRoundRect(ctx, x, y, width, height, radius) {
-    const r = Math.min(radius, width / 2, height / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + width - r, y);
-    ctx.arcTo(x + width, y, x + width, y + r, r);
-    ctx.lineTo(x + width, y + height - r);
-    ctx.arcTo(x + width, y + height, x + width - r, y + height, r);
-    ctx.lineTo(x + r, y + height);
-    ctx.arcTo(x, y + height, x, y + height - r, r);
-    ctx.lineTo(x, y + r);
-    ctx.arcTo(x, y, x + r, y, r);
-    ctx.closePath();
-  }
-
-  async function generatePersonalPoster() {
+  function saveMarketingPoster() {
     const poster = marketingPosterById(state.posterId);
-    const account = state.adminUser;
-    if (!poster || !account || state.posterBusy) return;
-    state.posterBusy = true;
-    renderOverlay();
-    try {
-      if (document.fonts?.ready) await document.fonts.ready;
-      const image = await loadImageSource(poster.image);
-      const width = image.naturalWidth || 1080;
-      const height = image.naturalHeight || 1920;
-      const scale = width / 1080;
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(image, 0, 0, width, height);
-
-      const card = {
-        x: 88 * scale,
-        y: height - 150 * scale,
-        w: width - 176 * scale,
-        h: 126 * scale,
-        r: 28 * scale
-      };
-      ctx.save();
-      ctx.shadowColor = "rgba(4, 18, 48, 0.26)";
-      ctx.shadowBlur = 30 * scale;
-      ctx.shadowOffsetY = 10 * scale;
-      canvasRoundRect(ctx, card.x, card.y, card.w, card.h, card.r);
-      ctx.fillStyle = "rgba(255, 255, 255, 0.97)";
-      ctx.fill();
-      ctx.restore();
-      canvasRoundRect(ctx, card.x, card.y, card.w, card.h, card.r);
-      ctx.strokeStyle = "rgba(11, 49, 143, 0.12)";
-      ctx.lineWidth = 2 * scale;
-      ctx.stroke();
-
-      canvasRoundRect(
-        ctx,
-        card.x + 24 * scale,
-        card.y + 29 * scale,
-        6 * scale,
-        68 * scale,
-        3 * scale
-      );
-      ctx.fillStyle = "#ea5504";
-      ctx.fill();
-
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillStyle = "#0b318f";
-      ctx.font = `700 ${31 * scale}px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif`;
-      ctx.fillText(`项目顾问 · ${account.name}`, card.x + 52 * scale, card.y + 53 * scale);
-
-      const phone = String(account.phone || "").trim();
-      if (phone) {
-        ctx.textAlign = "right";
-        ctx.fillStyle = "#0757d8";
-        ctx.font = `700 ${25 * scale}px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif`;
-        ctx.fillText(phone, card.x + card.w - 34 * scale, card.y + 50 * scale);
-      }
-
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#667085";
-      ctx.font = `500 ${19 * scale}px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif`;
-      ctx.fillText("扫码预约 · 院方项目组全程跟进", card.x + 52 * scale, card.y + 89 * scale);
-
-      state.posterDataUrl = canvas.toDataURL("image/jpeg", 0.9);
-    } catch (error) {
-      showToast("海报生成失败，请稍后重试。");
-    } finally {
-      state.posterBusy = false;
-      renderOverlay();
-    }
-  }
-
-  function saveGeneratedPoster() {
-    const poster = marketingPosterById(state.posterId);
-    if (!poster || !state.posterDataUrl) return;
+    if (!poster) return;
     const anchor = document.createElement("a");
-    anchor.href = state.posterDataUrl;
-    anchor.download = `北大医疗名医入企-${poster.id}-${state.adminUser?.name || "项目顾问"}.jpg`;
+    anchor.href = poster.image;
+    anchor.download = `北大医疗名医入企-${poster.id}.webp`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-    showToast("海报已生成。若微信未自动保存，请长按预览图保存到相册。");
+    showToast("高清海报已打开。若微信未自动保存，请长按预览图保存到相册。");
   }
 
   function renderAdminScreen() {
@@ -5991,11 +5861,8 @@
       case "open-poster":
         openPosterSheet(el.dataset.posterId);
         break;
-      case "generate-poster":
-        await generatePersonalPoster();
-        break;
       case "save-poster":
-        saveGeneratedPoster();
+        saveMarketingPoster();
         break;
       case "copy-poster-link": {
         const copied = await copyText(SERVICE_LINK);
