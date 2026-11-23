@@ -1483,6 +1483,43 @@ textarea {
   flex: 1;
 }
 
+.hero-hospital__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hero-hospital__meta small {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-hospital__meta button {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffd1b6;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.hero-hospital__meta button.is-needed {
+  border-color: rgba(234, 85, 4, 0.36);
+  background: linear-gradient(145deg, #ff8a3d, #e95004);
+  box-shadow: 0 4px 12px rgba(234, 85, 4, 0.24);
+  color: #fff;
+}
+
 .hero-hospital__body small {
   display: block;
   overflow: hidden;
@@ -7680,6 +7717,143 @@ textarea {
   object-fit: cover;
   object-position: center;
   transform: scale(1.015);
+}
+
+.season-banner--art {
+  background:
+    radial-gradient(86% 118% at 92% 2%, rgba(var(--season-a), 0.46), transparent 60%),
+    radial-gradient(72% 110% at 2% 116%, rgba(26, 101, 255, 0.42), transparent 62%),
+    linear-gradient(142deg, #0d316f 0%, #082152 48%, #04142f 100%);
+}
+
+.season-tone--winter {
+  --season-a: 117, 197, 255;
+  --season-b: 196, 216, 255;
+}
+
+.season-tone--spring {
+  --season-a: 72, 220, 173;
+  --season-b: 169, 242, 205;
+}
+
+.season-tone--summer {
+  --season-a: 255, 183, 77;
+  --season-b: 255, 220, 146;
+}
+
+.season-tone--autumn {
+  --season-a: 255, 138, 61;
+  --season-b: 255, 198, 150;
+}
+
+.season-banner__art {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.season-banner__glow {
+  position: absolute;
+  top: -66px;
+  right: -50px;
+  width: 224px;
+  height: 224px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(var(--season-a), 0.78) 0%,
+    rgba(var(--season-a), 0.22) 46%,
+    transparent 72%
+  );
+  filter: blur(9px);
+}
+
+.season-banner__ring {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 50%;
+}
+
+.season-banner__ring--outer {
+  right: -104px;
+  bottom: -142px;
+  width: 282px;
+  height: 282px;
+}
+
+.season-banner__ring--inner {
+  right: -48px;
+  bottom: -84px;
+  width: 188px;
+  height: 188px;
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 22px rgba(255, 255, 255, 0.022);
+}
+
+.season-banner__spark {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.07);
+}
+
+.season-banner__spark--one {
+  top: 30%;
+  right: 26%;
+}
+
+.season-banner__spark--two {
+  top: 17%;
+  right: 12%;
+  width: 3px;
+  height: 3px;
+  opacity: 0.72;
+}
+
+.season-banner__glyph {
+  position: absolute;
+  top: -16px;
+  right: -6px;
+  color: rgba(var(--season-b), 0.2);
+  transform: rotate(-7deg);
+}
+
+.season-banner__glyph svg {
+  width: 96px;
+  height: 96px;
+  stroke-width: 0.85;
+}
+
+.season-banner--art .season-banner__shade {
+  z-index: 1;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(3, 14, 37, 0.14) 0%,
+      rgba(3, 14, 37, 0.3) 42%,
+      rgba(3, 14, 37, 0.78) 78%,
+      rgba(3, 14, 37, 0.95) 100%
+    ),
+    linear-gradient(
+      98deg,
+      rgba(3, 14, 37, 0.7) 0%,
+      rgba(3, 14, 37, 0.26) 52%,
+      rgba(3, 14, 37, 0) 82%
+    );
+}
+
+.season-banner--art::after {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
 }
 
 .season-banner__shade {

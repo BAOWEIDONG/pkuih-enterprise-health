@@ -17,12 +17,13 @@
     planTemplates: "pkuih_h6_plan_templates",
     slots: "pkuih_h6_slots",
     smsLogs: "pkuih_h6_sms_logs",
+    homeRegion: "pkuih_h6_home_region",
     lastPortal: "pkuih_h6_portal",
     seed: "pkuih_h6_seed"
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261123-17";
+  const DATA_VERSION = "20261123-18";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -168,6 +169,8 @@
     adminUser: null,
     // client
     homeHospitalId: "",
+    homeRegion: null,
+    homeRegionDraft: null,
     geoStatus: "idle",
     geoLat: null,
     geoLng: null,
@@ -818,6 +821,53 @@
     return fallbackHospital(user);
   }
 
+  function currentClientRegion() {
+    if (state.homeRegion?.province) {
+      return normalizeRegion(state.homeRegion.province, state.homeRegion.city);
+    }
+    const hospital = nearestHospital();
+    if (hospital) return normalizeRegion(hospital.province, hospital.city);
+    return normalizeRegion(state.session?.province || "北京市", state.session?.city || "北京市");
+  }
+
+  function hospitalForRegion(region) {
+    const normalized = normalizeRegion(region?.province, region?.city);
+    const exact = state.hospitals.find((hospital) =>
+      hospitalMatchesRegion(hospital, normalized)
+    );
+    if (exact) return exact;
+    const sameProvince = state.hospitals.find(
+      (hospital) =>
+        normalizeRegion(hospital.province, hospital.city).province === normalized.province
+    );
+    return sameProvince || state.hospitals[0] || null;
+  }
+
+  function hospitalMatchesRegion(hospital, region) {
+    if (!hospital || !region?.province) return false;
+    const hospitalRegion = normalizeRegion(hospital.province, hospital.city);
+    const targetRegion = normalizeRegion(region.province, region.city);
+    return (
+      hospitalRegion.province === targetRegion.province &&
+      hospitalRegion.city === targetRegion.city
+    );
+  }
+
+  function persistHomeRegion(region) {
+    const normalized = normalizeRegion(region?.province, region?.city);
+    state.homeRegion = normalized;
+    writeJSON(STORAGE.homeRegion, normalized);
+    const hospital = hospitalForRegion(normalized);
+    state.homeHospitalId = hospital?.id || "";
+    state.expertScope = "nearby";
+    return hospital;
+  }
+
+  function clearHomeRegion() {
+    state.homeRegion = null;
+    localStorage.removeItem(STORAGE.homeRegion);
+  }
+
   function locationDistanceText() {
     const value = Number(state.geoDistanceKm);
     if (!Number.isFinite(value)) return "";
@@ -837,6 +887,9 @@
 
   function homeLocationText() {
     const hospital = nearestHospital();
+    if (state.homeRegion) {
+      return `手动选择 · ${regionText(state.homeRegion.province, state.homeRegion.city)}`;
+    }
     if (state.homeHospitalId && hospital) {
       return `已切换 · ${regionText(hospital.province, hospital.city)}`;
     }
@@ -933,6 +986,28 @@
         (!hospitalId || expert.hospitalId === hospitalId) &&
         matchesService(expert, service)
     ).length;
+  }
+
+  function scopedServiceCount(service, scope = state.expertScope) {
+    const hospital = nearestHospital();
+    const region = currentClientRegion();
+    return state.experts.filter((expert) => {
+      if (!expert.active || !matchesService(expert, service)) return false;
+      if (scope === "nearby" && expert.hospitalId !== hospital?.id) return false;
+      if (
+        scope === "all" &&
+        !expertCoversRegion(expert, region.province, region.city)
+      ) {
+        return false;
+      }
+      if (
+        state.expertAvailability === "bookable" &&
+        !doctorAvailability(expert).bookable
+      ) {
+        return false;
+      }
+      return true;
+    }).length;
   }
 
   function serviceTagsFor(expert) {
@@ -1398,6 +1473,23 @@
     return text || String(value || "");
   }
 
+  function seasonKeyOf(month = currentMonth()) {
+    const value = Number(month) || currentMonth();
+    if ([12, 1, 2].includes(value)) return "winter";
+    if ([3, 4, 5].includes(value)) return "spring";
+    if ([6, 7, 8].includes(value)) return "summer";
+    return "autumn";
+  }
+
+  function seasonGlyphOf(month = currentMonth()) {
+    return {
+      winter: "snow",
+      spring: "flower",
+      summer: "sun",
+      autumn: "leaf"
+    }[seasonKeyOf(month)];
+  }
+
   const DEPT_ALIASES = {
     心血管: ["心血管"],
     呼吸科: ["呼吸"],
@@ -1640,6 +1732,10 @@
     sparkles:
       '<path d="M12 3.5 13.8 9l5.5 1.8-5.5 1.8L12 18l-1.8-5.4L4.7 10.8 10.2 9Z"/><path d="M19 16.5 19.8 19l2.5.8-2.5.8L19 23l-.8-2.4-2.5-.8 2.5-.8Z"/>',
     leaf: '<path d="M20 4C11 4 4.5 8.5 4.5 15.5c0 2 .7 3.5 1.8 4.5C8 13 12 10 18 8c-4.6 2.6-7.7 6.2-9.2 11.4 2.2.7 4.3.4 6.2-.8C20 15.8 20 9.2 20 4Z"/>',
+    snow: '<path d="M12 2.5v19M4 7l16 10M20 7 4 17"/><path d="m9 4 3 2 3-2M9 20l3-2 3 2M2.9 9.3l3.2 1.4.5 3.5M21.1 14.7l-3.2-1.4-.5-3.5M4.1 16.6l1.4-3.2 3.5-.5M19.9 7.4l-1.4 3.2-3.5.5"/>',
+    flower:
+      '<circle cx="12" cy="12" r="2.1"/><path d="M12 9.9C10.5 6 12.5 3.5 14.8 3.8 17 4.2 17 7.8 14 9.9M14.1 12c3.9-1.5 6.4.5 6.1 2.8-.4 2.2-4 2.2-6.1-.8M12 14.1c1.5 3.9-.5 6.4-2.8 6.1-2.2-.4-2.2-4 .8-6.1M9.9 12C6 13.5 3.5 11.5 3.8 9.2 4.2 7 7.8 7 9.9 10"/>',
+    sun: '<circle cx="12" cy="12" r="4.1"/><path d="M12 2.5v3M12 18.5v3M2.6 12h3M18.4 12h3M5.4 5.4l2.1 2.1M16.5 16.5l2.1 2.1M18.6 5.4l-2.1 2.1M7.5 16.5l-2.1 2.1"/>',
     stethoscope:
       '<path d="M5 3v5a4 4 0 0 0 8 0V3"/><path d="M5 3h2M11 3h2"/><path d="M9 12v3a5 5 0 0 0 10 0v-2"/><circle cx="19" cy="10" r="2.2"/>',
     briefcase: '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V4.8c0-.5.4-.8.8-.8h4.4c.4 0 .8.3.8.8V7M3 12.5h18"/>',
@@ -1831,6 +1927,7 @@
     state.adminTemplateDraft = null;
     state.adminThemeDraft = null;
     state.appointmentLocationDraft = null;
+    state.homeRegionDraft = null;
     state.adminThemeMonth = 0;
     state.slotDay = "";
   }
@@ -1890,6 +1987,7 @@
     if (type === "doctor") return paint(renderDoctorSheet());
     if (type === "appointment") return paint(renderAppointmentSheet());
     if (type === "appointment-location") return paint(renderAppointmentLocationSheet());
+    if (type === "home-city") return paint(renderHomeCitySheet());
     if (type === "demand-create") return paint(renderDemandCreateSheet());
     if (type === "demand") return paint(renderDemandSheet());
     if (type === "profile") return paint(renderProfileSheet());
@@ -2389,13 +2487,23 @@
       });
   }
 
-  function bookableScopeExperts(scope = state.expertScope) {
+  function bookableScopeExperts(
+    scope = state.expertScope,
+    availability = state.expertAvailability
+  ) {
     const hospital = nearestHospital();
+    const region = currentClientRegion();
     return state.experts
       .filter((expert) => {
         if (!expert.active) return false;
         if (scope === "nearby" && expert.hospitalId !== hospital?.id) return false;
-        if (state.expertAvailability === "bookable" && !doctorAvailability(expert).bookable) return false;
+        if (
+          scope === "all" &&
+          !expertCoversRegion(expert, region.province, region.city)
+        ) {
+          return false;
+        }
+        if (availability === "bookable" && !doctorAvailability(expert).bookable) return false;
         if (state.expertMonth > 0 && !matchesService(expert, "讲座")) return false;
         if (!matchesService(expert, state.expertService)) return false;
         if (state.expertMonth > 0) {
@@ -2486,9 +2594,23 @@
   function renderHomeHospitalPicker() {
     const current = nearestHospital();
     const hospitals = homeHospitalsByDistance();
+    const locationFailed =
+      !state.homeRegion &&
+      ["denied", "error", "unavailable"].includes(state.geoStatus);
+    const cityMismatch =
+      Boolean(state.homeRegion) && !hospitalMatchesRegion(current, state.homeRegion);
     const meta =
-      state.geoStatus === "loading"
+      state.homeRegion
+        ? cityMismatch
+          ? `手动城市 · ${regionText(
+              state.homeRegion.province,
+              state.homeRegion.city
+            )} · 本地暂无履约医院`
+          : `手动城市 · ${regionText(state.homeRegion.province, state.homeRegion.city)}`
+        : state.geoStatus === "loading"
         ? "定位中…"
+        : locationFailed
+        ? "未获取定位 · 请选择所在城市"
         : state.homeHospitalId
         ? "已手动切换"
         : state.geoStatus === "ready"
@@ -2497,14 +2619,25 @@
         ? `按${regionText(state.session.province, state.session.city)}推荐`
         : "定位后推荐最近医院";
     const sortHint =
-      state.geoStatus === "ready" && Number.isFinite(Number(state.geoLat))
+      !locationFailed &&
+      state.geoStatus === "ready" &&
+      Number.isFinite(Number(state.geoLat))
         ? " · 按距离排序"
-        : " · 定位后可按距离排序";
+        : "";
     return `
       <div class="hero-hospital">
         <span class="hero-hospital__pin">${icon("mapPin", 15)}</span>
         <span class="hero-hospital__body">
-          <small>当前附近医院 · ${esc(meta)}${sortHint}</small>
+          <span class="hero-hospital__meta">
+            <small>${
+              state.homeRegion || locationFailed ? "" : "当前附近医院 · "
+            }${esc(meta)}${sortHint}</small>
+            <button type="button" data-action="home-city-open" ${
+              locationFailed ? 'class="is-needed"' : ""
+            }>${
+              state.homeRegion ? "改城市" : "选择城市"
+            }</button>
+          </span>
           <span class="hero-hospital__select-wrap">
             <select data-home-hospital-picker aria-label="切换履约医院">
               ${hospitals
@@ -2576,48 +2709,114 @@
     const picker = document.getElementById("home-hospital-picker");
     const nearby = document.getElementById("home-nearby-section");
     const metrics = document.getElementById("home-metrics");
+    const season = document.getElementById("home-season-banner");
+    const tiers = document.getElementById("home-tiers");
+    const services = document.getElementById("home-services");
     if (picker) picker.innerHTML = renderHomeHospitalPicker();
     if (nearby) nearby.innerHTML = renderHomeNearbySection();
     if (metrics) metrics.innerHTML = homeMetricsMarkup();
+    if (season) season.innerHTML = renderHomeSeasonBanner();
+    if (tiers) tiers.innerHTML = renderHomeTierSection();
+    if (services) services.innerHTML = renderHomeServiceSection();
   }
 
-  function renderHomePage() {
+  function openHomeCityPicker() {
+    const region = currentClientRegion();
+    state.homeRegionDraft = {
+      province: region.province,
+      city: region.city
+    };
+    openOverlayLayer({ type: "home-city" });
+  }
+
+  function renderHomeCitySheet() {
+    const draft = state.homeRegionDraft;
+    if (!draft) return "";
+    return `
+      <div class="sheet-backdrop" data-action="close-overlay"></div>
+      <section class="sheet home-city-sheet" role="dialog" aria-modal="true" aria-label="选择所在城市">
+        <div class="sheet__grabber"></div>
+        <div class="sheet__bar">
+          <div><h2>选择所在城市</h2><p>用于推荐附近医院与筛选可履约专家</p></div>
+          <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">
+            ${icon("close", 15)}
+          </button>
+        </div>
+        <div class="sheet__body">
+          <div class="sheet-pad">
+            <div class="template-form-note">${icon(
+              "mapPin",
+              13
+            )} 定位未开启或不准确时，可手动选择城市。保存后首页按该城市推荐医院，专家库“全部医院”只展示可服务该城市的专家。</div>
+            <div class="field-row">
+              <div class="field"><label>省份</label>
+                <select data-home-region-province>${renderProvinceOptions(
+                  draft.province
+                )}</select>
+              </div>
+              <div class="field"><label>城市</label>
+                <select data-home-region-city>${renderCityOptions(
+                  draft.province,
+                  draft.city
+                )}</select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="sheet__footer">
+          <button class="btn btn--ghost" type="button" data-action="close-overlay">取消</button>
+          <button class="btn btn--primary" type="button" data-action="home-city-save">
+            使用该城市 ${icon("check", 14)}
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
+  function saveHomeCity() {
+    const draft = state.homeRegionDraft;
+    if (!draft?.province || !draft?.city) return showToast("请选择省份和城市。");
+    const localHospital = state.hospitals.find((hospital) =>
+      hospitalMatchesRegion(hospital, draft)
+    );
+    const hospital = persistHomeRegion(draft);
+    state.homeRegionDraft = null;
+    if (!popOverlayLayer()) {
+      clearOverlayState();
+      releaseOverlayHistory();
+    }
+    renderApp({ scrollTo: currentWindowScroll() });
+    showToast(
+      localHospital
+        ? `已切换到${regionText(draft.province, draft.city)}，优先推荐${localHospital.name}。`
+        : hospital
+        ? `已切换到${regionText(
+            draft.province,
+            draft.city
+          )}，本地暂无履约医院，已推荐最近的${hospital.name}。`
+        : `已切换到${regionText(draft.province, draft.city)}。`
+    );
+  }
+
+  function renderHomeSeasonBanner() {
     const month = currentMonth();
     const hospital = nearestHospital() || state.hospitals[0];
     const currentTheme = hospital ? hospitalTheme(hospital.id, month) : null;
     const season = seasonalOf(month);
     const topics = (currentTheme?.topics || season?.topics || []).slice(0, 2);
     return `
-      <div class="screen">
-        <section class="hero">
-          <div class="hero__media">
-            <img src="assets/hero-campus-960.jpg" alt="北京大学国际医院" width="960" height="411"
-              fetchpriority="high" decoding="async">
-          </div>
-          <div class="hero__content">
-            <div id="home-hospital-picker">${renderHomeHospitalPicker()}</div>
-            <span class="hero__kicker"><i></i> 白大褂到企 · 名医入企计划</span>
-            <h1>把医学专家<br><em>请到企业身边</em></h1>
-            <p>面向保险公司与企业，提供健康讲座、健康咨询与 1v1 报告解读。按医院、科室与时令主题匹配专家，院方项目组全程跟进。</p>
-            <div class="hero__actions">
-              <button class="btn btn--accent" type="button" data-action="open-booking">
-                发起活动预约 ${icon("arrowRight", 15)}
-              </button>
-              <button class="btn btn--glass" type="button" data-action="tab" data-tab="experts">
-                浏览专家库
-              </button>
-            </div>
-            <div class="hero__metrics" id="home-metrics">
-              ${homeMetricsMarkup()}
-            </div>
-          </div>
-        </section>
-
-        <section class="season-banner season-banner--media" data-action="theme-open"
+        <section class="season-banner season-banner--media season-banner--art season-tone--${seasonKeyOf(
+          month
+        )}" data-action="theme-open"
           data-month="${month}" data-hospital-id="${esc(hospital?.id || "")}">
-          <img class="season-banner__image" src="${themeImageFor(
-            month
-          )}" alt="${month}月时令主题" width="900" height="560" loading="lazy" decoding="async">
+          <span class="season-banner__art" aria-hidden="true">
+            <i class="season-banner__glow"></i>
+            <i class="season-banner__ring season-banner__ring--outer"></i>
+            <i class="season-banner__ring season-banner__ring--inner"></i>
+            <i class="season-banner__spark season-banner__spark--one"></i>
+            <i class="season-banner__spark season-banner__spark--two"></i>
+            <span class="season-banner__glyph">${icon(seasonGlyphOf(month), 108)}</span>
+          </span>
           <div class="season-banner__shade"></div>
           <div class="season-banner__content">
             <div class="season-banner__head">
@@ -2649,9 +2848,12 @@
             </div>
           </div>
         </section>
+    `;
+  }
 
-        <div id="home-nearby-section">${renderHomeNearbySection()}</div>
-
+  function renderHomeTierSection() {
+    const hospital = nearestHospital() || state.hospitals[0];
+    return `
         <section class="section">
           <div class="section-head">
             <div><h2>三级专家资源</h2><p>按活动规格与预约周期匹配</p></div>
@@ -2678,7 +2880,12 @@
             }).join("")}
           </div>
         </section>
+    `;
+  }
 
+  function renderHomeServiceSection() {
+    const hospital = nearestHospital() || state.hospitals[0];
+    return `
         <section class="section">
           <div class="section-head">
             <div><h2>到企服务类型</h2><p>健康讲座、健康咨询与 1v1 报告解读</p></div>
@@ -2704,6 +2911,43 @@
             }).join("")}
           </div>
         </section>
+    `;
+  }
+
+  function renderHomePage() {
+    return `
+      <div class="screen">
+        <section class="hero">
+          <div class="hero__media">
+            <img src="assets/hero-campus-960.jpg" alt="北京大学国际医院" width="960" height="411"
+              fetchpriority="high" decoding="async">
+          </div>
+          <div class="hero__content">
+            <div id="home-hospital-picker">${renderHomeHospitalPicker()}</div>
+            <span class="hero__kicker"><i></i> 白大褂到企 · 名医入企计划</span>
+            <h1>把医学专家<br><em>请到企业身边</em></h1>
+            <p>面向保险公司与企业，提供健康讲座、健康咨询与 1v1 报告解读。按医院、科室与时令主题匹配专家，院方项目组全程跟进。</p>
+            <div class="hero__actions">
+              <button class="btn btn--accent" type="button" data-action="open-booking">
+                发起活动预约 ${icon("arrowRight", 15)}
+              </button>
+              <button class="btn btn--glass" type="button" data-action="tab" data-tab="experts">
+                浏览专家库
+              </button>
+            </div>
+            <div class="hero__metrics" id="home-metrics">
+              ${homeMetricsMarkup()}
+            </div>
+          </div>
+        </section>
+
+        <div id="home-season-banner">${renderHomeSeasonBanner()}</div>
+
+        <div id="home-nearby-section">${renderHomeNearbySection()}</div>
+
+        <div id="home-tiers">${renderHomeTierSection()}</div>
+
+        <div id="home-services">${renderHomeServiceSection()}</div>
 
         <section class="section">
           <div class="section-head">
@@ -3096,10 +3340,17 @@
   function renderExpertResults() {
     const list = bookableScopeExperts();
     const hospital = nearestHospital();
+    const region = currentClientRegion();
     return `
       <div class="expert-result-meta">
-        <span><b>${list.length}</b> 位专家</span>
-        <span>${state.expertScope === "nearby" ? esc(hospital?.name || "就近医院") : "全国可预约专家"}</span>
+        <span><b>${list.length}</b> 位专家${
+          state.expertAvailability === "bookable" ? " · 仅可约" : ""
+        }</span>
+        <span>${
+          state.expertScope === "nearby"
+            ? esc(hospital?.name || "就近医院")
+            : `全部医院 · ${esc(regionText(region.province, region.city))}可履约`
+        }</span>
       </div>
       ${
         list.length
@@ -3148,7 +3399,7 @@
               data-action="expert-service" data-value="${esc(id)}">${esc(
                 serviceLabel(id)
               )}<span class="chip__count">${
-                id === "1对1" ? "协调" : serviceCount(id, scopeHospitalId)
+                id === "1对1" ? "提需" : scopedServiceCount(id)
               }</span></button>`
         ).join("")}
       </div>
@@ -3157,7 +3408,9 @@
 
   function renderExpertsPage() {
     const hospital = nearestHospital();
-    const nearCount = nearbyExperts().length;
+    const nearCount = bookableScopeExperts("nearby").length;
+    const bookableCount = bookableScopeExperts(state.expertScope, "bookable").length;
+    const allCount = bookableScopeExperts(state.expertScope, "all").length;
     const serviceScopeHospitalId = state.expertScope === "nearby" ? hospital?.id || "" : "";
     return `
       <div class="screen experts-screen">
@@ -3176,7 +3429,7 @@
               <button class="${state.expertScope === "nearby" ? "is-active" : ""}" type="button"
                 data-action="expert-scope" data-value="nearby">就近医院 <span>${nearCount}</span></button>
               <button class="${state.expertScope === "all" ? "is-active" : ""}" type="button"
-                data-action="expert-scope" data-value="all">全部地区</button>
+                data-action="expert-scope" data-value="all">全部医院</button>
             </div>
             <button class="icon-button ${state.expertSearchOpen ? "is-active" : ""}" type="button"
               data-action="expert-search-toggle" aria-label="搜索专家">${icon("search", 17)}</button>
@@ -3209,9 +3462,9 @@
               .join("")}
             <i class="filter-divider"></i>
             <button class="chip ${state.expertAvailability === "bookable" ? "is-active" : ""}" type="button"
-              data-action="expert-availability" data-value="bookable">只看可约</button>
+              data-action="expert-availability" data-value="bookable">只看可约<span class="chip__count">${bookableCount}</span></button>
             <button class="chip ${state.expertAvailability === "all" ? "is-active" : ""}" type="button"
-              data-action="expert-availability" data-value="all">全部专家</button>
+              data-action="expert-availability" data-value="all">全部专家<span class="chip__count">${allCount}</span></button>
           </div>
           ${expertServiceFilterMarkup(serviceScopeHospitalId)}
           <div class="expert-select-filters">
@@ -3244,8 +3497,12 @@
           </div>
           <p class="expert-toolbar__hint" id="expert-scope-hint">${icon("mapPin", 11)} ${
             state.expertScope === "nearby"
-              ? `优先展示 ${esc(hospital?.name || "就近医院")}，可切换到全部地区`
-              : "展示全国可预约专家，号源按各医院实时配置"
+              ? `优先展示 ${esc(hospital?.name || "就近医院")}${
+                  state.expertAvailability === "bookable" ? " · 仅显示可约专家" : " · 含暂无号源专家"
+                }`
+              : `全部医院中，仅展示可服务${esc(
+                  regionText(currentClientRegion().province, currentClientRegion().city)
+                )}的专家${state.expertAvailability === "bookable" ? " · 仅显示可约" : ""}`
           }</p>
         </div>
         <div id="expert-results">${renderExpertResults()}</div>
@@ -3272,6 +3529,20 @@
     document.querySelectorAll('[data-action="expert-availability"]').forEach((button) => {
       button.classList.toggle("is-active", button.dataset.value === state.expertAvailability);
     });
+    refreshExpertAvailabilityCounts();
+  }
+
+  function refreshExpertAvailabilityCounts() {
+    const bookable = bookableScopeExperts(state.expertScope, "bookable").length;
+    const all = bookableScopeExperts(state.expertScope, "all").length;
+    const bookableCount = document.querySelector(
+      '[data-action="expert-availability"][data-value="bookable"] .chip__count'
+    );
+    const allCount = document.querySelector(
+      '[data-action="expert-availability"][data-value="all"] .chip__count'
+    );
+    if (bookableCount) bookableCount.textContent = String(bookable);
+    if (allCount) allCount.textContent = String(all);
   }
 
   function resetExpertFilters(overrides = {}) {
@@ -3299,6 +3570,7 @@
     document.querySelectorAll('[data-action="expert-availability"]').forEach((button) => {
       button.classList.toggle("is-active", button.dataset.value === state.expertAvailability);
     });
+    refreshExpertAvailabilityCounts();
     refreshExpertHint();
   }
 
@@ -5263,7 +5535,6 @@
     }
     const appointments = appointmentsForUser(session.phone);
     const demands = demandsForUser(session.phone);
-    const hospital = nearestHospital(session);
     return `
       <div class="screen me-screen">
         <header class="page-head page-head--tight">
@@ -5283,16 +5554,10 @@
               14
             )} 编辑</button>
           </div>
-          <a class="profile-hero__phone" href="${esc(phoneHref(session.contactPhone || session.phone))}">
+          <div class="profile-hero__phone">
             ${icon("phone", 15)}
             <strong>${esc(session.contactPhone || session.phone)}</strong>
-            <span>点击拨打</span>
-          </a>
-          <div class="profile-hero__meta">
-            <div><small>所在地区</small><strong>${esc(session.province || "")} ${esc(
-              session.city || ""
-            )}</strong></div>
-            <div><small>就近医院</small><strong>${esc(hospital?.short || "")}</strong></div>
+            <span>联系手机</span>
           </div>
         </section>
         <div class="me-stats">
@@ -5320,7 +5585,7 @@
           </button>
           <button type="button" data-action="open-profile">
             <span class="me-menu__icon">${icon("user", 17)}</span>
-            <span><strong>企业资料</strong><small>姓名、单位、联系方式与所在城市</small></span>
+            <span><strong>企业资料</strong><small>姓名、单位与联系方式</small></span>
             ${icon("chevronRight", 15)}
           </button>
           <a href="${esc(phoneHref("400-000-0000"))}">
@@ -5379,13 +5644,7 @@
                 draft.contactPhone || draft.phone
               )}">
             </div>
-            <div class="field"><label>所在省市 <span>用于优先展示就近医院</span></label>
-              <div class="field-row">
-                <select data-profile-province>${renderProvinceOptions(draft.province)}</select>
-                <select data-profile-city>${renderCityOptions(draft.province, draft.city)}</select>
-              </div>
-            </div>
-            <p class="field-help">修改所在城市后，专家库与预约会优先展示对应医院的专家。</p>
+            <p class="field-help">所在城市请在首页定位区域手动选择，用于推荐附近医院与可履约专家。</p>
           </div>
         </div>
         <div class="sheet__footer">
@@ -8497,10 +8756,17 @@
     const hint = document.getElementById("expert-scope-hint");
     if (!hint) return;
     const hospital = nearestHospital();
+    const region = currentClientRegion();
     hint.innerHTML =
       state.expertScope === "nearby"
-        ? `${icon("mapPin", 11)} 优先展示 ${esc(hospital?.name || "就近医院")}，可切换到全部地区`
-        : `${icon("mapPin", 11)} 展示全国可预约专家，号源按各医院实时配置`;
+        ? `${icon("mapPin", 11)} 优先展示 ${esc(hospital?.name || "就近医院")}${
+            state.expertAvailability === "bookable"
+              ? " · 仅显示可约专家"
+              : " · 含暂无号源专家"
+          }`
+        : `${icon("mapPin", 11)} 全部医院中，仅展示可服务${esc(
+            regionText(region.province, region.city)
+          )}的专家${state.expertAvailability === "bookable" ? " · 仅显示可约" : ""}`;
   }
 
   /* =========================================================
@@ -8610,7 +8876,32 @@
     if (target.matches("[data-home-hospital-picker]")) {
       state.homeHospitalId = target.value || "";
       state.expertScope = "nearby";
+      const hospital = hospitalById(state.homeHospitalId);
+      if (hospital) {
+        state.homeRegion = {
+          province: hospital.province,
+          city: hospital.city
+        };
+        writeJSON(STORAGE.homeRegion, state.homeRegion);
+      }
       refreshHomeLocationViews();
+      return;
+    }
+    if (target.matches("[data-home-region-province]") && state.homeRegionDraft) {
+      state.homeRegionDraft.province = target.value;
+      state.homeRegionDraft.city =
+        (state.chinaCities?.[target.value] || [target.value])[0] || target.value;
+      const city = document.querySelector("[data-home-region-city]");
+      if (city) {
+        city.innerHTML = renderCityOptions(
+          state.homeRegionDraft.province,
+          state.homeRegionDraft.city
+        );
+      }
+      return;
+    }
+    if (target.matches("[data-home-region-city]") && state.homeRegionDraft) {
+      state.homeRegionDraft.city = target.value;
       return;
     }
     if (target.matches("[data-login-province]")) {
@@ -9104,7 +9395,14 @@
         state.expertScope = "nearby";
         refreshHomeLocationViews();
         break;
+      case "home-city-open":
+        openHomeCityPicker();
+        break;
+      case "home-city-save":
+        saveHomeCity();
+        break;
       case "home-use-location":
+        clearHomeRegion();
         state.homeHospitalId = "";
         requestLocationRecommendation({ manual: true });
         refreshHomeLocationViews();
@@ -9218,6 +9516,7 @@
         break;
       case "expert-availability":
         state.expertAvailability = el.dataset.value;
+        refreshExpertFilterChrome();
         refreshExpertResults();
         break;
       case "expert-search-toggle":
@@ -9586,6 +9885,13 @@
       }
       state.session = user;
       if (user) writeJSON(STORAGE.session, user);
+
+      const storedHomeRegion = readJSON(STORAGE.homeRegion, null);
+      if (storedHomeRegion?.province) {
+        const region = normalizeRegion(storedHomeRegion.province, storedHomeRegion.city);
+        state.homeRegion = region;
+        state.homeHospitalId = hospitalForRegion(region)?.id || "";
+      }
 
       const adminSession = readJSON(STORAGE.adminSession, null);
       const account = adminSession?.username
