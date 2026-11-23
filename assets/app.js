@@ -22,7 +22,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261123-14";
+  const DATA_VERSION = "20261123-15";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -245,6 +245,8 @@
     historyDepth: 0,
     overlayHistoryDepth: 0,
     suppressPopCount: 0,
+    historyNavToken: 0,
+    historyNavTarget: null,
     authHistory: false,
     adminHistory: false,
     reuseHistoryForOverlay: false,
@@ -1670,11 +1672,14 @@
     });
   }
 
-  function pushAppHistory(layer = "overlay") {
+  function pushAppHistory(layer = "overlay", overlayDepth = null) {
     if (state.screen === "auth" && layer !== "auth") return false;
     try {
+      const nextState = { ...(window.history.state || {}), pkuihLayer: layer };
+      if (overlayDepth == null) delete nextState.pkuihOverlayDepth;
+      else nextState.pkuihOverlayDepth = overlayDepth;
       window.history.pushState(
-        { ...(window.history.state || {}), pkuihLayer: layer },
+        nextState,
         "",
         window.location.href
       );
@@ -1702,20 +1707,60 @@
   }
 
   function pushOverlayHistory() {
-    if (state.reuseHistoryForOverlay) {
-      state.reuseHistoryForOverlay = false;
-      state.overlayHistoryDepth = Math.max(1, state.overlayHistoryDepth);
-      return;
-    }
-    if (pushAppHistory("overlay")) state.overlayHistoryDepth += 1;
+    const nextDepth = state.overlayHistoryDepth + 1;
+    if (pushAppHistory("overlay", nextDepth)) state.overlayHistoryDepth = nextDepth;
   }
 
   function releaseOverlayHistory(levels = null) {
     const depth = state.overlayHistoryDepth;
     if (depth <= 0) return 0;
     const count = levels === null ? depth : Math.min(Math.max(1, levels), depth);
-    state.overlayHistoryDepth = depth - count;
-    return popAppHistory(count);
+    const targetDepth = depth - count;
+    state.overlayHistoryDepth = targetDepth;
+    state.historyDepth = Math.max(0, state.historyDepth - count);
+    const token = state.historyNavToken + 1;
+    state.historyNavToken = token;
+    state.historyNavTarget = { depth: targetDepth, token };
+    window.setTimeout(() => {
+      if (state.historyNavTarget?.token === token) state.historyNavTarget = null;
+    }, 900);
+    try {
+      window.history.go(-count);
+      return count;
+    } catch {
+      state.overlayHistoryDepth = depth;
+      state.historyDepth += count;
+      state.historyNavTarget = null;
+      return 0;
+    }
+  }
+
+  function syncOverlayToHistoryDepth(targetDepth) {
+    const target = Math.max(0, Number(targetDepth) || 0);
+    const currentDepth = state.overlay ? state.overlayStack.length + 1 : 0;
+    if (!state.overlay) return;
+    if (target <= 0) {
+      const restoreTop = state.overlayScrollY;
+      state.overlayHistoryDepth = 0;
+      clearOverlayState();
+      if (state.screen === "admin" || state.screen === "admin-login") {
+        renderApp({ scrollTo: restoreTop });
+      } else {
+        renderOverlay();
+      }
+      document.body.classList.remove("is-locked");
+      return;
+    }
+    if (target >= currentDepth) {
+      state.overlayHistoryDepth = currentDepth;
+      return;
+    }
+    while (state.overlayStack.length && state.overlayStack.length + 1 > target) {
+      state.overlay = state.overlayStack.pop();
+    }
+    state.overlayHistoryDepth = target;
+    renderOverlay();
+    document.body.classList.add("is-locked");
   }
 
   function openOverlayLayer(nextOverlay) {
@@ -2002,12 +2047,27 @@
     const hadOverlay = Boolean(
       state.overlay || overlayRoot?.querySelector(".sheet, .sheet-backdrop, .flow")
     );
-    const reuseOverlayHistory = hadOverlay && state.overlayHistoryDepth > 0;
+    const hadOverlayHistory = hadOverlay && state.overlayHistoryDepth > 0;
     if (hadOverlay) {
       clearOverlayState();
       if (overlayRoot) overlayRoot.innerHTML = "";
       document.body.classList.remove("is-locked");
-      if (reuseOverlayHistory) state.overlayHistoryDepth = 0;
+      state.overlayHistoryDepth = 0;
+      if (hadOverlayHistory) {
+        try {
+          window.history.replaceState(
+            {
+              ...(window.history.state || {}),
+              pkuihLayer: "auth",
+              pkuihOverlayDepth: 0
+            },
+            "",
+            window.location.href
+          );
+        } catch {
+          state.overlayHistoryDepth = 0;
+        }
+      }
     }
     applyLocationToLogin(nearestHospital());
     state.pendingAuth = pending;
@@ -2016,9 +2076,10 @@
     state.login.code = "";
     state.login.agree = false;
     state.adminAuthed = false;
+    state.reuseHistoryForOverlay = false;
     if (!state.authHistory) {
       state.authHistory = true;
-      if (!reuseOverlayHistory) pushAppHistory("auth");
+      if (!hadOverlayHistory) pushAppHistory("auth", 0);
     }
     renderApp();
   }
@@ -2087,7 +2148,21 @@
     setLastPortal("client");
     if (state.authHistory) {
       state.authHistory = false;
-      state.reuseHistoryForOverlay = true;
+      state.reuseHistoryForOverlay = false;
+      state.historyDepth = Math.max(0, state.historyDepth - 1);
+      try {
+        window.history.replaceState(
+          {
+            ...(window.history.state || {}),
+            pkuihLayer: "main",
+            pkuihOverlayDepth: 0
+          },
+          "",
+          window.location.href
+        );
+      } catch {
+        // History replacement is best effort; navigation still remains usable.
+      }
     }
     const pending = state.pendingAuth;
     state.pendingAuth = null;
@@ -2095,7 +2170,7 @@
     state.login.step = 1;
     state.login.code = "";
     if (pending?.type === "booking") {
-      state.tab = "experts";
+      state.tab = pending.returnTab || "experts";
       renderApp({ scrollTo: 0 });
       openBooking(
         pending.doctorId || "",
@@ -2306,6 +2381,7 @@
         if (!expert.active) return false;
         if (scope === "nearby" && expert.hospitalId !== hospital?.id) return false;
         if (state.expertAvailability === "bookable" && !doctorAvailability(expert).bookable) return false;
+        if (state.expertMonth > 0 && !matchesService(expert, "讲座")) return false;
         if (!matchesService(expert, state.expertService)) return false;
         if (state.expertMonth > 0) {
           const theme = hospitalTheme(expert.hospitalId, state.expertMonth);
@@ -2967,7 +3043,10 @@
   function renderExpertCard(expert) {
     const tier = tierOf(expert);
     const availability = doctorAvailability(expert);
-    const serviceTags = serviceTagsFor(expert, { coordination: state.expertService === "1对1" });
+    const serviceTags =
+      state.expertMonth > 0
+        ? [{ service: "讲座", coordinated: false }]
+        : serviceTagsFor(expert, { coordination: state.expertService === "1对1" });
     return `
       <button class="expert-card" type="button" data-action="open-doctor" data-doctor-id="${esc(expert.id)}">
         <span class="expert-card__media">
@@ -3034,6 +3113,38 @@
     `;
   }
 
+  function expertServiceFilterMarkup(scopeHospitalId = "") {
+    if (state.expertMonth > 0) {
+      return `
+        <div class="filter-scroll filter-scroll--services" id="expert-service-filter">
+          <span class="filter-label">服务类型</span>
+          <button class="chip is-active" type="button" data-action="expert-service"
+            data-value="讲座">${esc(serviceLabel("讲座"))}<span class="chip__count">本月</span></button>
+          <span class="filter-month-note">${icon("leaf", 10)} 月令主题仅对应健康讲座</span>
+          <button class="filter-reset-link" type="button" data-action="expert-month-clear">
+            清除月令筛选
+          </button>
+        </div>
+      `;
+    }
+    return `
+      <div class="filter-scroll filter-scroll--services" id="expert-service-filter">
+        <span class="filter-label">服务类型</span>
+        <button class="chip ${state.expertService === "all" ? "is-active" : ""}" type="button"
+          data-action="expert-service" data-value="all">全部服务</button>
+        ${SERVICE_IDS.map(
+          (id) =>
+            `<button class="chip ${state.expertService === id ? "is-active" : ""}" type="button"
+              data-action="expert-service" data-value="${esc(id)}">${esc(
+                serviceLabel(id)
+              )}<span class="chip__count">${
+                id === "1对1" ? "协调" : serviceCount(id, scopeHospitalId)
+              }</span></button>`
+        ).join("")}
+      </div>
+    `;
+  }
+
   function renderExpertsPage() {
     const hospital = nearestHospital();
     const nearCount = nearbyExperts().length;
@@ -3092,20 +3203,7 @@
             <button class="chip ${state.expertAvailability === "all" ? "is-active" : ""}" type="button"
               data-action="expert-availability" data-value="all">全部专家</button>
           </div>
-          <div class="filter-scroll filter-scroll--services">
-            <span class="filter-label">服务类型</span>
-            <button class="chip ${state.expertService === "all" ? "is-active" : ""}" type="button"
-                  data-action="expert-service" data-value="all">全部服务</button>
-            ${SERVICE_IDS.map(
-              (id) =>
-                `<button class="chip ${state.expertService === id ? "is-active" : ""}" type="button"
-                  data-action="expert-service" data-value="${esc(id)}">${esc(
-                    serviceLabel(id)
-                  )}<span class="chip__count">${
-                    id === "1对1" ? "协调" : serviceCount(id, serviceScopeHospitalId)
-                  }</span></button>`
-            ).join("")}
-          </div>
+          ${expertServiceFilterMarkup(serviceScopeHospitalId)}
           <div class="expert-select-filters">
             <label>
               <span>${icon("leaf", 11)} 月份时令 <em>可选</em></span>
@@ -3164,6 +3262,34 @@
     document.querySelectorAll('[data-action="expert-availability"]').forEach((button) => {
       button.classList.toggle("is-active", button.dataset.value === state.expertAvailability);
     });
+  }
+
+  function resetExpertFilters(overrides = {}) {
+    state.expertScope = overrides.scope || "nearby";
+    state.expertTier = overrides.tier || "all";
+    state.expertService = overrides.service || "all";
+    state.expertMonth = Number(overrides.month) || 0;
+    state.expertDept = overrides.dept || "all";
+    state.expertAvailability = overrides.availability || "bookable";
+    state.expertSearch = overrides.search || "";
+    state.expertSearchOpen = Boolean(overrides.searchOpen);
+  }
+
+  function refreshExpertFilterChrome() {
+    const hospital = nearestHospital();
+    const scopeHospitalId = state.expertScope === "nearby" ? hospital?.id || "" : "";
+    const serviceFilter = document.getElementById("expert-service-filter");
+    if (serviceFilter) serviceFilter.outerHTML = expertServiceFilterMarkup(scopeHospitalId);
+    document.querySelectorAll('[data-action="expert-scope"]').forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.value === state.expertScope);
+    });
+    document.querySelectorAll('[data-action="expert-tier"]').forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.value === state.expertTier);
+    });
+    document.querySelectorAll('[data-action="expert-availability"]').forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.value === state.expertAvailability);
+    });
+    refreshExpertHint();
   }
 
   function renderDoctorSheet() {
@@ -3408,7 +3534,8 @@
         tier,
         service: preferredService,
         topic: preferredTopic,
-        theme: preferredTheme
+        theme: preferredTheme,
+        returnTab: state.tab || "home"
       });
       return;
     }
@@ -3429,10 +3556,7 @@
   }
 
   function bookingTopicContext(booking) {
-    const date = parseDate(booking?.date);
-    const month =
-      Number(booking?.themeMonth) ||
-      (date ? date.getMonth() + 1 : currentMonth());
+    const month = Number(booking?.themeMonth) || currentMonth();
     const expert = bookingSelectedDoctor(booking);
     const hospitalId = expert?.hospitalId || nearestHospital()?.id || "";
     const theme = hospitalTheme(hospitalId, month);
@@ -3534,22 +3658,38 @@
         <p class="booking-doctor__note">${icon("sparkles", 12)} ${
           coordinated
             ? "默认由院方按报告协调专科医生，无需选择具体专家。"
-            : "默认不选择专家，由院方按需求匹配；点击医生可先查看介绍。"
+            : "默认不选择专家，由院方按需求匹配。可先查看简介，再单独点“选择”。"
         }</p>
+        <div class="booking-doctor__status ${doctor ? "has-doctor" : ""}">
+          <span>${doctor ? `已选专家 · ${esc(doctor.name)}` : "当前未指定专家"}</span>
+          ${
+            doctor
+              ? `<button type="button" data-action="booking-doctor" data-value="">改为院方匹配</button>`
+              : ""
+          }
+        </div>
         ${options
           .map((expert) => {
             const availability = doctorAvailability(expert);
+            const active = booking.doctorId === expert.id;
             return `
-              <button class="booking-doctor ${
-                booking.doctorId === expert.id ? "is-active" : ""
-              }" type="button" data-action="booking-doctor-preview" data-value="${esc(expert.id)}">
-                <img src="${esc(expertAvatar(expert))}" alt="${esc(expert.name)}" loading="lazy">
-                <span><strong>${esc(expert.name)}<i>${esc(expert.deptTitle)}</i></strong>
-                  <small>${esc(expert.hospital)} · 最近可约 ${formatMD(
-                    availability.next
-                  )} · 查看简介</small></span>
-                <i class="booking-doctor__check">${icon("check", 12)}</i>
-              </button>
+              <div class="booking-doctor ${active ? "is-active" : ""}" data-action="booking-doctor-preview"
+                data-value="${esc(expert.id)}">
+                <button class="booking-doctor__profile" type="button"
+                  data-action="booking-doctor-preview" data-value="${esc(expert.id)}">
+                  <img src="${esc(expertAvatar(expert))}" alt="${esc(expert.name)}" loading="lazy">
+                  <span><strong>${esc(expert.name)}<i>${esc(expert.deptTitle)}</i></strong>
+                    <small>${esc(expert.hospital)} · 最近可约 ${formatMD(
+                      availability.next
+                    )} · <em>查看简介</em></small></span>
+                </button>
+                <button class="booking-doctor__select ${active ? "is-active" : ""}" type="button"
+                  data-action="booking-doctor" data-value="${esc(expert.id)}"
+                  aria-pressed="${active ? "true" : "false"}">
+                  <i class="booking-doctor__check">${icon("check", 12)}</i>
+                  <span>${active ? "已选" : "选择"}</span>
+                </button>
+              </div>
             `;
           })
           .join("")}
@@ -3603,6 +3743,7 @@
     const list = bookingTopicChoices(booking);
     const { month, hospitalId, theme } = bookingTopicContext(booking);
     const selected = bookingSelectedTopicCoverage(booking);
+    const monthBookable = month === currentMonth();
     const coverageCallout = selected
       ? `<div class="booking-topic-coverage ${
           selected.available ? "is-available" : "is-unavailable"
@@ -3632,21 +3773,34 @@
                     booking.province,
                     booking.city
                   );
+                  const active =
+                    booking.customTopic === topic.title &&
+                    (!booking.themeTopicId ||
+                      !topic.id ||
+                      String(booking.themeTopicId) === String(topic.id));
+                  const selectable = available && monthBookable;
                   return `
-                    <button class="topic-chip ${
-                      booking.customTopic === topic.title ? "is-active" : ""
-                    } ${available ? "" : "is-unavailable"}" type="button"
-                      data-action="booking-topic-preview" data-value="${esc(topic.title)}"
-                      title="履约地：${esc(coverage.label)}${
-                        available ? "" : " · 当前城市不可预约"
-                      }">
-                      <span class="topic-chip__main"><i>${esc(topic.dept)}</i>${esc(
-                        topic.title
-                      )}</span>
-                      <small>${icon("mapPin", 9)} ${esc(coverage.label)}${
-                        available ? "" : " · 当前城市不可约"
-                      }</small>
-                    </button>
+                    <div class="topic-chip ${active ? "is-active" : ""} ${
+                      available ? "" : "is-unavailable"
+                    }">
+                      <button class="topic-chip__preview" type="button"
+                        data-action="booking-topic-preview" data-value="${esc(topic.title)}"
+                        title="履约地：${esc(coverage.label)}${
+                          available ? "" : " · 当前城市不可预约"
+                        }">
+                        <span class="topic-chip__main"><i>${esc(topic.dept)}</i>${esc(
+                          topic.title
+                        )}</span>
+                        <small>${icon("mapPin", 9)} ${esc(coverage.label)}${
+                          available ? "" : " · 当前城市不可约"
+                        }</small>
+                      </button>
+                      <button class="topic-chip__select ${active ? "is-active" : ""}" type="button"
+                        data-action="booking-topic" data-value="${esc(topic.title)}"
+                        ${selectable ? "" : "disabled"}>
+                        ${active ? "已选" : available ? (monthBookable ? "选择" : "仅浏览") : "不可约"}
+                      </button>
+                    </div>
                   `;
                 })
                 .join("")
@@ -3893,9 +4047,8 @@
         state.booking.date = "";
       }
     }
-    document.querySelectorAll('[data-action="booking-doctor"]').forEach((button) => {
-      button.classList.toggle("is-active", button.dataset.value === state.booking.doctorId);
-    });
+    const wrap = document.getElementById("booking-doctors");
+    if (wrap) wrap.innerHTML = renderBookingDoctorSection(state.booking);
     refreshBookingDates();
     refreshBookingTopics();
   }
@@ -3966,6 +4119,37 @@
       state.overlay = { type: "booking" };
       renderOverlay();
     }
+    showToast(`已选择主题「${topic.title}」。`);
+  }
+
+  function selectBookingTopicByTitle(title) {
+    const booking = state.booking;
+    if (!booking || !title) return;
+    const { month, hospitalId, theme } = bookingTopicContext(booking);
+    const source = theme?.topics || seasonalOf(month)?.topics || [];
+    const topic = source.find(
+      (item) => String(item.title || "").trim() === String(title).trim()
+    );
+    if (!topic) return showToast("该主题暂不可用。");
+    if (month !== currentMonth()) {
+      return showToast("非本月时令主题仅可浏览，不能预约。");
+    }
+    const coverage = themeTopicCoverage(topic, theme, hospitalId);
+    if (!themeTopicCoversRegion(coverage, booking.province, booking.city)) {
+      return showToast(
+        `「${topic.title}」履约地不含${regionText(
+          booking.province,
+          booking.city
+        )}，请更换课题或活动城市。`
+      );
+    }
+    booking.customTopic = topic.title;
+    booking.themeMonth = month;
+    booking.themeTopicId = topic.id || "";
+    booking.themeCoverage = coverage.label;
+    const input = document.querySelector('[data-booking-field="customTopic"]');
+    if (input) input.value = topic.title;
+    refreshBookingTopics();
     showToast(`已选择主题「${topic.title}」。`);
   }
 
@@ -8220,6 +8404,8 @@
     const target = event.target;
     if (target.matches("[data-expert-month]")) {
       state.expertMonth = Math.max(0, Number(target.value) || 0);
+      state.expertService = state.expertMonth > 0 ? "讲座" : "all";
+      refreshExpertFilterChrome();
       refreshExpertResults();
       return;
     }
@@ -8350,6 +8536,7 @@
         }
         state.screen = "main";
         state.tab = el.dataset.tab || "home";
+        if (state.tab === "experts") resetExpertFilters();
         renderApp({ scrollTo: storedScrollForView(`main:${state.tab}`) });
         if (state.tab === "home" && state.geoStatus === "idle") requestLocationRecommendation();
         break;
@@ -8730,8 +8917,7 @@
         refreshHomeLocationViews();
         break;
       case "home-hospital-experts":
-        state.expertScope = "nearby";
-        state.expertTier = "all";
+        resetExpertFilters();
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
         break;
@@ -8767,12 +8953,11 @@
         );
         break;
       case "theme-experts":
-        state.expertMonth = Number(el.dataset.month) || currentMonth();
-        state.expertDept = "all";
-        state.expertService = "讲座";
-        state.expertAvailability = "all";
-        state.expertTier = "all";
-        state.expertScope = "all";
+        resetExpertFilters({
+          month: Number(el.dataset.month) || currentMonth(),
+          service: "讲座",
+          availability: "bookable"
+        });
         releaseOverlayHistory();
         clearOverlayState();
         state.screen = "main";
@@ -8792,40 +8977,27 @@
         }
         break;
       case "tier-open":
-        state.expertTier = el.dataset.value;
-        state.expertMonth = 0;
-        state.expertDept = "all";
-        state.expertScope = "nearby";
+        resetExpertFilters({ tier: el.dataset.value });
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
         break;
       case "service-open":
-        state.expertService = el.dataset.value;
-        state.expertTier = "all";
-        state.expertMonth = 0;
-        state.expertDept = "all";
-        state.expertScope = "nearby";
-        state.expertSearch = "";
-        state.expertSearchOpen = false;
-        state.expertAvailability = "all";
+        resetExpertFilters({ service: el.dataset.value, availability: "bookable" });
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
         break;
       case "search-topic":
-        state.expertSearch = el.dataset.value;
-        state.expertSearchOpen = true;
-        state.expertTier = "all";
-        state.expertService = "all";
-        state.expertMonth = 0;
-        state.expertDept = "all";
-        state.expertScope = "all";
+        resetExpertFilters({
+          search: el.dataset.value,
+          searchOpen: true
+        });
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
         break;
       case "expert-scope":
         state.expertScope = el.dataset.value;
+        refreshExpertFilterChrome();
         refreshExpertResults();
-        refreshExpertHint();
         break;
       case "expert-tier":
         state.expertTier = el.dataset.value;
@@ -8833,7 +9005,23 @@
         break;
       case "expert-service":
         state.expertService = el.dataset.value;
+        if (state.expertMonth > 0 && state.expertService !== "讲座") {
+          state.expertMonth = 0;
+          showToast("月令主题仅对应健康讲座，已清除月令筛选。");
+        }
+        refreshExpertFilterChrome();
         refreshExpertResults();
+        break;
+      case "expert-month-clear":
+        state.expertMonth = 0;
+        state.expertService = "all";
+        {
+          const select = document.querySelector("[data-expert-month]");
+          if (select) select.value = "0";
+        }
+        refreshExpertFilterChrome();
+        refreshExpertResults();
+        showToast("已清除月令筛选。");
         break;
       case "expert-availability":
         state.expertAvailability = el.dataset.value;
@@ -8981,14 +9169,7 @@
         setBookingDate(el.dataset.value);
         break;
       case "booking-topic": {
-        if (!state.booking) return;
-        const value = el.dataset.value;
-        state.booking.customTopic = state.booking.customTopic === value ? "" : value;
-        document.querySelectorAll('[data-action="booking-topic"]').forEach((button) => {
-          button.classList.toggle("is-active", button.dataset.value === state.booking.customTopic);
-        });
-        const input = document.querySelector('[data-booking-field="customTopic"]');
-        if (input) input.value = state.booking.customTopic;
+        selectBookingTopicByTitle(el.dataset.value || "");
         break;
       }
       case "booking-next":
@@ -9105,24 +9286,30 @@
     document.addEventListener("touchend", finishSheetDrag);
     document.addEventListener("touchcancel", finishSheetDrag);
 
-    window.addEventListener("popstate", () => {
+    window.addEventListener("popstate", (event) => {
       if (state.suppressPopCount > 0) {
         state.suppressPopCount -= 1;
         return;
       }
-      if (state.overlay && state.overlayStack.length) {
-        state.overlay = state.overlayStack.pop();
-        state.overlayHistoryDepth = Math.max(0, state.overlayHistoryDepth - 1);
-        renderOverlay();
+      const targetDepth = Math.max(
+        0,
+        Number(event.state?.pkuihOverlayDepth) || 0
+      );
+      if (
+        state.historyNavTarget &&
+        state.historyNavTarget.depth === targetDepth
+      ) {
+        state.historyNavTarget = null;
         return;
       }
+      state.historyNavTarget = null;
       if (state.overlay) {
-        state.historyDepth = Math.max(0, state.historyDepth - 1);
-        state.overlayHistoryDepth = 0;
-        clearOverlayState();
-        if (state.screen === "admin" || state.screen === "admin-login") renderApp();
-        else renderOverlay();
-        document.body.classList.remove("is-locked");
+        const currentDepth = state.overlayStack.length + 1;
+        state.historyDepth = Math.max(
+          0,
+          state.historyDepth - Math.max(0, currentDepth - targetDepth)
+        );
+        syncOverlayToHistoryDepth(targetDepth);
         return;
       }
       if (state.screen === "auth") {
@@ -9139,6 +9326,12 @@
         state.adminHistory = false;
         setLastPortal("client");
         state.screen = "main";
+        state.tab = "home";
+        renderApp({ scrollTo: storedScrollForView("main:home") });
+        return;
+      }
+      if (state.screen === "main" && state.tab !== "home") {
+        storeCurrentScroll();
         state.tab = "home";
         renderApp({ scrollTo: storedScrollForView("main:home") });
         return;
