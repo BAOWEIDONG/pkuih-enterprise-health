@@ -20,6 +20,18 @@
   };
 
   const DEMO_CODE = "888888";
+  const DATA_VERSION = "20261123-5";
+  const DEMO_PHONE = "13800000001";
+  const DEMO_PROFILE = {
+    phone: DEMO_PHONE,
+    contactPhone: DEMO_PHONE,
+    name: "王经理",
+    orgName: "示例保险有限公司",
+    orgType: "保险公司",
+    title: "客户健康负责人",
+    province: "北京市",
+    city: "北京市"
+  };
   const SERVICE_LINK = "https://baoweidong.github.io/pkuih-enterprise-health/";
   const AVATARS = {
     male: "assets/avatars/doctor-male.svg",
@@ -55,6 +67,7 @@
     }
   };
   const TIER_ORDER = ["elite", "director", "specialist"];
+  const CLIENT_TIER_ORDER = ["specialist", "director", "elite"];
 
   const SERVICES = {
     讲座: { id: "讲座", label: "专家讲座", desc: "主题分享 + 现场问答" },
@@ -130,6 +143,14 @@
     adminAuthed: false,
     adminUser: null,
     // client
+    homeHospitalId: "",
+    geoStatus: "idle",
+    geoLat: null,
+    geoLng: null,
+    geoAccuracy: 0,
+    geoHospitalId: "",
+    geoDistanceKm: null,
+    geoError: "",
     expertScope: "nearby",
     expertTier: "all",
     expertService: "all",
@@ -540,7 +561,7 @@
     return SERVICES[value]?.label || value;
   }
 
-  function nearestHospital(user = state.session) {
+  function fallbackHospital(user = state.session) {
     const province = user?.province || "北京";
     const city = user?.city || "北京";
     if (city && city.includes("深圳")) return hospitalById("shenzhen");
@@ -557,6 +578,128 @@
     if (province === "湖南") return hospitalById("kaide");
     if (province === "广东") return hospitalById("shenzhen");
     return hospitalById("pkuih");
+  }
+
+  function distanceKm(lat1, lng1, lat2, lng2) {
+    const toRad = (value) => (Number(value) * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function nearestHospitalByCoords(lat, lng) {
+    const candidates = state.hospitals.filter(
+      (hospital) => Number.isFinite(Number(hospital.lat)) && Number.isFinite(Number(hospital.lng))
+    );
+    if (!candidates.length) return null;
+    return candidates
+      .map((hospital) => ({
+        hospital,
+        distance: distanceKm(lat, lng, hospital.lat, hospital.lng)
+      }))
+      .sort((a, b) => a.distance - b.distance)[0];
+  }
+
+  function nearestHospital(user = state.session) {
+    const manual = state.homeHospitalId ? hospitalById(state.homeHospitalId) : null;
+    if (manual) return manual;
+    const located = state.geoHospitalId ? hospitalById(state.geoHospitalId) : null;
+    if (located) return located;
+    return fallbackHospital(user);
+  }
+
+  function locationDistanceText() {
+    const value = Number(state.geoDistanceKm);
+    if (!Number.isFinite(value)) return "";
+    if (value < 1) return "1 公里内";
+    if (value < 10) return `约 ${value.toFixed(1)} 公里`;
+    return `约 ${Math.round(value)} 公里`;
+  }
+
+  function hospitalDistanceText(hospital) {
+    if (!hospital || state.geoStatus !== "ready") return "";
+    if (!Number.isFinite(Number(state.geoLat)) || !Number.isFinite(Number(state.geoLng))) return "";
+    const value = distanceKm(state.geoLat, state.geoLng, hospital.lat, hospital.lng);
+    if (value < 1) return "1 公里内";
+    if (value < 10) return `约 ${value.toFixed(1)} 公里`;
+    return `约 ${Math.round(value)} 公里`;
+  }
+
+  function homeLocationText() {
+    const hospital = nearestHospital();
+    if (state.homeHospitalId && hospital) {
+      return `已切换 · ${regionText(hospital.province, hospital.city)}`;
+    }
+    if (state.geoStatus === "loading") return "正在获取当前位置…";
+    if (state.geoStatus === "ready" && state.geoHospitalId) {
+      return `当前位置附近 · 距${hospital?.short || "推荐医院"}${locationDistanceText()}`;
+    }
+    if (state.geoStatus === "denied") return "未开启定位 · 可手动切换医院";
+    if (state.geoStatus === "error" || state.geoStatus === "unavailable") {
+      return "定位不可用 · 可手动切换医院";
+    }
+    if (state.session) return `当前所在地区 · ${regionText(state.session.province, state.session.city)}`;
+    return "定位后将优先推荐最近医院";
+  }
+
+  function applyLocationToLogin(hospital) {
+    if (state.session || !hospital) return;
+    const region = normalizeRegion(hospital.province, hospital.city);
+    state.login.province = region.province;
+    state.login.city = region.city;
+  }
+
+  function requestLocationRecommendation({ manual = false } = {}) {
+    if (state.geoStatus === "loading") return;
+    if (!navigator.geolocation) {
+      state.geoStatus = "unavailable";
+      state.geoError = "当前浏览器不支持定位";
+      refreshHomeLocationViews();
+      if (manual) showToast("当前浏览器不支持定位，请手动切换医院。");
+      return;
+    }
+    state.geoStatus = "loading";
+    state.geoError = "";
+    refreshHomeLocationViews();
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const nearest = nearestHospitalByCoords(lat, lng);
+        state.geoStatus = "ready";
+        state.geoLat = lat;
+        state.geoLng = lng;
+        state.geoAccuracy = Math.round(position.coords.accuracy || 0);
+        state.geoHospitalId = nearest?.hospital?.id || "";
+        state.geoDistanceKm = nearest?.distance ?? null;
+        if (manual) state.homeHospitalId = "";
+        applyLocationToLogin(nearest?.hospital);
+        refreshHomeLocationViews();
+        if (state.screen === "main" && state.tab === "experts" && state.expertScope === "nearby") {
+          refreshExpertResults();
+          refreshExpertHint();
+        }
+        if (manual && nearest?.hospital) {
+          showToast(`已定位，为你推荐${nearest.hospital.name}，${locationDistanceText()}。`);
+        }
+      },
+      (error) => {
+        state.geoStatus = error.code === 1 ? "denied" : "error";
+        state.geoError = error.message || "无法获取当前位置";
+        refreshHomeLocationViews();
+        if (manual) {
+          showToast(
+            error.code === 1
+              ? "未获得定位权限，请在系统设置中允许定位，或手动切换医院。"
+              : "暂时无法获取定位，请手动切换医院。"
+          );
+        }
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
   }
 
   function doctorExpertise(expert) {
@@ -609,6 +752,249 @@
     });
     saveAllSlots(all);
     writeJSON(STORAGE.seed, { ...seeded, slots: true, at: new Date().toISOString() });
+  }
+
+  function seedDemoRecords() {
+    const seeded = readJSON(STORAGE.seed, {});
+    if (seeded.records) return;
+    if (!getUser(DEMO_PHONE)) {
+      upsertUser({
+        ...DEMO_PROFILE,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+    const hospital = hospitalById("pkuih") || state.hospitals[0];
+    if (!hospital) return;
+    const today = startOfDay();
+    const staff = {
+      username: "pkuih",
+      name: "周老师",
+      phone: "13800001111"
+    };
+    const specialist =
+      state.experts.find(
+        (item) => item.hospitalId === hospital.id && item.tier === "specialist" && item.active
+      ) || state.experts[0];
+    const director =
+      state.experts.find(
+        (item) => item.hospitalId === hospital.id && item.tier === "director" && item.active
+      ) || specialist;
+    const specialistDates = specialist ? doctorAvailability(specialist).dates : [];
+    const directorDates = director ? doctorAvailability(director).dates : [];
+    const reviewDate =
+      specialistDates[0] || isoDate(addDays(today, Math.max(8, specialist?.leadDays || 7)));
+    const confirmedDate =
+      directorDates[0] || isoDate(addDays(today, Math.max(16, director?.leadDays || 14)));
+    const pendingDate = isoDate(addDays(today, 12));
+    const now = new Date().toISOString();
+    let appointmentChanged = false;
+    let demandChanged = false;
+    const appointments = getAppointments();
+    if (!appointments.some((item) => item.id === "BD-DEMO-01")) {
+      appointments.push(
+        {
+          id: "BD-DEMO-01",
+          ownerPhone: DEMO_PHONE,
+          orgName: DEMO_PROFILE.orgName,
+          orgType: DEMO_PROFILE.orgType,
+          contactName: DEMO_PROFILE.name,
+          contactTitle: DEMO_PROFILE.title,
+          phone: DEMO_PHONE,
+          province: "北京市",
+          city: "北京市",
+          address: "北京市朝阳区建国路 88 号",
+          venue: "客户总部 3 层报告厅",
+          serviceType: "讲座",
+          doctorId: "",
+          doctorName: "",
+          tier: "specialist",
+          hospitalId: hospital.id,
+          date: pendingDate,
+          topic: "职场人群睡眠与压力管理",
+          audience: "企业员工",
+          headcount: "80",
+          note: "希望安排现场问答，活动时长约 90 分钟。",
+          status: "pending",
+          assignedStaff: null,
+          plan: null,
+          planHistory: [],
+          internalNote: "",
+          feedback: "",
+          createdAt: now,
+          updatedAt: now
+        },
+        {
+          id: "BD-DEMO-02",
+          ownerPhone: DEMO_PHONE,
+          orgName: DEMO_PROFILE.orgName,
+          orgType: DEMO_PROFILE.orgType,
+          contactName: DEMO_PROFILE.name,
+          contactTitle: DEMO_PROFILE.title,
+          phone: DEMO_PHONE,
+          province: "北京市",
+          city: "北京市",
+          address: "北京市海淀区中关村软件园 8 号楼",
+          venue: "一层多功能厅",
+          serviceType: "讲座",
+          doctorId: specialist?.id || "",
+          doctorName: specialist?.name || "",
+          tier: specialist?.tier || "specialist",
+          hospitalId: hospital.id,
+          date: reviewDate,
+          topic: "久坐人群体态与颈腰椎健康管理",
+          audience: "研发与管理团队",
+          headcount: "60",
+          note: "客户希望增加现场体态评估与答疑环节。",
+          status: "review",
+          assignedStaff: staff,
+          plan: {
+            topic: "久坐人群体态与颈腰椎健康管理",
+            serviceType: "讲座",
+            speakerId: specialist?.id || "",
+            speaker: specialist ? `${specialist.name} · ${specialist.deptTitle}` : "院方安排",
+            date: reviewDate,
+            time: "14:00-16:00",
+            province: "北京市",
+            city: "北京市",
+            venue: "一层多功能厅",
+            address: "北京市海淀区中关村软件园 8 号楼",
+            outline:
+              "1. 久坐与常见颈腰椎问题\n2. 办公场景中的风险识别\n3. 日常拉伸与运动处方\n4. 现场问答与健康咨询",
+            agenda:
+              "14:00-14:10 签到与开场\n14:10-15:10 专家主题分享\n15:10-15:40 现场问答\n15:40-16:00 健康咨询",
+            team: "周老师（项目负责人）",
+            message: "院方已完成专家与课题匹配，请确认活动时间、地点与流程。如人数或场地有变化，请提前联系项目对接人。",
+            contact: "周老师 · 13800001111",
+            updatedAt: now
+          },
+          planHistory: [],
+          internalNote: "场地投影与电源待客户确认；建议专家提前 40 分钟到场。",
+          feedback: "",
+          acceptedAt: now,
+          planSentAt: now,
+          createdAt: now,
+          updatedAt: now
+        },
+        {
+          id: "BD-DEMO-03",
+          ownerPhone: DEMO_PHONE,
+          orgName: DEMO_PROFILE.orgName,
+          orgType: DEMO_PROFILE.orgType,
+          contactName: DEMO_PROFILE.name,
+          contactTitle: DEMO_PROFILE.title,
+          phone: DEMO_PHONE,
+          province: "北京市",
+          city: "北京市",
+          address: "北京市朝阳区望京 SOHO T1",
+          venue: "B1 员工活动中心",
+          serviceType: "巡诊",
+          doctorId: director?.id || "",
+          doctorName: director?.name || "",
+          tier: director?.tier || "director",
+          hospitalId: hospital.id,
+          date: confirmedDate,
+          topic: "企业员工代谢健康与体重管理巡诊",
+          audience: "全体职工",
+          headcount: "120",
+          note: "需要分时段到场，现场提供血压与体脂测量。",
+          status: "confirmed",
+          assignedStaff: staff,
+          plan: {
+            topic: "企业员工代谢健康与体重管理巡诊",
+            serviceType: "巡诊",
+            speakerId: director?.id || "",
+            speaker: director ? `${director.name} · ${director.deptTitle}` : "院方安排",
+            date: confirmedDate,
+            time: "10:00-12:00",
+            province: "北京市",
+            city: "北京市",
+            venue: "B1 员工活动中心",
+            address: "北京市朝阳区望京 SOHO T1",
+            outline: "血压、体脂与腰围测量；代谢风险分层；个体化饮食与运动建议。",
+            agenda: "10:00-10:20 场地准备\n10:20-11:40 分组巡诊\n11:40-12:00 汇总答疑",
+            team: "周老师（项目负责人）、张老师（现场执行）",
+            message: "方案已确认，院方将按流程到场执行。",
+            contact: "周老师 · 13800001111",
+            updatedAt: now
+          },
+          planHistory: [],
+          internalNote: "已确认场地与设备。",
+          feedback: "",
+          acceptedAt: now,
+          planSentAt: now,
+          confirmedAt: now,
+          createdAt: now,
+          updatedAt: now
+        }
+      );
+      appointmentChanged = true;
+    }
+    const demands = getDemands();
+    if (!demands.some((item) => item.id === "XQ-DEMO-01")) {
+      demands.push(
+        {
+          id: "XQ-DEMO-01",
+          ownerPhone: DEMO_PHONE,
+          orgName: DEMO_PROFILE.orgName,
+          orgType: DEMO_PROFILE.orgType,
+          contactName: DEMO_PROFILE.name,
+          contactTitle: DEMO_PROFILE.title,
+          phone: DEMO_PHONE,
+          province: "北京市",
+          city: "北京市",
+          hospitalId: hospital.id,
+          serviceType: "巡诊",
+          topic: "企业园区颈肩腰腿痛巡诊",
+          audience: "一线员工与司机班组",
+          headcount: "120",
+          preferredDate: isoDate(addDays(today, 20)),
+          note: "希望安排康复或骨科方向医生，现场可分两组咨询。",
+          status: "pending",
+          assignedStaff: null,
+          followUps: [],
+          createdAt: now,
+          updatedAt: now
+        },
+        {
+          id: "XQ-DEMO-02",
+          ownerPhone: DEMO_PHONE,
+          orgName: DEMO_PROFILE.orgName,
+          orgType: DEMO_PROFILE.orgType,
+          contactName: DEMO_PROFILE.name,
+          contactTitle: DEMO_PROFILE.title,
+          phone: DEMO_PHONE,
+          province: "北京市",
+          city: "北京市",
+          hospitalId: hospital.id,
+          serviceType: "1对1",
+          topic: "管理层一对一健康咨询",
+          audience: "管理层 12 人",
+          headcount: "12",
+          preferredDate: isoDate(addDays(today, 26)),
+          note: "希望安排全科或心血管方向专家。",
+          status: "contacted",
+          assignedStaff: staff,
+          followUps: [
+            {
+              note: "已电话沟通，建议采用全科 + 心血管方向专家分组咨询。",
+              by: staff,
+              at: now
+            }
+          ],
+          createdAt: now,
+          updatedAt: now
+        }
+      );
+      demandChanged = true;
+    }
+    if (appointmentChanged) saveAppointments(appointments);
+    if (demandChanged) saveDemands(demands);
+    writeJSON(STORAGE.seed, {
+      ...seeded,
+      records: true,
+      recordsAt: new Date().toISOString()
+    });
   }
 
   function getAppointments() {
@@ -1079,7 +1465,14 @@
                 <button class="btn btn--primary btn--block auth-submit" type="button" data-action="login-next">
                   ${existing ? "登录" : "下一步"} ${icon("arrowRight", 15)}
                 </button>
-                <p class="auth-tip">${icon("lock", 12)} 未注册手机号验证后将自动创建账号</p>
+                <button class="demo-login" type="button" data-action="demo-login">
+                  <span>
+                    <small>机构演示账号 · 任意手机号均可登录</small>
+                    <strong>13800000001 · 验证码 888888</strong>
+                  </span>
+                  <i>一键进入 ${icon("arrowRight", 13)}</i>
+                </button>
+                <p class="auth-tip">${icon("lock", 12)} 机构账号无需预分配：任意手机号 + 验证码 888888 即可登录</p>
               `
               : `
                 <div class="auth-profile-head">
@@ -1155,6 +1548,7 @@
 
   function startLogin(pending = null) {
     if (state.session) return;
+    applyLocationToLogin(nearestHospital());
     state.pendingAuth = pending;
     state.screen = "auth";
     state.login.step = 1;
@@ -1166,6 +1560,21 @@
       pushAppHistory("auth");
     }
     renderApp();
+  }
+
+  function loginDemoUser() {
+    const hospital = nearestHospital();
+    const region = normalizeRegion(hospital?.province || "北京市", hospital?.city || "北京市");
+    const existing = getUser(DEMO_PHONE);
+    const user = upsertUser({
+      ...(existing || {}),
+      ...DEMO_PROFILE,
+      province: region.province,
+      city: region.city,
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    finishLogin(user);
   }
 
   function startCodeCountdown() {
@@ -1319,7 +1728,7 @@
               ? `<button class="avatar-button" type="button" data-action="tab" data-tab="me" aria-label="个人中心">${esc(
                   initialOf(session.name)
                 )}</button>`
-              : `<button class="topbar__login" type="button" data-action="start-login">登录 ${icon(
+              : `<button class="topbar__login" type="button" data-action="start-login">机构登录 ${icon(
                   "arrowRight",
                   14
                 )}</button>`
@@ -1378,39 +1787,52 @@
      ========================================================= */
   function nearbyExperts({ bookableOnly = false } = {}) {
     const hospital = nearestHospital();
-    return state.experts.filter((expert) => {
-      if (!expert.active) return false;
-      if (expert.hospitalId !== hospital?.id) return false;
-      if (bookableOnly && !doctorAvailability(expert).bookable) return false;
-      return true;
-    });
+    return state.experts
+      .filter((expert) => {
+        if (!expert.active) return false;
+        if (expert.hospitalId !== hospital?.id) return false;
+        if (bookableOnly && !doctorAvailability(expert).bookable) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        return (
+          CLIENT_TIER_ORDER.indexOf(a.tier) - CLIENT_TIER_ORDER.indexOf(b.tier) ||
+          a.name.localeCompare(b.name, "zh-CN")
+        );
+      });
   }
 
   function bookableScopeExperts(scope = state.expertScope) {
     const hospital = nearestHospital();
-    return state.experts.filter((expert) => {
-      if (!expert.active) return false;
-      if (scope === "nearby" && expert.hospitalId !== hospital?.id) return false;
-      if (state.expertAvailability === "bookable" && !doctorAvailability(expert).bookable) return false;
-      if (!matchesService(expert, state.expertService)) return false;
-      if (state.expertTier !== "all" && expert.tier !== state.expertTier) return false;
-      const q = state.expertSearch.trim().toLowerCase();
-      if (q) {
-        const haystack = [
-          expert.name,
-          expert.hospital,
-          expert.dept,
-          expert.deptTitle,
-          expert.specialty,
-          expert.coverage,
-          ...(expert.services || [])
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    });
+    return state.experts
+      .filter((expert) => {
+        if (!expert.active) return false;
+        if (scope === "nearby" && expert.hospitalId !== hospital?.id) return false;
+        if (state.expertAvailability === "bookable" && !doctorAvailability(expert).bookable) return false;
+        if (!matchesService(expert, state.expertService)) return false;
+        if (state.expertTier !== "all" && expert.tier !== state.expertTier) return false;
+        const q = state.expertSearch.trim().toLowerCase();
+        if (q) {
+          const haystack = [
+            expert.name,
+            expert.hospital,
+            expert.dept,
+            expert.deptTitle,
+            expert.specialty,
+            expert.coverage,
+            ...(expert.services || [])
+          ]
+            .join(" ")
+            .toLowerCase();
+          if (!haystack.includes(q)) return false;
+        }
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          CLIENT_TIER_ORDER.indexOf(a.tier) - CLIENT_TIER_ORDER.indexOf(b.tier) ||
+          a.name.localeCompare(b.name, "zh-CN")
+      );
   }
 
   function renderExpertMini(expert) {
@@ -1436,12 +1858,108 @@
     `;
   }
 
-  function renderHomePage() {
-    const session = state.session;
+  function renderHomeLocationCard() {
+    const hospital = nearestHospital();
+    const bookable = nearbyExperts({ bookableOnly: true }).length;
+    const relation = state.homeHospitalId
+      ? "已切换到该院"
+      : state.geoStatus === "ready"
+      ? "按当前位置推荐"
+      : "按登录地区推荐";
+    return `
+      <button class="nearby-card ${state.session ? "" : "nearby-card--guest"}" type="button"
+        data-action="home-hospital-experts">
+        <span class="nearby-card__icon">${icon("mapPin", 17)}</span>
+        <span class="nearby-card__copy">
+          <small>${esc(homeLocationText())}</small>
+          <strong>${esc(hospital?.name || "北京大学国际医院")}</strong>
+          <span>${bookable} 位专家近期可预约 · ${relation}</span>
+        </span>
+        <span class="nearby-card__cta">查看 ${icon("chevronRight", 14)}</span>
+      </button>
+    `;
+  }
+
+  function renderHomeHospitalSwitch() {
+    const current = nearestHospital();
+    const geolocatedId = state.geoHospitalId;
+    return `
+      <section class="section home-hospitals">
+        <div class="section-head">
+          <div>
+            <h2>切换履约医院</h2>
+            <p id="home-location-status">${esc(homeLocationText())}</p>
+          </div>
+          <button class="text-link" type="button" data-action="home-use-location">
+            ${icon("mapPin", 13)} ${state.geoStatus === "loading" ? "定位中…" : "重新定位"}
+          </button>
+        </div>
+        <div class="hospital-switch" role="list" aria-label="切换履约医院">
+          ${state.hospitals
+            .map((hospital) => {
+              const count = state.experts.filter(
+                (expert) =>
+                  expert.active &&
+                  expert.hospitalId === hospital.id &&
+                  doctorAvailability(expert).bookable
+              ).length;
+              const distance = hospitalDistanceText(hospital);
+              return `
+                <button class="hospital-chip ${
+                  hospital.id === current?.id ? "is-active" : ""
+                }" type="button" data-action="home-hospital" data-value="${esc(hospital.id)}">
+                  <span class="hospital-chip__top">
+                    <small>${esc(distance || hospital.province)}</small>
+                    ${hospital.id === geolocatedId ? "<i>最近</i>" : ""}
+                  </span>
+                  <strong>${esc(hospital.short)}</strong>
+                  <span class="hospital-chip__count">${count} 位可约</span>
+                </button>
+              `;
+            })
+            .join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderHomeNearbySection() {
     const hospital = nearestHospital();
     const near = nearbyExperts({ bookableOnly: true });
+    return `
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <h2>${state.homeHospitalId ? "该院可预约专家" : "就近可预约专家"}</h2>
+            <p id="home-nearby-summary">${esc(hospital?.name || "")} · ${near.length} 位近期可约 · 专业医生优先</p>
+          </div>
+          <button class="text-link" type="button" data-action="home-hospital-experts">
+            全部专家 ${icon("chevronRight", 14)}
+          </button>
+        </div>
+        <div class="expert-mini-list" id="home-nearby-experts">
+          ${
+            near.length
+              ? near.slice(0, 4).map(renderExpertMini).join("")
+              : `<div class="inline-empty">该院近期暂无号源，可切换医院查看，或发起提需由院方协调。</div>`
+          }
+        </div>
+      </section>
+    `;
+  }
+
+  function refreshHomeLocationViews() {
+    if (state.screen !== "main" || state.tab !== "home") return;
+    const card = document.getElementById("home-nearby-card");
+    const hospitals = document.getElementById("home-hospital-block");
+    const nearby = document.getElementById("home-nearby-section");
+    if (card) card.innerHTML = renderHomeLocationCard();
+    if (hospitals) hospitals.innerHTML = renderHomeHospitalSwitch();
+    if (nearby) nearby.innerHTML = renderHomeNearbySection();
+  }
+
+  function renderHomePage() {
     const season = seasonalOf();
-    const nearCount = nearbyExperts().filter((expert) => doctorAvailability(expert).bookable).length;
     return `
       <div class="screen">
         <section class="hero">
@@ -1469,31 +1987,8 @@
           </div>
         </section>
 
-        ${
-          session
-            ? `
-              <button class="nearby-card" type="button" data-action="tab" data-tab="experts">
-                <span class="nearby-card__icon">${icon("mapPin", 17)}</span>
-                <span class="nearby-card__copy">
-                  <small>当前所在地区 · ${esc(regionText(session.province, session.city) || "北京")}</small>
-                  <strong>${esc(hospital?.name || "北京大学国际医院")}</strong>
-                  <span>${nearCount} 位专家近期可预约 · 优先展示就近医院</span>
-                </span>
-                <span class="nearby-card__cta">查看 ${icon("chevronRight", 14)}</span>
-              </button>
-            `
-            : `
-              <button class="nearby-card nearby-card--guest" type="button" data-action="start-login">
-                <span class="nearby-card__icon">${icon("mapPin", 17)}</span>
-                <span class="nearby-card__copy">
-                  <small>就近医院优先展示</small>
-                  <strong>登录后查看本地可预约专家</strong>
-                  <span>按所在省市匹配医院与专家号源</span>
-                </span>
-                <span class="nearby-card__cta">登录 ${icon("chevronRight", 14)}</span>
-              </button>
-            `
-        }
+        <div id="home-nearby-card">${renderHomeLocationCard()}</div>
+        <div id="home-hospital-block">${renderHomeHospitalSwitch()}</div>
 
         <section class="season-banner">
           <div class="season-banner__head">
@@ -1519,22 +2014,7 @@
           </div>
         </section>
 
-        <section class="section">
-          <div class="section-head">
-            <div>
-              <h2>就近可预约专家</h2>
-              <p>${esc(hospital?.name || "")} · 与号源实时关联</p>
-            </div>
-            <button class="text-link" type="button" data-action="tab" data-tab="experts">全部专家 ${icon("chevronRight", 14)}</button>
-          </div>
-          <div class="expert-mini-list">
-            ${
-              near.length
-                ? near.slice(0, 4).map(renderExpertMini).join("")
-                : `<div class="inline-empty">近期暂无号源，可切换查看全部地区专家，或发起提需由院方协调。</div>`
-            }
-          </div>
-        </section>
+        <div id="home-nearby-section">${renderHomeNearbySection()}</div>
 
         <section class="section">
           <div class="section-head">
@@ -1565,6 +2045,9 @@
           <div class="service-grid">
             ${SERVICE_IDS.map((id, index) => {
               const service = SERVICES[id];
+              const count = state.experts.filter(
+                (expert) => expert.active && matchesService(expert, id)
+              ).length;
               return `
                 <button class="service-card" type="button" data-action="service-open" data-value="${esc(id)}">
                   <span class="service-card__num">0${index + 1}</span>
@@ -1574,6 +2057,7 @@
                   )}</span>
                   <strong>${esc(service.label)}</strong>
                   <p>${esc(service.desc)}</p>
+                  <span class="service-card__count">${count} 位专家可服务</span>
                 </button>
               `;
             }).join("")}
@@ -1614,7 +2098,7 @@
         </section>
 
         <p class="source-note">
-          专家资料、医院与服务信息来自院方整理表（2026-11-20），仅用于本演示。实际出讲专家、号源与排期以院方最终确认为准。
+          专家资料、医院与服务信息来自院方整理表（2026-11-23），仅用于本演示。实际出讲专家、号源与排期以院方最终确认为准。
         </p>
         <section class="hospital-entry-section">
           <button class="hospital-entry" type="button" data-action="open-admin">
@@ -1693,7 +2177,11 @@
         <header class="page-head page-head--tight">
           <span class="eyebrow"><i></i> Expert Network</span>
           <h1>专家库</h1>
-          <p>按医院、梯队、科室、服务类型与时令主题匹配专家。</p>
+          <p>${
+            state.expertService === "all"
+              ? "按医院、梯队、科室、服务类型与时令主题匹配专家。"
+              : `当前展示「${esc(serviceLabel(state.expertService))}」对应专家。`
+          }</p>
         </header>
         <div class="expert-toolbar" id="expert-toolbar">
           <div class="expert-toolbar__row">
@@ -4417,12 +4905,14 @@
       const now = new Date();
       state.slotMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
     }
+    const doctor = doctors.find((item) => item.id === state.slotDoctorId) || doctors[0];
     if (!state.slotDraft) state.slotDraft = {};
     const batch = state.slotBatch || {};
-    if (!batch.from) batch.from = todayIso();
-    if (!batch.to) batch.to = isoDate(addDays(startOfDay(), 30));
+    const lead = Math.max(1, Number(doctor.leadDays) || tierOf(doctor).leadDays);
+    if (!batch.from) batch.from = isoDate(addDays(startOfDay(), lead));
+    if (!batch.to) batch.to = isoDate(addDays(startOfDay(), lead + 30));
     state.slotBatch = batch;
-    return doctors.find((item) => item.id === state.slotDoctorId) || doctors[0];
+    return doctor;
   }
 
   function selectedSlotDoctor() {
@@ -4479,6 +4969,37 @@
     `;
   }
 
+  function renderSlotDoctorRail(current) {
+    const doctors = slotDoctors();
+    return `
+      <section class="slot-doctor-rail">
+        <div class="slot-doctor-rail__head">
+          <h3>${icon("users", 15)} 专家排班</h3>
+          <span>${doctors.length} 位专家 · 点击快速切换</span>
+        </div>
+        <div class="slot-doctor-rail__scroller">
+          ${doctors
+            .map((doctor) => {
+              const availability = doctorAvailability(doctor);
+              return `
+                <button class="slot-doctor-chip ${
+                  doctor.id === current.id ? "is-active" : ""
+                }" type="button" data-action="slot-doctor-pick" data-doctor-id="${esc(doctor.id)}">
+                  <img src="${esc(expertAvatar(doctor))}" alt="${esc(doctor.name)}" loading="lazy">
+                  <span>
+                    <strong>${esc(doctor.name)}</strong>
+                    <small>${esc(tierOf(doctor).short)} · ${availability.dates.length} 个可约日</small>
+                  </span>
+                  <i>${doctor.id === current.id ? icon("check", 11) : icon("chevronRight", 11)}</i>
+                </button>
+              `;
+            })
+            .join("")}
+        </div>
+      </section>
+    `;
+  }
+
   function renderSlotCalendar(doctor) {
     const [year, month] = state.slotMonth.split("-").map(Number);
     const first = new Date(year, month - 1, 1, 12);
@@ -4521,7 +5042,18 @@
       <section class="batch-card">
         <div class="batch-card__head">
           <h3>${icon("sparkles", 15)} 批量快捷设置</h3>
-          <span>按日期范围统一设置每日号源</span>
+          <span>一键设置未来工作日号源，也可按日期范围统一调整</span>
+        </div>
+        <div class="batch-card__quick">
+          <button type="button" data-action="slot-quick-batch" data-days="7" data-capacity="1">
+            <strong>首约日起 7 天</strong><small>每日 1 个</small>
+          </button>
+          <button type="button" data-action="slot-quick-batch" data-days="14" data-capacity="2">
+            <strong>首约日起 14 天</strong><small>每日 2 个</small>
+          </button>
+          <button type="button" data-action="slot-quick-batch" data-days="30" data-capacity="2">
+            <strong>首约日起 30 天</strong><small>每日 2 个</small>
+          </button>
         </div>
         <div class="batch-card__presets">
           <button type="button" data-action="slot-preset" data-value="14">未来 14 天</button>
@@ -4564,7 +5096,7 @@
         <button class="btn btn--soft btn--block" type="button" data-action="slot-batch-apply">
           应用到草稿（不立即保存）
         </button>
-        <p class="batch-card__hint">不会低于已预约数量；配置完成后点击底部“统一保存”生效。</p>
+        <p class="batch-card__hint">快捷按钮从该专家最早可约日期起算并直接保存；自定义批次先加入草稿，再点底部“统一保存”。号源不会低于已预约数量，早于专家预约周期的日期会自动跳过。</p>
       </section>
     `;
   }
@@ -4581,6 +5113,7 @@
       return;
     }
     wrap.innerHTML = `
+      ${renderSlotDoctorRail(doctor)}
       <div class="slot-doctor-card">
         <img src="${esc(expertAvatar(doctor))}" alt="${esc(doctor.name)}">
         <div>
@@ -4726,7 +5259,7 @@
     renderOverlay();
   }
 
-  function applySlotBatch() {
+  function applySlotBatch({ save = false } = {}) {
     const doctor = selectedSlotDoctor();
     const batch = state.slotBatch;
     if (!doctor || !batch) return;
@@ -4739,12 +5272,21 @@
       batch.scope === "hospital" ? slotDoctors() : state.experts.filter((item) => item.id === doctor.id);
     let applied = 0;
     let adjusted = 0;
+    let skipped = 0;
     doctors.forEach((item) => {
+      const leadDate = isoDate(
+        addDays(startOfDay(), Math.max(1, Number(item.leadDays) || tierOf(item).leadDays))
+      );
       let date = parseDate(batch.from);
       const end = parseDate(batch.to);
       while (date && end && date <= end) {
         if (batch.weekdays.includes(date.getDay())) {
           const iso = isoDate(date);
+          if (iso < leadDate) {
+            skipped += 1;
+            date = addDays(date, 1);
+            continue;
+          }
           const booked = bookedCount(item.id, iso);
           const value = Math.max(capacity, booked);
           if (value !== capacity) adjusted += 1;
@@ -4754,10 +5296,21 @@
         date = addDays(date, 1);
       }
     });
-    renderSlotConfigContent();
-    showToast(
-      `已应用到草稿：${applied} 个日期${adjusted ? `，${adjusted} 天因已有预约自动抬高` : ""}。`
-    );
+    if (save) {
+      saveSlotDraft();
+      showToast(
+        `已快速保存：${doctors.length} 位专家、${applied} 个日期${
+          adjusted ? `，${adjusted} 天因已有预约自动抬高` : ""
+        }${skipped ? `，跳过 ${skipped} 个早于预约周期的日期` : ""}。`
+      );
+    } else {
+      renderSlotConfigContent();
+      showToast(
+        `已应用到草稿：${applied} 个日期${
+          adjusted ? `，${adjusted} 天因已有预约自动抬高` : ""
+        }${skipped ? `，跳过 ${skipped} 个早于预约周期的日期` : ""}。`
+      );
+    }
   }
 
   function saveSlotDraft() {
@@ -4805,6 +5358,8 @@
     "肿瘤",
     "临床营养",
     "全科",
+    "健康管理",
+    "老年科",
     "骨科",
     "康复科",
     "中医科",
@@ -4813,6 +5368,7 @@
     "神经内科",
     "急诊急救",
     "皮肤医美",
+    "烧伤科",
     "妇科",
     "儿科",
     "其他"
@@ -5861,6 +6417,12 @@
     }
     if (target.matches("[data-slot-doctor]")) {
       state.slotDoctorId = target.value;
+      {
+        const doctor = selectedSlotDoctor();
+        const lead = Math.max(1, Number(doctor?.leadDays) || tierOf(doctor).leadDays);
+        state.slotBatch.from = isoDate(addDays(startOfDay(), lead));
+        state.slotBatch.to = isoDate(addDays(startOfDay(), lead + 30));
+      }
       renderSlotConfigContent();
       return;
     }
@@ -5892,6 +6454,7 @@
         state.screen = "main";
         state.tab = el.dataset.tab || "home";
         renderApp({ scrollTo: storedScrollForView(`main:${state.tab}`) });
+        if (state.tab === "home" && state.geoStatus === "idle") requestLocationRecommendation();
         break;
       }
       case "start-login": {
@@ -5911,6 +6474,9 @@
         break;
       case "login-next":
         loginNext();
+        break;
+      case "demo-login":
+        loginDemoUser();
         break;
       case "login-back":
         state.login.step = 1;
@@ -6040,6 +6606,16 @@
       case "slot-month":
         shiftSlotMonth(Number(el.dataset.value));
         break;
+      case "slot-doctor-pick":
+        state.slotDoctorId = el.dataset.doctorId || "";
+        {
+          const doctor = selectedSlotDoctor();
+          const lead = Math.max(1, Number(doctor?.leadDays) || tierOf(doctor).leadDays);
+          state.slotBatch.from = isoDate(addDays(startOfDay(), lead));
+          state.slotBatch.to = isoDate(addDays(startOfDay(), lead + 30));
+        }
+        renderSlotConfigContent();
+        break;
       case "slot-day-open":
         openSlotDay(el.dataset.value);
         break;
@@ -6072,6 +6648,17 @@
       case "slot-batch-apply":
         applySlotBatch();
         break;
+      case "slot-quick-batch": {
+        const days = Math.max(1, Number(el.dataset.days) || 7);
+        const capacity = Math.max(0, Number(el.dataset.capacity) || 1);
+        const doctor = selectedSlotDoctor();
+        const lead = Math.max(1, Number(doctor?.leadDays) || tierOf(doctor).leadDays);
+        state.slotBatch.from = isoDate(addDays(startOfDay(), lead));
+        state.slotBatch.to = isoDate(addDays(startOfDay(), lead + days - 1));
+        state.slotBatch.capacity = capacity;
+        applySlotBatch({ save: true });
+        break;
+      }
       case "slot-weekday": {
         const day = Number(el.dataset.value);
         const list = state.slotBatch.weekdays;
@@ -6083,8 +6670,10 @@
       }
       case "slot-preset": {
         const days = Number(el.dataset.value);
-        state.slotBatch.from = todayIso();
-        state.slotBatch.to = isoDate(addDays(startOfDay(), days));
+        const doctor = selectedSlotDoctor();
+        const lead = Math.max(1, Number(doctor?.leadDays) || tierOf(doctor).leadDays);
+        state.slotBatch.from = isoDate(addDays(startOfDay(), lead));
+        state.slotBatch.to = isoDate(addDays(startOfDay(), lead + days - 1));
         renderSlotConfigContent();
         break;
       }
@@ -6167,6 +6756,22 @@
       case "open-booking":
         openBooking();
         break;
+      case "home-hospital":
+        state.homeHospitalId = el.dataset.value || "";
+        state.expertScope = "nearby";
+        refreshHomeLocationViews();
+        break;
+      case "home-use-location":
+        state.homeHospitalId = "";
+        requestLocationRecommendation({ manual: true });
+        refreshHomeLocationViews();
+        break;
+      case "home-hospital-experts":
+        state.expertScope = "nearby";
+        state.expertTier = "all";
+        state.tab = "experts";
+        renderApp({ scrollTo: 0 });
+        break;
       case "book-doctor":
         openBooking(el.dataset.doctorId || "");
         break;
@@ -6189,6 +6794,9 @@
         state.expertService = el.dataset.value;
         state.expertTier = "all";
         state.expertScope = "all";
+        state.expertSearch = "";
+        state.expertSearchOpen = false;
+        state.expertAvailability = "all";
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
         break;
@@ -6512,11 +7120,11 @@
     renderApp();
     try {
       const [expertsRes, hospitalsRes, seasonalRes, matchesRes, citiesRes] = await Promise.all([
-        fetch("assets/data/experts.json"),
-        fetch("assets/data/hospitals.json"),
-        fetch("assets/data/seasonal.json"),
-        fetch("assets/data/theme-matches.json"),
-        fetch("assets/china-cities.json").catch(() => null)
+        fetch(`assets/data/experts.json?v=${DATA_VERSION}`),
+        fetch(`assets/data/hospitals.json?v=${DATA_VERSION}`),
+        fetch(`assets/data/seasonal.json?v=${DATA_VERSION}`),
+        fetch(`assets/data/theme-matches.json?v=${DATA_VERSION}`),
+        fetch(`assets/china-cities.json?v=${DATA_VERSION}`).catch(() => null)
       ]);
       if (!expertsRes.ok) throw new Error(`专家数据加载失败 HTTP ${expertsRes.status}`);
       if (!hospitalsRes.ok) throw new Error(`医院数据加载失败 HTTP ${hospitalsRes.status}`);
@@ -6535,6 +7143,7 @@
       if (cities && typeof cities === "object" && !Array.isArray(cities)) state.chinaCities = cities;
       mergeExperts();
       seedSlots();
+      seedDemoRecords();
 
       const storedSession = readJSON(STORAGE.session, null);
       let user = storedSession?.phone ? getUser(storedSession.phone) || storedSession : null;
@@ -6569,6 +7178,9 @@
         state.screen = "main";
       }
       renderApp({ scrollTo: 0 });
+      if (state.screen === "main" && state.tab === "home") {
+        requestLocationRecommendation();
+      }
     } catch (error) {
       console.error("Failed to load application data:", error);
       state.loaded = true;
