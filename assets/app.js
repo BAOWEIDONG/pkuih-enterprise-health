@@ -22,7 +22,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261123-12";
+  const DATA_VERSION = "20261123-13";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -41,6 +41,14 @@
     maleSenior: "assets/avatars/doctor-male-senior.svg",
     female: "assets/avatars/doctor-female.svg",
     femaleSenior: "assets/avatars/doctor-female-senior.svg"
+  };
+  const EXPERT_DATA_FIXES = {
+    "specialist-09": {
+      services: ["讲座", "巡诊"],
+      coverage: "全国",
+      coverageCities: ["全国"],
+      coverageRegions: ["全国"]
+    }
   };
 
   const TIERS = {
@@ -529,7 +537,11 @@
     const removed = new Set(config.removed || []);
     const merged = state.baseExperts
       .filter((expert) => !removed.has(expert.id))
-      .map((expert) => ({ ...expert, ...(config.overrides?.[expert.id] || {}) }));
+      .map((expert) => ({
+        ...expert,
+        ...(EXPERT_DATA_FIXES[expert.id] || {}),
+        ...(config.overrides?.[expert.id] || {})
+      }));
     const added = (config.added || []).map((expert) => ({ ...expert, custom: true }));
     state.experts = merged.concat(added);
   }
@@ -603,6 +615,21 @@
     if (cities.includes("全国")) return "全国";
     if (cities.length <= 3) return cities.join(" / ");
     return `${cities.slice(0, 2).join(" / ")} 等 ${cities.length} 城`;
+  }
+
+  function expertCoversRegion(expert, province = "", city = "") {
+    const cities = coverageCitiesFor(expert);
+    if (cities.includes("全国")) return true;
+    const normalize = (value) =>
+      String(value || "")
+        .trim()
+        .replace(/(壮族自治区|回族自治区|维吾尔自治区|特别行政区|自治区|省|市|地区|盟|自治州)$/g, "");
+    const provinceKey = normalize(province);
+    const cityKey = normalize(city);
+    return cities.some((item) => {
+      const key = normalize(item);
+      return Boolean(key) && (key === cityKey || key === provinceKey);
+    });
   }
 
   function expertAvatarDetail(expert) {
@@ -769,13 +796,23 @@
 
   function matchesService(expert, service) {
     if (!service || service === "all") return true;
-    if (service === "1对1") return expert.active !== false;
-    return (expert.services || []).includes(service);
+    const normalize = (value) => {
+      const text = String(value || "").trim();
+      if (["讲座", "健康讲座"].includes(text)) return "讲座";
+      if (["巡诊", "健康咨询"].includes(text)) return "巡诊";
+      if (["1对1", "1v1", "1v1报告解读", "报告解读"].includes(text)) return "1对1";
+      return text;
+    };
+    const target = normalize(service);
+    return (expert.services || []).some((item) => normalize(item) === target);
   }
 
-  function serviceCount(service) {
+  function serviceCount(service, hospitalId = "") {
     return state.experts.filter(
-      (expert) => expert.active !== false && matchesService(expert, service)
+      (expert) =>
+        expert.active !== false &&
+        (!hospitalId || expert.hospitalId === hospitalId) &&
+        matchesService(expert, service)
     ).length;
   }
 
@@ -2350,7 +2387,12 @@
           <div class="tier-row">
             ${TIER_ORDER.map((tierId) => {
               const tier = TIERS[tierId];
-              const list = state.experts.filter((expert) => expert.tier === tierId && expert.active);
+              const list = state.experts.filter(
+                (expert) =>
+                  expert.tier === tierId &&
+                  expert.active !== false &&
+                  expert.hospitalId === hospital?.id
+              );
               const open = list.filter((expert) => doctorAvailability(expert).bookable).length;
               return `
                 <button class="tier-card tier-card--${tierId}" type="button" data-action="tier-open" data-value="${tierId}">
@@ -2372,8 +2414,9 @@
           <div class="service-grid">
             ${SERVICE_IDS.map((id, index) => {
               const service = SERVICES[id];
-              const count = serviceCount(id);
-              const countLabel = id === "1对1" ? "位可由院方协调" : "位专家可服务";
+              const count = serviceCount(id, hospital?.id);
+              const countText =
+                id === "1对1" ? "院方按报告协调" : `${count} 位本院专家可服务`;
               return `
                 <button class="service-card" type="button" data-action="service-open" data-value="${esc(id)}">
                   <span class="service-card__num">0${index + 1}</span>
@@ -2383,7 +2426,7 @@
                   )}</span>
                   <strong>${esc(service.label)}</strong>
                   <p>${esc(service.desc)}</p>
-                  <span class="service-card__count">${count} ${countLabel}</span>
+                  <span class="service-card__count">${countText}</span>
                 </button>
               `;
             }).join("")}
@@ -2673,6 +2716,16 @@
       ${
         list.length
           ? `<div class="expert-list">${list.map(renderExpertCard).join("")}</div>`
+          : state.expertService === "1对1"
+          ? `<div class="empty-state">
+              <span class="empty-state__icon">${icon("users", 26)}</span>
+              <h3>1v1 报告解读由院方协调</h3>
+              <p>无需指定专家。提交预约后，院方会根据体检报告和关注方向安排对应专科医生。</p>
+              <button class="btn btn--primary btn--sm" type="button" data-action="service-book"
+                data-value="1对1">
+                发起报告解读预约
+              </button>
+            </div>`
           : `<div class="empty-state">
               <span class="empty-state__icon">${icon("search", 26)}</span>
               <h3>没有匹配的可预约专家</h3>
@@ -2686,6 +2739,7 @@
   function renderExpertsPage() {
     const hospital = nearestHospital();
     const nearCount = nearbyExperts().length;
+    const serviceScopeHospitalId = state.expertScope === "nearby" ? hospital?.id || "" : "";
     return `
       <div class="screen experts-screen">
         <header class="page-head page-head--tight">
@@ -2749,7 +2803,9 @@
                 `<button class="chip ${state.expertService === id ? "is-active" : ""}" type="button"
                   data-action="expert-service" data-value="${esc(id)}">${esc(
                     serviceLabel(id)
-                  )}<span class="chip__count">${serviceCount(id)}</span></button>`
+                  )}<span class="chip__count">${
+                    id === "1对1" ? "协调" : serviceCount(id, serviceScopeHospitalId)
+                  }</span></button>`
             ).join("")}
           </div>
           <div class="expert-select-filters">
@@ -3023,6 +3079,7 @@
   }
 
   function bookingTopicChoices(booking) {
+    if (booking?.serviceType !== "讲座") return [];
     const date = parseDate(booking?.date);
     const month = date ? date.getMonth() + 1 : currentMonth();
     const expert = bookingSelectedDoctor(booking);
@@ -3078,20 +3135,28 @@
       if (!expert.active) return false;
       if (expert.hospitalId !== hospital?.id) return false;
       if (!matchesService(expert, booking.serviceType)) return false;
+      if (!expertCoversRegion(expert, booking.province, booking.city)) return false;
       return doctorAvailability(expert).bookable;
     });
-    return list.slice(0, 8);
+    return list;
   }
 
   function renderBookingDoctorSection(booking) {
     const options = bookingDoctorOptions(booking);
     const doctor = bookingSelectedDoctor(booking);
+    const coordinated = booking.serviceType === "1对1";
     return `
       <div class="booking-doctor-list">
         <button class="booking-doctor ${!booking.doctorId ? "is-active" : ""}" type="button"
           data-action="booking-doctor" data-value="">
           <span class="booking-doctor__any">${icon("sparkles", 18)}</span>
-          <span><strong>不指定专家，由院方匹配</strong><small>院方接单后根据主题与人群安排</small></span>
+          <span><strong>${
+            coordinated ? "由院方匹配报告解读医生" : "不指定专家，由院方匹配"
+          }</strong><small>${
+            coordinated
+              ? "根据体检报告与关注方向协调对应专科医生"
+              : "院方接单后根据主题与人群安排"
+          }</small></span>
           <i class="booking-doctor__check">${icon("check", 12)}</i>
         </button>
         ${options
@@ -3109,6 +3174,17 @@
             `;
           })
           .join("")}
+        ${
+          !options.length
+            ? `<div class="inline-empty">${
+                coordinated
+                  ? "1v1 报告解读由院方统一协调专科医生，无需指定专家。"
+                  : `当前医院暂无可提供「${esc(
+                      serviceLabel(booking.serviceType)
+                    )}」且覆盖该履约地的专家，可切换服务类型或由院方匹配。`
+              }</div>`
+            : ""
+        }
         ${
           doctor
             ? `<p class="booking-hint">${icon("clock", 12)} ${esc(
@@ -3148,17 +3224,25 @@
     const list = bookingTopicChoices(booking);
     return `
       <div class="topic-chip-list" id="booking-topics">
-        ${list
-          .map(
-            (topic) => `
-              <button class="topic-chip ${
-                booking.customTopic === topic.title ? "is-active" : ""
-              }" type="button" data-action="booking-topic" data-value="${esc(topic.title)}">
-                <i>${esc(topic.dept)}</i>${esc(topic.title)}
-              </button>
-            `
-          )
-          .join("")}
+        ${
+          list.length
+            ? list
+                .map(
+                  (topic) => `
+                    <button class="topic-chip ${
+                      booking.customTopic === topic.title ? "is-active" : ""
+                    }" type="button" data-action="booking-topic" data-value="${esc(topic.title)}">
+                      <i>${esc(topic.dept)}</i>${esc(topic.title)}
+                    </button>
+                  `
+                )
+                .join("")
+            : `<div class="inline-empty">${
+                booking.serviceType === "1对1"
+                  ? "1v1 报告解读不关联讲座课题，院方会按报告内容协调专科医生。"
+                  : "健康咨询不展示讲座课题，请直接填写咨询方向或人群健康需求。"
+              }</div>`
+        }
       </div>
     `;
   }
@@ -3203,7 +3287,13 @@
         </div>
       </div>
       <div class="flow-section">
-        <div class="flow-section__head"><h2>活动需求</h2><span>本月时令主题优先推荐</span></div>
+        <div class="flow-section__head"><h2>活动需求</h2><span>${
+          booking.serviceType === "讲座"
+            ? "本月时令主题优先推荐"
+            : booking.serviceType === "巡诊"
+            ? "填写咨询方向与人群需求"
+            : "填写报告解读关注方向"
+        }</span></div>
         ${renderBookingTopics(booking)}
         <div class="field">
           <label>活动主题 <span>可选本月主题，也可自定义</span></label>
@@ -3383,12 +3473,30 @@
     refreshBookingTopics();
   }
 
+  function refreshBookingForLocation() {
+    if (!state.booking) return;
+    const doctor = bookingSelectedDoctor(state.booking);
+    if (
+      doctor &&
+      (!matchesService(doctor, state.booking.serviceType) ||
+        !expertCoversRegion(doctor, state.booking.province, state.booking.city))
+    ) {
+      state.booking.doctorId = "";
+      state.booking.date = "";
+    }
+    const wrap = document.getElementById("booking-doctors");
+    if (wrap) wrap.innerHTML = renderBookingDoctorSection(state.booking);
+    refreshBookingDates();
+    refreshBookingTopics();
+  }
+
   function setBookingProvince(value) {
     if (!state.booking) return;
     state.booking.province = value;
     state.booking.city = (state.chinaCities?.[value] || [value])[0];
     const citySelect = document.querySelector("[data-booking-city]");
     if (citySelect) citySelect.innerHTML = renderCityOptions(value, state.booking.city);
+    refreshBookingForLocation();
   }
 
   function validateBookingStepOne() {
@@ -3404,6 +3512,12 @@
     if (booking.doctorId) {
       const expert = expertById(booking.doctorId);
       if (!expert) return "专家信息已失效，请重新选择。";
+      if (!matchesService(expert, booking.serviceType)) {
+        return "所选专家不提供当前服务类型，请重新选择。";
+      }
+      if (!expertCoversRegion(expert, booking.province, booking.city)) {
+        return "所选专家不覆盖当前活动城市，请更换专家或重新选择履约地。";
+      }
       if (dayRemaining(expert.id, booking.date) <= 0) return "该日期号源已约满，请选择其他日期。";
     }
     return "";
@@ -7601,6 +7715,7 @@
     }
     if (target.matches("[data-booking-city]") && state.booking) {
       state.booking.city = target.value;
+      refreshBookingForLocation();
       return;
     }
     if (target.matches("[data-demand-province]") && state.overlay?.draft) {
@@ -8064,6 +8179,9 @@
       case "open-booking":
         openBooking();
         break;
+      case "service-book":
+        openBooking("", "", el.dataset.value || "");
+        break;
       case "home-hospital":
         state.homeHospitalId = el.dataset.value || "";
         state.expertScope = "nearby";
@@ -8129,7 +8247,7 @@
         state.expertTier = el.dataset.value;
         state.expertMonth = 0;
         state.expertDept = "all";
-        state.expertScope = "all";
+        state.expertScope = "nearby";
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
         break;
@@ -8138,7 +8256,7 @@
         state.expertTier = "all";
         state.expertMonth = 0;
         state.expertDept = "all";
-        state.expertScope = "all";
+        state.expertScope = "nearby";
         state.expertSearch = "";
         state.expertSearchOpen = false;
         state.expertAvailability = "all";
