@@ -22,7 +22,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261123-16";
+  const DATA_VERSION = "20261123-17";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -83,7 +83,7 @@
   const SERVICES = {
     讲座: { id: "讲座", label: "健康讲座", desc: "主题分享 + 现场问答" },
     巡诊: { id: "巡诊", label: "健康咨询", desc: "健康筛查 + 现场咨询" },
-    "1对1": { id: "1对1", label: "1v1报告解读", desc: "报告解读 · 院方协调" }
+    "1对1": { id: "1对1", label: "1v1报告解读", desc: "报告解读 · 一对一咨询" }
   };
   const SERVICE_IDS = ["讲座", "巡诊", "1对1"];
   const THEME_COVERAGE_OPTIONS = [
@@ -225,6 +225,7 @@
     adminNoteEditing: false,
     adminDemandId: "",
     adminDemandDraft: null,
+    appointmentLocationDraft: null,
     slotDoctorId: "",
     slotMonth: "",
     slotDraft: null,
@@ -934,15 +935,8 @@
     ).length;
   }
 
-  function serviceTagsFor(expert, { coordination = false } = {}) {
-    const tags = [...(expert?.services || [])].map((service) => ({
-      service,
-      coordinated: false
-    }));
-    if (coordination && matchesService(expert, "1对1") && !tags.some((tag) => tag.service === "1对1")) {
-      tags.push({ service: "1对1", coordinated: true });
-    }
-    return tags;
+  function serviceTagsFor(expert) {
+    return [...(expert?.services || [])].map((service) => ({ service }));
   }
 
   function getSlots(doctorId) {
@@ -991,7 +985,26 @@
 
   function seedDemoRecords() {
     const seeded = readJSON(STORAGE.seed, {});
-    if (seeded.records) return;
+    if (seeded.records) {
+      const pendingDemo = getAppointments().find((item) => item.id === "BD-DEMO-01");
+      if (pendingDemo && !pendingDemo.doctorId) {
+        const fallbackExpert =
+          state.experts.find(
+            (item) =>
+              item.hospitalId === pendingDemo.hospitalId &&
+              item.active &&
+              matchesService(item, pendingDemo.serviceType)
+          ) || state.experts[0];
+        if (fallbackExpert) {
+          updateAppointment(pendingDemo.id, {
+            doctorId: fallbackExpert.id,
+            doctorName: fallbackExpert.name,
+            tier: fallbackExpert.tier
+          });
+        }
+      }
+      return;
+    }
     if (!getUser(DEMO_PHONE)) {
       upsertUser({
         ...DEMO_PROFILE,
@@ -1041,9 +1054,9 @@
           address: "北京市朝阳区建国路 88 号",
           venue: "客户总部 3 层报告厅",
           serviceType: "讲座",
-          doctorId: "",
-          doctorName: "",
-          tier: "specialist",
+          doctorId: specialist?.id || "",
+          doctorName: specialist?.name || "",
+          tier: specialist?.tier || "specialist",
           hospitalId: hospital.id,
           date: pendingDate,
           topic: "职场人群睡眠与压力管理",
@@ -1817,6 +1830,7 @@
     state.adminDoctorDraft = null;
     state.adminTemplateDraft = null;
     state.adminThemeDraft = null;
+    state.appointmentLocationDraft = null;
     state.adminThemeMonth = 0;
     state.slotDay = "";
   }
@@ -1875,6 +1889,7 @@
     if (type === "booking") return paint(renderBookingFlow());
     if (type === "doctor") return paint(renderDoctorSheet());
     if (type === "appointment") return paint(renderAppointmentSheet());
+    if (type === "appointment-location") return paint(renderAppointmentLocationSheet());
     if (type === "demand-create") return paint(renderDemandCreateSheet());
     if (type === "demand") return paint(renderDemandSheet());
     if (type === "profile") return paint(renderProfileSheet());
@@ -2497,7 +2512,7 @@
                   const distance = hospitalDistanceText(hospital);
                   return `<option value="${esc(hospital.id)}" ${
                     hospital.id === current?.id ? "selected" : ""
-                  }>${esc(hospital.short)}${distance ? ` · ${distance}` : ""}</option>`;
+                  }>${esc(hospital.name)}${distance ? ` · ${distance}` : ""}</option>`;
                 })
                 .join("")}
             </select>
@@ -2935,7 +2950,7 @@
                     const content = `
                         <span class="theme-topic-card__dept">${esc(topic.dept || "综合")}</span>
                         <strong>${esc(topic.title)}</strong>
-                        <small>${expert ? `${esc(expert.name)} · ${esc(expert.deptTitle)}` : "院方匹配主讲专家"}</small>
+                        <small>${expert ? `${esc(expert.name)} · ${esc(expert.deptTitle)}` : "主讲专家待确认"}</small>
                         <em class="theme-topic-card__coverage ${
                           row.available ? "" : "is-unavailable"
                         }">${icon("mapPin", 10)} ${esc(row.coverage.label)} · ${
@@ -3045,8 +3060,8 @@
     const availability = doctorAvailability(expert);
     const serviceTags =
       state.expertMonth > 0
-        ? [{ service: "讲座", coordinated: false }]
-        : serviceTagsFor(expert, { coordination: state.expertService === "1对1" });
+        ? [{ service: "讲座" }]
+        : serviceTagsFor(expert);
     return `
       <button class="expert-card" type="button" data-action="open-doctor" data-doctor-id="${esc(expert.id)}">
         <span class="expert-card__media">
@@ -3067,12 +3082,8 @@
           <span class="expert-card__foot">
             <span class="expert-card__services">${serviceTags
               .map(
-                ({ service, coordinated }) =>
-                  `<span class="${coordinated ? "is-coordinated" : ""}">${esc(
-                    serviceLabel(service)
-                  )}${
-                    coordinated ? " · 院方协调" : ""
-                  }</span>`
+                ({ service }) =>
+                  `<span>${esc(serviceLabel(service))}</span>`
               )
               .join("")}</span>
             <span class="expert-card__more">详情 ${icon("chevronRight", 11)}</span>
@@ -3096,11 +3107,10 @@
           : state.expertService === "1对1"
           ? `<div class="empty-state">
               <span class="empty-state__icon">${icon("users", 26)}</span>
-              <h3>1v1 报告解读由院方协调</h3>
-              <p>无需指定专家。提交预约后，院方会根据体检报告和关注方向安排对应专科医生。</p>
-              <button class="btn btn--primary btn--sm" type="button" data-action="service-book"
-                data-value="1对1">
-                发起报告解读预约
+              <h3>当前范围暂无可提供 1v1 的专家</h3>
+              <p>专家为预约必选项。可切换到全部地区查看，或发起提需由医院运营人员电话沟通匹配。</p>
+              <button class="btn btn--primary btn--sm" type="button" data-action="open-demand">
+                发起提需
               </button>
             </div>`
           : `<div class="empty-state">
@@ -3338,17 +3348,17 @@
           <div class="doctor-sheet__content">
             <span class="doctor-services__label">可服务类型</span>
             <div class="doctor-services">
-              ${serviceTagsFor(expert, { coordination: true })
+              ${serviceTagsFor(expert)
                 .map(
-                  ({ service, coordinated }) =>
+                  ({ service }) =>
                     `<span>${icon(
                       service === "讲座" ? "message" : service === "巡诊" ? "stethoscope" : "users",
                       13
-                    )} ${esc(serviceLabel(service))}${coordinated ? " · 院方协调" : ""}</span>`
+                    )} ${esc(serviceLabel(service))}</span>`
                 )
                 .join("")}
             </div>
-            <p class="doctor-services__note">健康讲座与健康咨询按院方专家资料匹配；1v1 报告解读由院方结合企业需求协调安排。</p>
+            <p class="doctor-services__note">仅展示该专家实际可提供的服务类型；发起预约时必须选择对应专家，暂无合适专家可发起提需。</p>
             <div class="fact-grid">
               <div><small>履约机构</small><strong>${esc(expert.hospital)}</strong></div>
               <div><small>科室 / 任职</small><strong>${esc(expert.deptTitle)}</strong></div>
@@ -3652,19 +3662,18 @@
   function renderBookingDoctorSection(booking) {
     const options = bookingDoctorOptions(booking);
     const doctor = bookingSelectedDoctor(booking);
-    const coordinated = booking.serviceType === "1对1";
     return `
       <div class="booking-doctor-list">
-        <p class="booking-doctor__note">${icon("sparkles", 12)} ${
-          coordinated
-            ? "默认由院方按报告协调专科医生，无需选择具体专家。"
-            : "默认不选择专家，由院方按需求匹配。可先查看简介，再单独点“选择”。"
-        }</p>
+        <p class="booking-doctor__note">${icon("sparkles", 12)}
+          专家为必选项，请选择一位可提供「${esc(
+            serviceLabel(booking.serviceType)
+          )}」服务的专家；再次点击已选专家可取消选择。
+        </p>
         <div class="booking-doctor__status ${doctor ? "has-doctor" : ""}">
-          <span>${doctor ? `已选专家 · ${esc(doctor.name)}` : "当前未指定专家"}</span>
+          <span>${doctor ? `已选专家 · ${esc(doctor.name)}` : "尚未选择专家"}</span>
           ${
             doctor
-              ? `<button type="button" data-action="booking-doctor" data-value="">改为院方匹配</button>`
+              ? `<button type="button" data-action="booking-doctor" data-value="">取消选择</button>`
               : ""
           }
         </div>
@@ -3687,7 +3696,7 @@
                   data-action="booking-doctor" data-value="${esc(expert.id)}"
                   aria-pressed="${active ? "true" : "false"}">
                   <i class="booking-doctor__check">${icon("check", 12)}</i>
-                  <span>${active ? "已选" : "选择"}</span>
+                  <span>${active ? "已选 · 取消" : "选择"}</span>
                 </button>
               </div>
             `;
@@ -3695,13 +3704,15 @@
           .join("")}
         ${
           !options.length
-            ? `<div class="inline-empty">${
-                coordinated
-                  ? "1v1 报告解读由院方统一协调专科医生，无需指定专家。"
-                  : `当前医院暂无可提供「${esc(
-                      serviceLabel(booking.serviceType)
-                    )}」且覆盖该履约地的专家，可切换服务类型或由院方匹配。`
-              }</div>`
+            ? `<div class="inline-empty booking-demand-empty">
+                <strong>当前医院暂无可选专家</strong>
+                <span>暂无同时满足「${esc(
+                  serviceLabel(booking.serviceType)
+                )}」服务类型、履约城市和可预约号源的专家。专家为必选项，请切换服务类型或发起提需。</span>
+                <button class="btn btn--soft btn--sm" type="button" data-action="booking-open-demand">
+                  ${icon("send", 13)} 发起提需
+                </button>
+              </div>`
             : ""
         }
         ${
@@ -3716,6 +3727,16 @@
   }
 
   function renderBookingDates(booking) {
+    if (!booking?.doctorId) {
+      return `
+        <div class="date-chip-list" id="booking-dates">
+          <div class="inline-empty booking-date-locked">
+            <strong>请先选择专家</strong>
+            <span>选择专家后，这里只展示该专家实际配置且可预约的日期。</span>
+          </div>
+        </div>
+      `;
+    }
     const options = bookingDateOptions(booking);
     return `
       <div class="date-chip-list" id="booking-dates">
@@ -3733,7 +3754,13 @@
                   `;
                 })
                 .join("")
-            : `<div class="inline-empty">该专家暂无可约日期，可切换其他专家或发起提需。</div>`
+            : `<div class="inline-empty booking-demand-empty">
+                <strong>该专家暂无可约日期</strong>
+                <span>请选择其他专家，或发起提需由医院运营人员电话沟通。</span>
+                <button class="btn btn--soft btn--sm" type="button" data-action="booking-open-demand">
+                  ${icon("send", 13)} 发起提需
+                </button>
+              </div>`
         }
       </div>
     `;
@@ -3798,7 +3825,7 @@
                       <button class="topic-chip__select ${active ? "is-active" : ""}" type="button"
                         data-action="booking-topic" data-value="${esc(topic.title)}"
                         ${selectable ? "" : "disabled"}>
-                        ${active ? "已选" : available ? (monthBookable ? "选择" : "仅浏览") : "不可约"}
+                        ${active ? "已选 · 取消" : available ? (monthBookable ? "选择" : "仅浏览") : "不可约"}
                       </button>
                     </div>
                   `;
@@ -3806,7 +3833,7 @@
                 .join("")
             : `<div class="inline-empty">${
                 booking.serviceType === "1对1"
-                  ? "1v1 报告解读不关联讲座课题，院方会按报告内容协调专科医生。"
+                  ? "1v1 报告解读不关联讲座课题，可直接填写报告解读方向。"
                   : "健康咨询不展示讲座课题，请直接填写咨询方向或人群健康需求。"
               }</div>`
         }
@@ -3824,7 +3851,7 @@
         ${renderBookingServiceSection(booking)}
       </div>
       <div class="flow-section">
-        <div class="flow-section__head"><h2>专家</h2><span>默认不选 · 点击可看详情</span></div>
+        <div class="flow-section__head"><h2>专家 <em>*</em></h2><span>必选 · 点击可看详情，再点可取消</span></div>
         <div id="booking-doctors">${renderBookingDoctorSection(booking)}</div>
       </div>
       <div class="flow-section">
@@ -3857,7 +3884,7 @@
       <div class="flow-section">
         <div class="flow-section__head"><h2>活动需求</h2><span>${
           booking.serviceType === "讲座"
-            ? "点击课题可查看主题详情"
+            ? "时令主题可选，点击已选主题可取消"
             : booking.serviceType === "巡诊"
             ? "填写咨询方向与人群需求"
             : "填写报告解读关注方向"
@@ -3921,7 +3948,7 @@
       </div>
       <div class="summary-list">
         <div><span>专家</span><strong>${esc(
-          expert ? `${expert.name} · ${expert.deptTitle}` : "不指定专家，由院方匹配"
+          expert ? `${expert.name} · ${expert.deptTitle}` : "请选择专家"
         )}</strong></div>
         <div><span>活动地点</span><strong>${esc(
           formatAddress(booking.province, booking.city, booking.address, booking.venue)
@@ -4033,24 +4060,32 @@
 
   function setBookingDoctor(value) {
     if (!state.booking) return;
-    state.booking.doctorId = value || "";
-    const expert = value ? expertById(value) : null;
+    const booking = state.booking;
+    const currentDoctorId = booking.doctorId || "";
+    const nextDoctorId = value && value !== currentDoctorId ? value : "";
+    const hadThemedTopic = Boolean(bookingSelectedTopic(booking));
+    booking.doctorId = nextDoctorId;
+    booking.date = "";
+    const expert = nextDoctorId ? expertById(nextDoctorId) : null;
     if (expert) {
-      state.booking.tier = expert.tier;
-      if (!matchesService(expert, state.booking.serviceType)) {
-        state.booking.serviceType = expert.services[0] || "讲座";
+      booking.tier = expert.tier;
+      if (!matchesService(expert, booking.serviceType)) {
+        booking.serviceType = expert.services[0] || "讲座";
         document.querySelectorAll('[data-action="booking-service"]').forEach((button) => {
-          button.classList.toggle("is-active", button.dataset.value === state.booking.serviceType);
+          button.classList.toggle("is-active", button.dataset.value === booking.serviceType);
         });
       }
-      if (state.booking.date && !doctorAvailability(expert).dates.includes(state.booking.date)) {
-        state.booking.date = "";
-      }
+    }
+    if (hadThemedTopic && currentDoctorId !== nextDoctorId) {
+      clearBookingTopicSelection();
     }
     const wrap = document.getElementById("booking-doctors");
-    if (wrap) wrap.innerHTML = renderBookingDoctorSection(state.booking);
+    if (wrap) wrap.innerHTML = renderBookingDoctorSection(booking);
     refreshBookingDates();
     refreshBookingTopics();
+    if (currentDoctorId && !nextDoctorId) {
+      showToast("已取消专家选择，请重新选择专家。");
+    }
   }
 
   function chooseBookingDoctor(doctorId) {
@@ -4086,6 +4121,17 @@
     const index = (theme?.topics || []).findIndex((topic) => topic.title === title);
     if (index < 0) return showToast("该主题详情暂不可用。");
     openTheme(month, index, hospitalId);
+  }
+
+  function clearBookingTopicSelection() {
+    const booking = state.booking;
+    if (!booking) return;
+    booking.customTopic = "";
+    booking.themeMonth = 0;
+    booking.themeTopicId = "";
+    booking.themeCoverage = "";
+    const input = document.querySelector('[data-booking-field="customTopic"]');
+    if (input) input.value = "";
   }
 
   function chooseBookingTopic(month, topicIndex) {
@@ -4125,6 +4171,16 @@
   function selectBookingTopicByTitle(title) {
     const booking = state.booking;
     if (!booking || !title) return;
+    const active =
+      Boolean(booking.themeMonth && booking.themeTopicId) &&
+      String(booking.customTopic || "").trim() === String(title).trim() &&
+      Number(booking.themeMonth) === currentMonth();
+    if (active) {
+      clearBookingTopicSelection();
+      refreshBookingTopics();
+      showToast(`已取消主题「${title}」，时令主题为可选项。`);
+      return;
+    }
     const { month, hospitalId, theme } = bookingTopicContext(booking);
     const source = theme?.topics || seasonalOf(month)?.topics || [];
     const topic = source.find(
@@ -4192,7 +4248,22 @@
     const booking = state.booking;
     if (!booking) return "预约信息已失效。";
     if (!booking.serviceType) return "请选择服务类型。";
+    if (!booking.doctorId) return "请选择专家；当前无合适专家可直接发起提需。";
+    const expert = expertById(booking.doctorId);
+    if (!expert) return "专家信息已失效，请重新选择。";
+    if (!matchesService(expert, booking.serviceType)) {
+      return "所选专家不提供当前服务类型，请重新选择。";
+    }
+    if (!expertCoversRegion(expert, booking.province, booking.city)) {
+      return "所选专家不覆盖当前活动城市，请更换专家或重新选择履约地。";
+    }
     if (!booking.date) return "请选择期望日期。";
+    if (!doctorAvailability(expert).dates.includes(booking.date)) {
+      return "该日期不在专家当前可约范围内，请重新选择。";
+    }
+    if (dayRemaining(expert.id, booking.date) <= 0) {
+      return "该日期号源已约满，请选择其他日期。";
+    }
     if (!booking.province || !booking.city) return "请选择活动省市。";
     if (!booking.address.trim()) return "请填写活动详细地址。";
     if (booking.contactPhone && !/^1\d{10}$/.test(booking.contactPhone)) {
@@ -4205,16 +4276,11 @@
         booking.city
       )}，请更换课题或活动城市。`;
     }
-    if (booking.doctorId) {
-      const expert = expertById(booking.doctorId);
-      if (!expert) return "专家信息已失效，请重新选择。";
-      if (!matchesService(expert, booking.serviceType)) {
-        return "所选专家不提供当前服务类型，请重新选择。";
-      }
-      if (!expertCoversRegion(expert, booking.province, booking.city)) {
-        return "所选专家不覆盖当前活动城市，请更换专家或重新选择履约地。";
-      }
-      if (dayRemaining(expert.id, booking.date) <= 0) return "该日期号源已约满，请选择其他日期。";
+    if (
+      selectedTopic?.topic?.expertId &&
+      String(selectedTopic.topic.expertId) !== String(expert.id)
+    ) {
+      return "所选时令主题不属于当前专家，请重新选择主题。";
     }
     return "";
   }
@@ -4354,7 +4420,7 @@
         <div class="record-card__meta">
           <span>${icon("briefcase", 12)} ${esc(serviceLabel(appointment.serviceType))}</span>
           <span>${icon("experts", 12)} ${esc(
-            expert ? expert.name : appointment.doctorName || "由院方匹配"
+            expert ? expert.name : appointment.doctorName || "专家待确认"
           )}</span>
           <span>${icon("building", 12)} ${esc(hospital?.short || hospital?.name || "")}</span>
         </div>
@@ -4603,10 +4669,10 @@
         )}</strong></div>
         <div class="plan-row"><span>活动地点</span><strong>${esc(
           formatAddress(
-            plan.province || appointment.province,
-            plan.city || appointment.city,
-            plan.address || appointment.address,
-            plan.venue || appointment.venue
+            appointment.province || plan.province,
+            appointment.city || plan.city,
+            appointment.address || plan.address,
+            appointment.venue || plan.venue
           )
         )}</strong></div>
         ${
@@ -4665,7 +4731,7 @@
                 )}</span>
                 <h1>${esc(topicOf(appointment))}</h1>
                 <p>${esc(formatDateCN(appointment.date, true))} · ${esc(
-                  expert ? expert.name : appointment.doctorName || "由院方匹配专家"
+                  expert ? expert.name : appointment.doctorName || "专家待确认"
                 )}</p>
               </div>
               ${statusPill(appointment.status)}
@@ -4680,6 +4746,16 @@
               <div class="info-row"><span>活动地址</span><strong>${esc(
                 appointmentLocationText(appointment)
               )}</strong></div>
+              ${
+                ["pending", "planning", "review", "revision"].includes(appointment.status)
+                  ? `<button class="location-edit-link" type="button"
+                      data-action="appointment-location-edit" data-appointment-id="${esc(
+                        appointment.id
+                      )}">
+                      ${icon("edit", 12)} 修改活动地点
+                    </button>`
+                  : ""
+              }
               <div class="info-row"><span>参与人群</span><strong>${esc(
                 appointment.audience || "待沟通"
               )}${appointment.headcount ? ` · ${esc(appointment.headcount)} 人` : ""}</strong></div>
@@ -4766,6 +4842,104 @@
     `;
   }
 
+  function openAppointmentLocationEdit(appointmentId) {
+    const appointment = appointmentById(appointmentId);
+    if (!appointment) return;
+    state.appointmentLocationDraft = {
+      appointmentId: appointment.id,
+      province: appointment.province || "北京市",
+      city: appointment.city || "北京市",
+      address: appointment.address || "",
+      venue: appointment.venue || ""
+    };
+    openOverlayLayer({
+      type: "appointment-location",
+      appointmentId: appointment.id
+    });
+  }
+
+  function renderAppointmentLocationSheet() {
+    const draft = state.appointmentLocationDraft;
+    const appointment = appointmentById(
+      draft?.appointmentId || state.overlay?.appointmentId
+    );
+    if (!draft || !appointment) return "";
+    return `
+      <div class="sheet-backdrop" data-action="close-overlay"></div>
+      <section class="sheet" role="dialog" aria-modal="true" aria-label="修改活动地点">
+        <div class="sheet__grabber"></div>
+        <div class="sheet__bar">
+          <div><h2>修改活动地点</h2><p>${esc(appointment.id)} · 由机构填写</p></div>
+          <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">
+            ${icon("close", 15)}
+          </button>
+        </div>
+        <div class="sheet__body">
+          <div class="sheet-pad">
+            <div class="template-form-note">${icon(
+              "building",
+              13
+            )} 活动地点由机构维护。保存后会同步到预约详情与院方方案，院方运营人员不覆盖此信息。</div>
+            <div class="field-row">
+              <div class="field"><label>省份</label>
+                <select data-location-province>${renderProvinceOptions(draft.province)}</select>
+              </div>
+              <div class="field"><label>城市</label>
+                <select data-location-city>${renderCityOptions(draft.province, draft.city)}</select>
+              </div>
+            </div>
+            <div class="field">
+              <label>详细地址 <em>*</em></label>
+              <input type="text" data-location-field="address" value="${esc(
+                draft.address
+              )}" placeholder="如：XX路XX号XX大厦">
+            </div>
+            <div class="field">
+              <label>场地名称 <span>选填</span></label>
+              <input type="text" data-location-field="venue" value="${esc(
+                draft.venue
+              )}" placeholder="如：总部大楼 3 层报告厅">
+            </div>
+          </div>
+        </div>
+        <div class="sheet__footer">
+          <button class="btn btn--ghost" type="button" data-action="close-overlay">取消</button>
+          <button class="btn btn--primary" type="button" data-action="appointment-location-save">
+            保存活动地点 ${icon("check", 14)}
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
+  function saveAppointmentLocation() {
+    const draft = state.appointmentLocationDraft;
+    const appointment = appointmentById(draft?.appointmentId);
+    if (!draft || !appointment) return;
+    if (!draft.address.trim()) return showToast("请填写活动详细地址。");
+    const patch = {
+      province: draft.province,
+      city: draft.city,
+      address: draft.address.trim(),
+      venue: draft.venue.trim()
+    };
+    if (appointment.plan) {
+      patch.plan = {
+        ...appointment.plan,
+        ...patch,
+        updatedAt: new Date().toISOString()
+      };
+    }
+    updateAppointment(appointment.id, patch);
+    state.appointmentLocationDraft = null;
+    if (!popOverlayLayer()) {
+      clearOverlayState();
+      releaseOverlayHistory();
+    }
+    renderApp({ scrollTo: currentWindowScroll() });
+    showToast("活动地点已更新，院方方案与短信内容已同步。");
+  }
+
   function openDemandCreate() {
     if (!state.session) {
       startLogin({ type: "demand" });
@@ -4793,6 +4967,45 @@
       }
     };
     renderOverlay();
+  }
+
+  function openBookingDemand() {
+    const booking = state.booking;
+    if (!booking) {
+      openDemandCreate();
+      return;
+    }
+    const expert = bookingSelectedDoctor(booking);
+    const hospital = expert ? hospitalById(expert.hospitalId) : nearestHospital();
+    openOverlayLayer({
+      type: "demand-create",
+      draft: {
+        hospitalId: hospital?.id || "pkuih",
+        serviceType: booking.serviceType || "讲座",
+        topic: booking.customTopic || "",
+        audience: booking.audience || "",
+        headcount: booking.headcount || "",
+        preferredDate: booking.date || "",
+        province: booking.province,
+        city: booking.city,
+        note: [
+          booking.note,
+          expert ? `意向专家：${expert.name} · ${expert.deptTitle}` : "",
+          booking.address
+            ? `活动地址：${formatAddress(
+                booking.province,
+                booking.city,
+                booking.address,
+                booking.venue
+              )}`
+            : ""
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        contactName: booking.contactName || state.session.name || "",
+        contactPhone: booking.contactPhone || state.session.phone || ""
+      }
+    });
   }
 
   function renderDemandCreateSheet() {
@@ -4931,7 +5144,7 @@
     const items = getDemands();
     items.push(demand);
     saveDemands(items);
-    state.overlay = null;
+    clearOverlayState();
     releaseOverlayHistory();
     state.clientRecordTab = "demands";
     state.tab = "appointments";
@@ -5591,8 +5804,8 @@
     const staff = appointmentAssignee(appointment);
     const plan = appointment.plan || {};
     const region = normalizeRegion(
-      plan.province || appointment.province || "北京市",
-      plan.city || appointment.city || "北京市"
+      appointment.province || "北京市",
+      appointment.city || "北京市"
     );
     return {
       topic: plan.topic || topicOf(appointment),
@@ -5603,8 +5816,8 @@
       time: "全天",
       province: region.province,
       city: region.city,
-      venue: plan.venue || appointment.venue || "",
-      address: plan.address || appointment.address || "",
+      venue: appointment.venue || "",
+      address: appointment.address || "",
       outline:
         plan.outline ||
         "1. 企业人群健康风险概览\n2. 专家主题分享\n3. 常见问题与误区\n4. 现场问答与健康咨询",
@@ -5634,10 +5847,12 @@
     const fields = collectReviewFields();
     if (!fields.topic) return showToast("请填写活动主题。");
     if (!fields.date) return showToast("请选择活动日期。");
-    if (!fields.address) return showToast("请填写活动详细地址。");
     const staff = appointmentAssignee(appointment);
     const speakerExpert = fields.speakerId ? expertById(fields.speakerId) : null;
-    const region = normalizeRegion(fields.province, fields.city);
+    const region = normalizeRegion(
+      appointment.province || "北京市",
+      appointment.city || "北京市"
+    );
     const plan = {
       topic: fields.topic,
       serviceType: fields.serviceType || appointment.serviceType,
@@ -5649,8 +5864,8 @@
       time: "全天",
       province: region.province,
       city: region.city,
-      venue: fields.venue || "",
-      address: fields.address,
+      venue: appointment.venue || "",
+      address: appointment.address || "",
       outline: fields.outline || "",
       agenda: fields.agenda || "",
       team: fields.team || "",
@@ -5667,10 +5882,6 @@
       ),
       feedback: "",
       feedbackAt: "",
-      province: plan.province,
-      city: plan.city,
-      venue: plan.venue,
-      address: plan.address,
       planSentAt: new Date().toISOString()
     });
     state.adminReviewId = "";
@@ -5888,28 +6099,17 @@
                           <div class="field-static">${icon("clock", 14)} 全天（1 天）</div>
                         </div>
                       </div>
-                      <div class="field-row">
-                        <div class="field"><label>省份</label>
-                          <select data-review-field="province" data-review-province>${renderProvinceOptions(
-                            draft.province
-                          )}</select>
-                        </div>
-                        <div class="field"><label>城市</label>
-                          <select data-review-field="city" data-review-city>${renderCityOptions(
+                      <div class="location-owned-card">
+                        <span>${icon("building", 14)} 活动地点 · 机构填写</span>
+                        <strong>${esc(
+                          formatAddress(
                             draft.province,
-                            draft.city
-                          )}</select>
-                        </div>
-                      </div>
-                      <div class="field"><label>场地名称</label>
-                        <input type="text" data-review-field="venue" value="${esc(
-                          draft.venue
-                        )}" placeholder="如：总部大楼 3 层报告厅">
-                      </div>
-                      <div class="field"><label>详细地址</label>
-                        <input type="text" data-review-field="address" value="${esc(
-                          draft.address
-                        )}" placeholder="请输入活动详细地址">
+                            draft.city,
+                            draft.address,
+                            draft.venue
+                          ) || "机构尚未补充活动地点"
+                        )}</strong>
+                        <small>省份、详细地址与场地名称由机构在预约时填写；院方保存方案时会自动带入最新地点，不可在此覆盖。</small>
                       </div>
                       <div class="field"><label>课题大纲</label>
                         <textarea data-review-field="outline">${esc(draft.outline)}</textarea>
@@ -5994,10 +6194,10 @@
     return `【北京大学国际医院】${appointment.contactName}您好，您预约的${formatDateCN(
       plan.date || appointment.date
     )} ${plan.time || ""}「${plan.topic || topicOf(appointment)}」活动已确认。地点：${formatAddress(
-      plan.province || appointment.province,
-      plan.city || appointment.city,
-      plan.address || appointment.address,
-      plan.venue || appointment.venue
+      appointment.province || plan.province,
+      appointment.city || plan.city,
+      appointment.address || plan.address,
+      appointment.venue || plan.venue
     )}。项目对接人：${
       staff ? staff.name + " " + staff.phone : "院方项目组"
     }。请提前安排，如需调整请联系项目对接人。`;
@@ -6426,27 +6626,33 @@
 
   function renderSlotBatchCard(doctor) {
     const batch = state.slotBatch;
+    const scopeLabel = batch.scope === "hospital" ? "本院全部专家" : `当前专家 · ${doctor.name}`;
+    const weekdayText = batch.weekdays.length
+      ? batch.weekdays
+          .slice()
+          .sort((a, b) => a - b)
+          .map((day) => ["日", "一", "二", "三", "四", "五", "六"][day])
+          .join("、")
+      : "未选择";
     return `
-      <section class="batch-card">
+      <section class="batch-card slot-batch-card">
         <div class="batch-card__head">
-          <h3>${icon("sparkles", 15)} 批量快捷设置</h3>
-          <span>一键设置未来工作日号源，也可按日期范围统一调整</span>
+          <h3>${icon("sparkles", 15)} 批量设置可约日</h3>
+          <span>先加入草稿，最后在页面底部统一保存</span>
         </div>
-        <div class="batch-card__quick">
-          <button type="button" data-action="slot-quick-batch" data-days="7" data-capacity="1">
-            <strong>首约日起 7 天</strong><small>每日 1 个</small>
-          </button>
-          <button type="button" data-action="slot-quick-batch" data-days="14" data-capacity="2">
-            <strong>首约日起 14 天</strong><small>每日 2 个</small>
-          </button>
-          <button type="button" data-action="slot-quick-batch" data-days="30" data-capacity="2">
-            <strong>首约日起 30 天</strong><small>每日 2 个</small>
-          </button>
+        <div class="slot-batch-steps">
+          <span><i>1</i>选专家</span>
+          <span><i>2</i>填范围</span>
+          <span><i>3</i>点日期微调</span>
+          <span><i>4</i>统一保存</span>
         </div>
-        <div class="batch-card__presets">
-          <button type="button" data-action="slot-preset" data-value="14">未来 14 天</button>
-          <button type="button" data-action="slot-preset" data-value="30">未来 30 天</button>
-          <button type="button" data-action="slot-preset" data-value="60">未来 60 天</button>
+        <div class="field">
+          <label>快捷范围 <span>只调整日期，不会立即保存</span></label>
+          <div class="batch-card__presets slot-range-presets">
+            <button type="button" data-action="slot-preset" data-value="7">未来 7 天</button>
+            <button type="button" data-action="slot-preset" data-value="14">未来 14 天</button>
+            <button type="button" data-action="slot-preset" data-value="30">未来 30 天</button>
+          </div>
         </div>
         <div class="field-row">
           <div class="field"><label>开始日期</label>
@@ -6457,7 +6663,7 @@
           </div>
         </div>
         <div class="field">
-          <label>应用星期</label>
+          <label>每周可约日</label>
           <div class="weekday-chips">
             ${["日", "一", "二", "三", "四", "五", "六"]
               .map(
@@ -6469,22 +6675,28 @@
           </div>
         </div>
         <div class="field-row">
-          <div class="field"><label>每日号源数</label>
+          <div class="field"><label>每日号源</label>
             <input type="number" inputmode="numeric" min="0" max="30" data-slot-batch="capacity" value="${esc(
               batch.capacity
             )}">
           </div>
-          <div class="field"><label>应用范围</label>
+          <div class="field"><label>设置给谁</label>
             <select data-slot-batch="scope">
               <option value="one" ${batch.scope === "one" ? "selected" : ""}>当前专家</option>
               <option value="hospital" ${batch.scope === "hospital" ? "selected" : ""}>本院全部专家</option>
             </select>
           </div>
         </div>
+        <div class="slot-batch-summary">
+          ${icon("alert", 13)}
+          <span>${esc(scopeLabel)} · 每周 ${esc(weekdayText)} · 每日 ${esc(
+            batch.capacity
+          )} 个 · ${esc(batch.from || "未选")} 至 ${esc(batch.to || "未选")}</span>
+        </div>
         <button class="btn btn--soft btn--block" type="button" data-action="slot-batch-apply">
-          应用到草稿（不立即保存）
+          ${icon("plus", 14)} 加入待保存
         </button>
-        <p class="batch-card__hint">快捷按钮从该专家最早可约日期起算并直接保存；自定义批次先加入草稿，再点底部“统一保存”。号源不会低于已预约数量，早于专家预约周期的日期会自动跳过。</p>
+        <p class="batch-card__hint">号源数不会低于已预约人数；早于专家提前预约周期的日期会自动跳过。批量加入后仍可点日历中的某一天单独微调。</p>
       </section>
     `;
   }
@@ -6520,34 +6732,11 @@
             .join("")}
         </select>
       </div>
-      ${renderSlotQuickBatch(doctor)}
+      ${renderSlotBatchCard(doctor)}
       ${renderSlotMonthNav()}
       ${renderSlotCalendar(doctor)}
-      ${renderSlotBatchCard(doctor)}
     `;
     refreshSlotSaveBar();
-  }
-
-  function renderSlotQuickBatch(doctor) {
-    return `
-      <section class="batch-card batch-card--compact">
-        <div class="batch-card__head">
-          <h3>${icon("sparkles", 15)} 快捷批量</h3>
-          <span>当前专家 · 从首约日起直接保存</span>
-        </div>
-        <div class="batch-card__quick">
-          <button type="button" data-action="slot-quick-batch" data-days="7" data-capacity="1">
-            <strong>7 天</strong><small>每日 1 个</small>
-          </button>
-          <button type="button" data-action="slot-quick-batch" data-days="14" data-capacity="2">
-            <strong>14 天</strong><small>每日 2 个</small>
-          </button>
-          <button type="button" data-action="slot-quick-batch" data-days="30" data-capacity="2">
-            <strong>30 天</strong><small>每日 2 个</small>
-          </button>
-        </div>
-      </section>
-    `;
   }
 
   function refreshSlotSaveBar() {
@@ -6882,7 +7071,7 @@
       <p class="admin-hint">${icon(
         "clipboard",
         12
-      )} 模版保存活动主题、服务类型、课题大纲、流程、项目组与确认说明；具体日期、地址和项目对接人仍按每场预约自动带入。</p>
+      )} 模版保存活动主题、服务类型、课题大纲、流程、项目组与确认说明；具体日期、地点和项目对接人按每场预约自动带入，场地与详细地址由机构填写。</p>
       <div class="plan-template-list">
         ${
           templates.length
@@ -6955,7 +7144,7 @@
             <div class="template-form-note">${icon(
               "clock",
               13
-            )} 活动时长统一按 1 天安排；模版不保存具体日期、地址与项目对接人。</div>
+            )} 活动时长统一按 1 天安排；模版不保存具体日期、地点与项目对接人，场地和详细地址由机构填写。</div>
             <div class="field-row">
               <div class="field"><label>模版名称 <em>*</em></label>
                 <input type="text" data-template-field="name" value="${esc(
@@ -7231,7 +7420,7 @@
               </div>
             </div>
             <div class="field">
-              <label>绑定本院专家 <span>仅可选择本院已上架讲座专家</span></label>
+              <label>绑定本院专家 <span>仅可选择本院已显示讲座专家</span></label>
               <div class="theme-expert-picker">
                 ${hospitalExperts
                   .map(
@@ -7274,7 +7463,7 @@
                             ).join("")}
                           </select>
                           <select data-theme-topic-field="expertId" data-index="${index}">
-                            <option value="">院方匹配主讲专家</option>
+                            <option value="">请选择主讲专家</option>
                             ${hospitalExperts
                               .map(
                                 (expert) =>
@@ -7413,7 +7602,7 @@
           <span class="doctor-admin-card__head">
             <strong>${esc(expert.name)}</strong>
             <span class="${expert.active === false ? "is-off" : "is-on"}">${
-              expert.active === false ? "已下架" : "已上架"
+              expert.active === false ? "未显示" : "已显示"
             }</span>
           </span>
           <span class="doctor-admin-card__role">${esc(expert.deptTitle)} · ${esc(expert.dept)}</span>
@@ -7654,7 +7843,7 @@
               <span class="field-help">对应院方表格中的「预约时间 T+N」，用于计算最早可约日期。</span>
             </div>
             <label class="switch-row">
-              <span><strong>上架展示</strong><small>关闭后机构端不再展示该专家</small></span>
+              <span><strong>在机构端显示</strong><small>关闭后机构端不再展示该专家</small></span>
               <input type="checkbox" data-doctor-active ${draft.active !== false ? "checked" : ""}>
             </label>
           </div>
@@ -8352,6 +8541,10 @@
       state.booking.agree = target.checked;
       return;
     }
+    if (target.matches("[data-location-field]") && state.appointmentLocationDraft) {
+      state.appointmentLocationDraft[target.dataset.locationField] = target.value;
+      return;
+    }
     if (target.matches("[data-demand-field]") && state.overlay?.draft) {
       state.overlay.draft[target.dataset.demandField] = target.value;
       return;
@@ -8440,6 +8633,23 @@
       refreshBookingForLocation();
       return;
     }
+    if (target.matches("[data-location-province]") && state.appointmentLocationDraft) {
+      state.appointmentLocationDraft.province = target.value;
+      state.appointmentLocationDraft.city =
+        (state.chinaCities?.[target.value] || [target.value])[0];
+      const city = document.querySelector("[data-location-city]");
+      if (city) {
+        city.innerHTML = renderCityOptions(
+          state.appointmentLocationDraft.province,
+          state.appointmentLocationDraft.city
+        );
+      }
+      return;
+    }
+    if (target.matches("[data-location-city]") && state.appointmentLocationDraft) {
+      state.appointmentLocationDraft.city = target.value;
+      return;
+    }
     if (target.matches("[data-demand-province]") && state.overlay?.draft) {
       state.overlay.draft.province = target.value;
       state.overlay.draft.city = (state.chinaCities?.[target.value] || [target.value])[0];
@@ -8481,12 +8691,6 @@
     if (target.matches("[data-theme-topic-field]") && state.adminThemeDraft) {
       const topic = state.adminThemeDraft.topics?.[Number(target.dataset.index)];
       if (topic) topic[target.dataset.themeTopicField] = target.value;
-      return;
-    }
-    if (target.matches("[data-review-province]")) {
-      const province = target.value;
-      const city = document.querySelector("[data-review-city]");
-      if (city) city.innerHTML = renderCityOptions(province, "");
       return;
     }
     if (target.matches("[data-review-speaker]") && state.adminDraft) {
@@ -8720,17 +8924,6 @@
       case "slot-batch-apply":
         applySlotBatch();
         break;
-      case "slot-quick-batch": {
-        const days = Math.max(1, Number(el.dataset.days) || 7);
-        const capacity = Math.max(0, Number(el.dataset.capacity) || 1);
-        const doctor = selectedSlotDoctor();
-        const lead = Math.max(1, Number(doctor?.leadDays) || tierOf(doctor).leadDays);
-        state.slotBatch.from = isoDate(addDays(startOfDay(), lead));
-        state.slotBatch.to = isoDate(addDays(startOfDay(), lead + days - 1));
-        state.slotBatch.capacity = capacity;
-        applySlotBatch({ save: true });
-        break;
-      }
       case "slot-weekday": {
         const day = Number(el.dataset.value);
         const list = state.slotBatch.weekdays;
@@ -9081,6 +9274,12 @@
         };
         renderOverlay();
         break;
+      case "appointment-location-edit":
+        openAppointmentLocationEdit(el.dataset.appointmentId || "");
+        break;
+      case "appointment-location-save":
+        saveAppointmentLocation();
+        break;
       case "appointment-action":
         if (!state.overlay) return;
         state.overlay.action = el.dataset.value || "";
@@ -9172,6 +9371,9 @@
         selectBookingTopicByTitle(el.dataset.value || "");
         break;
       }
+      case "booking-open-demand":
+        openBookingDemand();
+        break;
       case "booking-next":
         bookingNext();
         break;

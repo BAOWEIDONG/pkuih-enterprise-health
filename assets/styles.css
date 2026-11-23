@@ -3540,6 +3540,38 @@ textarea {
   color: var(--brand);
 }
 
+.booking-demand-empty,
+.booking-date-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px;
+  border: 1px dashed rgba(11, 49, 143, 0.2);
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f8fbff, #f1f6ff);
+  text-align: left;
+}
+
+.booking-demand-empty strong,
+.booking-date-locked strong {
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.booking-demand-empty span,
+.booking-date-locked span {
+  color: var(--ink-3);
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.booking-demand-empty .btn {
+  align-self: stretch;
+  margin-top: 3px;
+}
+
 .booking-doctor {
   display: flex;
   width: 100%;
@@ -4371,6 +4403,54 @@ textarea {
   background: #f7f9fc;
   color: var(--ink-2);
   white-space: pre-line;
+}
+
+.location-edit-link {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin: 2px 0 4px;
+  padding: 8px 10px;
+  border: 1px solid rgba(11, 49, 143, 0.12);
+  border-radius: 10px;
+  background: #f3f7ff;
+  color: var(--brand);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.location-owned-card {
+  display: grid;
+  gap: 5px;
+  margin-top: 13px;
+  padding: 12px;
+  border: 1px solid rgba(11, 49, 143, 0.11);
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f8fbff, #eef4ff);
+}
+
+.location-owned-card > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--brand);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.location-owned-card > strong {
+  color: var(--ink);
+  font-size: 10.5px;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.location-owned-card > small {
+  color: var(--ink-3);
+  font-size: 8px;
+  line-height: 1.55;
 }
 
 .plan-card {
@@ -6469,6 +6549,61 @@ textarea {
   margin-top: 3px;
   color: var(--ink-3);
   font-size: 8px;
+}
+
+.slot-batch-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 11px;
+}
+
+.slot-batch-steps span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-3);
+  font-size: 7px;
+  text-align: center;
+}
+
+.slot-batch-steps i {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: #e8f0ff;
+  color: var(--brand);
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 780;
+}
+
+.slot-range-presets {
+  margin-top: 5px;
+}
+
+.slot-batch-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: rgba(11, 49, 143, 0.055);
+  color: var(--ink-2);
+  font-size: 8px;
+  line-height: 1.55;
+}
+
+.slot-batch-summary svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--brand);
 }
 
 .batch-card__quick {
