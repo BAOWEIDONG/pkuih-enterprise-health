@@ -14,6 +14,7 @@
     adminSession: "pkuih_h6_admin_session",
     doctorConfig: "pkuih_h6_doctor_config",
     themeConfig: "pkuih_h6_theme_config",
+    planTemplates: "pkuih_h6_plan_templates",
     slots: "pkuih_h6_slots",
     smsLogs: "pkuih_h6_sms_logs",
     lastPortal: "pkuih_h6_portal",
@@ -21,7 +22,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261123-11";
+  const DATA_VERSION = "20261123-12";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -214,6 +215,7 @@
     slotDay: "",
     adminAccountDraft: null,
     adminDoctorDraft: null,
+    adminTemplateDraft: null,
     // history & scroll
     viewScroll: { main: {}, admin: {} },
     historyDepth: 0,
@@ -619,19 +621,23 @@
   function fallbackHospital(user = state.session) {
     const province = user?.province || "北京";
     const city = user?.city || "北京";
+    const provinceKey = String(province).replace(
+      /(壮族自治区|回族自治区|维吾尔自治区|特别行政区|自治区|省|市|地区|盟|自治州)$/g,
+      ""
+    );
     if (city && city.includes("深圳")) return hospitalById("shenzhen");
     if (city && city.includes("天津")) return hospitalById("ocean");
     if (city && city.includes("淄博")) {
-      return hospitalById(province === "山东" ? "luzhong" : "pkuih");
+      return hospitalById(provinceKey === "山东" ? "luzhong" : "pkuih");
     }
     if (city && city.includes("长治")) return hospitalById("luan");
     if (city && city.includes("株洲")) return hospitalById("kaide");
-    if (province === "北京") return hospitalById("pkuih");
-    if (province === "天津") return hospitalById("ocean");
-    if (province === "山东") return hospitalById("luzhong");
-    if (province === "山西") return hospitalById("luan");
-    if (province === "湖南") return hospitalById("kaide");
-    if (province === "广东") return hospitalById("shenzhen");
+    if (provinceKey === "北京") return hospitalById("pkuih");
+    if (provinceKey === "天津") return hospitalById("ocean");
+    if (provinceKey === "山东") return hospitalById("luzhong");
+    if (provinceKey === "山西") return hospitalById("luan");
+    if (provinceKey === "湖南") return hospitalById("kaide");
+    if (provinceKey === "广东") return hospitalById("shenzhen");
     return hospitalById("pkuih");
   }
 
@@ -928,7 +934,7 @@
             speakerId: specialist?.id || "",
             speaker: specialist ? `${specialist.name} · ${specialist.deptTitle}` : "院方安排",
             date: reviewDate,
-            time: "14:00-16:00",
+            time: "全天",
             province: "北京市",
             city: "北京市",
             venue: "一层多功能厅",
@@ -1380,7 +1386,13 @@
             ? saved[month].coverageCities
             : base?.coverageCities || [],
         expertIds:
-          saved[month]?.expertIds !== undefined ? saved[month].expertIds : base?.expertIds || [],
+          [
+            ...new Set(
+              saved[month]?.expertIds !== undefined
+                ? saved[month].expertIds
+                : base?.expertIds || []
+            )
+          ],
         topics: saved[month]?.topics !== undefined ? saved[month].topics : base?.topics || [],
         image: saved[month]?.image || base?.image || themeImageFor(month)
       };
@@ -1399,7 +1411,7 @@
       ...draft,
       month: Number(draft.month),
       coverageCities: [...(draft.coverageCities || [])],
-      expertIds: [...(draft.expertIds || [])],
+      expertIds: [...new Set(draft.expertIds || [])],
       topics: (draft.topics || []).map((topic, index) => ({
         ...topic,
         id: topic.id || `${draft.month}-custom-${index}-${Date.now()}`
@@ -1557,6 +1569,7 @@
     state.adminDemandDraft = null;
     state.adminAccountDraft = null;
     state.adminDoctorDraft = null;
+    state.adminTemplateDraft = null;
     state.adminThemeDraft = null;
     state.adminThemeMonth = 0;
     state.slotDay = "";
@@ -1610,6 +1623,7 @@
     if (type === "admin-account") return paint(renderAdminAccountSheet());
     if (type === "admin-doctor") return paint(renderAdminDoctorSheet());
     if (type === "admin-theme") return paint(renderAdminThemeSheet());
+    if (type === "admin-template") return paint(renderAdminTemplateSheet());
     if (type === "slot-day") return paint(renderSlotDaySheet());
     if (!state.overlay) {
       overlayRoot.innerHTML = "";
@@ -2173,11 +2187,15 @@
         : state.session
         ? `按${regionText(state.session.province, state.session.city)}推荐`
         : "定位后推荐最近医院";
+    const sortHint =
+      state.geoStatus === "ready" && Number.isFinite(Number(state.geoLat))
+        ? " · 按距离排序"
+        : " · 定位后可按距离排序";
     return `
       <div class="hero-hospital">
         <span class="hero-hospital__pin">${icon("mapPin", 15)}</span>
         <span class="hero-hospital__body">
-          <small>当前附近医院 · ${esc(meta)} · 按距离排序</small>
+          <small>当前附近医院 · ${esc(meta)}${sortHint}</small>
           <span class="hero-hospital__select-wrap">
             <select data-home-hospital-picker aria-label="切换履约医院">
               ${hospitals
@@ -2430,12 +2448,18 @@
       ...(theme?.expertIds || []).map(String),
       ...(theme?.topics || []).map((topic) => String(topic.expertId || "")).filter(Boolean)
     ]);
-    const hospitalExperts = state.experts.filter(
-      (expert) =>
-        expert.hospitalId === hospitalId &&
-        expert.active !== false &&
-        matchesService(expert, "讲座")
-    );
+    const hospitalExperts = [
+      ...new Map(
+        state.experts
+          .filter(
+            (expert) =>
+              expert.hospitalId === hospitalId &&
+              expert.active !== false &&
+              matchesService(expert, "讲座")
+          )
+          .map((expert) => [String(expert.id), expert])
+      ).values()
+    ];
     return hospitalExperts.filter((expert) => ids.has(String(expert.id)));
   }
 
@@ -4493,6 +4517,7 @@
       { id: "slots", label: "号源", icon: "clock" },
       { id: "doctors", label: "专家", icon: "experts" },
       { id: "themes", label: "时令", icon: "leaf" },
+      { id: "templates", label: "方案模版", icon: "clipboard" },
       { id: "marketing", label: "展业", icon: "send" },
       { id: "sms", label: "短信", icon: "message" }
     ];
@@ -4552,6 +4577,8 @@
               ? renderDoctorAdminPage()
               : state.adminTab === "themes"
               ? renderAdminThemesPage()
+              : state.adminTab === "templates"
+              ? renderAdminTemplatesPage()
               : state.adminTab === "hospitals"
               ? renderAdminHospitalsPage()
               : state.adminTab === "marketing"
@@ -4760,7 +4787,7 @@
       speakerId: plan.speakerId || expert?.id || "",
       speaker: plan.speaker || (expert ? `${expert.name} · ${expert.deptTitle}` : ""),
       date: plan.date || appointment.date || "",
-      time: plan.time || "14:00-16:00",
+      time: "全天",
       province: region.province,
       city: region.city,
       venue: plan.venue || appointment.venue || "",
@@ -4806,7 +4833,7 @@
         ? `${speakerExpert.name} · ${speakerExpert.deptTitle}`
         : fields.speaker || "",
       date: fields.date,
-      time: fields.time || "",
+      time: "全天",
       province: region.province,
       city: region.city,
       venue: fields.venue || "",
@@ -4887,6 +4914,7 @@
     const draft = state.adminDraft || buildReviewDraft(appointment);
     const canEdit = Boolean(assignee);
     const smsLog = getSmsLogs()[appointment.id];
+    const planTemplates = getPlanTemplates(appointment.hospitalId);
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet admin-review-sheet" role="dialog" aria-modal="true" aria-label="处理预约">
@@ -4976,6 +5004,33 @@
             ${
               canEdit
                 ? `<section class="review-form">
+                    <div class="plan-template-import">
+                      <div class="plan-template-import__head">
+                        <span>${icon("clipboard", 14)} 方案模版</span>
+                        <small>${planTemplates.length} 个可用</small>
+                      </div>
+                      ${
+                        planTemplates.length
+                          ? `<div class="plan-template-import__control">
+                              <select data-review-template aria-label="选择方案模版">
+                                ${planTemplates
+                                  .map(
+                                    (template) =>
+                                      `<option value="${esc(template.id)}">${esc(
+                                        template.name
+                                      )} · ${esc(serviceLabel(template.serviceType))}</option>`
+                                  )
+                                  .join("")}
+                              </select>
+                              <button class="btn btn--primary btn--sm" type="button"
+                                data-action="review-import-template">
+                                一键导入
+                              </button>
+                            </div>
+                            <p>导入会覆盖当前课题大纲、活动流程、项目组与确认说明。</p>`
+                          : `<p>暂无方案模版，可请院方运营在「方案模版」中配置。</p>`
+                      }
+                    </div>
                     <div class="form-card">
                       <div class="form-card__head">
                         <h3>${icon("clipboard", 15)} 活动方案</h3>
@@ -5016,10 +5071,8 @@
                           <input type="date" data-review-field="date" value="${esc(draft.date)}"
                             min="${todayIso()}">
                         </div>
-                        <div class="field"><label>活动时间</label>
-                          <input type="text" data-review-field="time" value="${esc(
-                            draft.time
-                          )}" placeholder="如：14:00-16:00">
+                        <div class="field"><label>活动时长</label>
+                          <div class="field-static">${icon("clock", 14)} 全天（1 天）</div>
                         </div>
                       </div>
                       <div class="field-row">
@@ -5891,6 +5944,329 @@
   }
 
   /* =========================================================
+     Admin plan templates
+     ========================================================= */
+  function defaultPlanTemplateSeeds() {
+    return state.hospitals.flatMap((hospital) => [
+      {
+        id: `tpl-${hospital.id}-lecture`,
+        hospitalId: hospital.id,
+        name: "标准健康讲座",
+        serviceType: "讲座",
+        topic: "",
+        outline:
+          "1. 企业人群健康风险概览\n2. 专家主题分享\n3. 常见问题与误区\n4. 现场问答与健康咨询",
+        agenda:
+          "09:00-09:20 签到与开场\n09:20-10:20 专家主题分享\n10:20-10:50 现场问答\n10:50-11:30 健康咨询",
+        team: "院方项目负责人、现场执行",
+        message:
+          "院方已完成专家与课题匹配，请确认活动日期、地点与流程。如人数或场地有变化，请提前联系项目对接人。",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: `tpl-${hospital.id}-consult`,
+        hospitalId: hospital.id,
+        name: "企业健康咨询",
+        serviceType: "巡诊",
+        topic: "",
+        outline:
+          "1. 健康风险筛查\n2. 分组一对一咨询\n3. 重点人群健康建议\n4. 现场问题汇总",
+        agenda:
+          "09:00-09:20 场地准备与签到\n09:20-11:30 分组健康咨询\n11:30-12:00 汇总答疑",
+        team: "院方项目负责人、现场执行",
+        message:
+          "院方已完成咨询专家与现场安排，请确认活动日期、场地与人员组织方式。如需调整，请提前联系项目对接人。",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ]);
+  }
+
+  function getPlanTemplateStore() {
+    const stored = readJSON(STORAGE.planTemplates, null);
+    if (Array.isArray(stored)) return stored;
+    const seeded = defaultPlanTemplateSeeds();
+    writeJSON(STORAGE.planTemplates, seeded);
+    return seeded;
+  }
+
+  function savePlanTemplateStore(templates) {
+    writeJSON(STORAGE.planTemplates, templates);
+  }
+
+  function getPlanTemplates(hospitalId) {
+    if (!hospitalId) return [];
+    return getPlanTemplateStore()
+      .filter((template) => template.hospitalId === hospitalId)
+      .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+  }
+
+  function activePlanTemplateHospital() {
+    if (isSuperadmin()) {
+      return state.adminHospitalId ? hospitalById(state.adminHospitalId) : null;
+    }
+    return operatorHospital();
+  }
+
+  function templateServiceOptions(selected = "讲座") {
+    return SERVICE_IDS.map(
+      (service) =>
+        `<option value="${esc(service)}" ${service === selected ? "selected" : ""}>${esc(
+          serviceLabel(service)
+        )}</option>`
+    ).join("");
+  }
+
+  function openAdminTemplateEditor(id = "") {
+    const hospital = activePlanTemplateHospital();
+    if (!hospital) return showToast("请先选择医院。");
+    const template = id
+      ? getPlanTemplates(hospital.id).find((item) => item.id === id)
+      : null;
+    state.adminTemplateDraft = template
+      ? clone(template)
+      : {
+          id: "",
+          hospitalId: hospital.id,
+          name: "",
+          serviceType: "讲座",
+          topic: "",
+          outline: "",
+          agenda: "",
+          team: "",
+          message: ""
+        };
+    state.overlay = { type: "admin-template" };
+    renderOverlay();
+  }
+
+  function renderAdminTemplatesPage() {
+    const hospital = activePlanTemplateHospital();
+    if (!hospital) {
+      return `
+        <div class="admin-page-head">
+          <div><h1>方案模版</h1><p>维护院方标准活动方案内容</p></div>
+        </div>
+        ${renderAdminTabs()}
+        ${renderAdminHospitalFilter()}
+        <div class="empty-state"><span class="empty-state__icon">${icon(
+          "building",
+          26
+        )}</span><h3>请选择医院</h3><p>超级管理员需先选择医院，再维护该院方案模版。</p></div>
+      `;
+    }
+    const templates = getPlanTemplates(hospital.id);
+    return `
+      <div class="admin-page-head">
+        <div><h1>方案模版</h1><p>${esc(hospital.short)} · 标准内容可一键导入</p></div>
+        <button class="btn btn--primary btn--sm" type="button" data-action="admin-template-add">
+          ${icon("plus", 14)} 新增模版
+        </button>
+      </div>
+      ${renderAdminTabs()}
+      ${renderAdminHospitalFilter()}
+      <p class="admin-hint">${icon(
+        "clipboard",
+        12
+      )} 模版保存活动主题、服务类型、课题大纲、流程、项目组与确认说明；具体日期、地址和项目对接人仍按每场预约自动带入。</p>
+      <div class="plan-template-list">
+        ${
+          templates.length
+            ? templates
+                .map(
+                  (template) => `
+                    <article class="plan-template-card">
+                      <div class="plan-template-card__top">
+                        <span>${esc(serviceLabel(template.serviceType))}</span>
+                        <strong>${esc(template.name)}</strong>
+                        <small>更新于 ${esc(formatDateTime(template.updatedAt))}</small>
+                      </div>
+                      ${
+                        template.topic
+                          ? `<p class="plan-template-card__topic">${icon(
+                              "sparkles",
+                              12
+                            )} ${esc(template.topic)}</p>`
+                          : ""
+                      }
+                      <p class="plan-template-card__preview">${esc(
+                        cleanText(template.outline || template.agenda || template.message, 110)
+                      )}</p>
+                      <div class="plan-template-card__meta">
+                        <span>${icon("users", 11)} ${esc(
+                          template.team || "未设置项目组"
+                        )}</span>
+                      </div>
+                      <div class="plan-template-card__actions">
+                        <button class="btn btn--ghost btn--sm" type="button"
+                          data-action="admin-template-edit" data-template-id="${esc(template.id)}">
+                          ${icon("edit", 12)} 编辑
+                        </button>
+                        <button class="text-link text-link--danger" type="button"
+                          data-action="admin-template-delete" data-template-id="${esc(
+                            template.id
+                          )}">删除</button>
+                      </div>
+                    </article>
+                  `
+                )
+                .join("")
+            : `<div class="empty-state"><span class="empty-state__icon">${icon(
+                "clipboard",
+                26
+              )}</span><h3>暂未配置方案模版</h3><p>新增后，运营人员在处理预约时可一键导入。</p></div>`
+        }
+      </div>
+    `;
+  }
+
+  function renderAdminTemplateSheet() {
+    const draft = state.adminTemplateDraft;
+    const hospital = draft?.hospitalId ? hospitalById(draft.hospitalId) : activePlanTemplateHospital();
+    if (!draft || !hospital) return "";
+    return `
+      <div class="sheet-backdrop" data-action="close-overlay"></div>
+      <section class="sheet plan-template-sheet" role="dialog" aria-modal="true" aria-label="方案模版">
+        <div class="sheet__grabber"></div>
+        <div class="sheet__bar">
+          <div><h2>${draft.id ? "编辑方案模版" : "新增方案模版"}</h2><p>${esc(
+            hospital.name
+          )}</p></div>
+          <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">
+            ${icon("close", 15)}
+          </button>
+        </div>
+        <div class="sheet__body">
+          <div class="sheet-pad">
+            <div class="template-form-note">${icon(
+              "clock",
+              13
+            )} 活动时长统一按 1 天安排；模版不保存具体日期、地址与项目对接人。</div>
+            <div class="field-row">
+              <div class="field"><label>模版名称 <em>*</em></label>
+                <input type="text" data-template-field="name" value="${esc(
+                  draft.name || ""
+                )}" placeholder="如：标准健康讲座">
+              </div>
+              <div class="field"><label>服务类型</label>
+                <select data-template-field="serviceType">${templateServiceOptions(
+                  draft.serviceType
+                )}</select>
+              </div>
+            </div>
+            <div class="field"><label>默认活动主题 <span>可留空，导入后再按预约填写</span></label>
+              <input type="text" data-template-field="topic" value="${esc(
+                draft.topic || ""
+              )}" placeholder="如：企业人群心血管健康管理">
+            </div>
+            <div class="field"><label>课题大纲</label>
+              <textarea class="textarea--tall" data-template-field="outline" placeholder="填写课题章节、重点内容与现场安排">${esc(
+                draft.outline || ""
+              )}</textarea>
+            </div>
+            <div class="field"><label>活动流程</label>
+              <textarea class="textarea--tall" data-template-field="agenda" placeholder="填写签到、分享、问答、咨询等流程">${esc(
+                draft.agenda || ""
+              )}</textarea>
+            </div>
+            <div class="field"><label>项目组成员</label>
+              <input type="text" data-template-field="team" value="${esc(
+                draft.team || ""
+              )}" placeholder="如：院方项目负责人、现场执行">
+            </div>
+            <div class="field"><label>发给机构的确认说明</label>
+              <textarea data-template-field="message" placeholder="填写需要机构确认的时间、场地、人数与注意事项">${esc(
+                draft.message || ""
+              )}</textarea>
+            </div>
+          </div>
+        </div>
+        <div class="sheet__footer">
+          <button class="btn btn--ghost" type="button" data-action="close-overlay">取消</button>
+          <button class="btn btn--primary" type="button" data-action="admin-template-save">
+            保存模版 ${icon("check", 14)}
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
+  function collectPlanTemplateFields() {
+    const fields = {};
+    document.querySelectorAll("[data-template-field]").forEach((input) => {
+      fields[input.dataset.templateField] = input.value.trim();
+    });
+    return fields;
+  }
+
+  function saveAdminTemplate() {
+    const draft = state.adminTemplateDraft;
+    if (!draft) return;
+    const fields = collectPlanTemplateFields();
+    if (!fields.name) return showToast("请填写模版名称。");
+    if (!fields.outline && !fields.agenda && !fields.message) {
+      return showToast("请至少填写课题大纲、活动流程或确认说明中的一项。");
+    }
+    const now = new Date().toISOString();
+    const store = getPlanTemplateStore();
+    const payload = {
+      ...draft,
+      ...fields,
+      hospitalId: draft.hospitalId,
+      updatedAt: now
+    };
+    const isNew = !payload.id;
+    if (payload.id) {
+      const index = store.findIndex((item) => item.id === payload.id);
+      if (index >= 0) store[index] = payload;
+      else store.push(payload);
+    } else {
+      payload.id = `tpl-custom-${Date.now()}`;
+      payload.createdAt = now;
+      store.push(payload);
+    }
+    savePlanTemplateStore(store);
+    releaseOverlayHistory();
+    clearOverlayState();
+    renderApp();
+    showToast(isNew ? "方案模版已新增。" : "方案模版已保存。");
+  }
+
+  function deleteAdminTemplate(id) {
+    const template = getPlanTemplateStore().find((item) => item.id === id);
+    if (!template) return;
+    if (!window.confirm(`确定删除「${template.name}」吗？`)) return;
+    savePlanTemplateStore(getPlanTemplateStore().filter((item) => item.id !== id));
+    renderApp();
+    showToast("方案模版已删除。");
+  }
+
+  function importReviewTemplate(templateId) {
+    const appointment = appointmentById(state.adminReviewId);
+    if (!appointment || !state.adminDraft) return;
+    const template = getPlanTemplates(appointment.hospitalId).find(
+      (item) => item.id === templateId
+    );
+    if (!template) return showToast("请选择要导入的方案模版。");
+    const current = {
+      ...state.adminDraft,
+      ...collectReviewFields()
+    };
+    state.adminDraft = {
+      ...current,
+      topic: template.topic || current.topic,
+      serviceType: template.serviceType || current.serviceType,
+      outline: template.outline || "",
+      agenda: template.agenda || "",
+      team: template.team || "",
+      message: template.message || ""
+    };
+    renderOverlay();
+    showToast(`已导入「${template.name}」，可继续修改。`);
+  }
+
+  /* =========================================================
      Admin seasonal theme config
      ========================================================= */
   function adminThemeHospital() {
@@ -5958,6 +6334,7 @@
     if (!theme) return;
     state.adminThemeMonth = Number(month);
     state.adminThemeDraft = clone(theme);
+    state.adminThemeDraft.expertIds = [...new Set(state.adminThemeDraft.expertIds || [])];
     state.overlay = { type: "admin-theme" };
     renderOverlay();
   }
@@ -5966,13 +6343,18 @@
     const hospital = adminThemeHospital();
     const draft = state.adminThemeDraft;
     if (!hospital || !draft) return "";
-    const hospitalExperts = state.experts
-      .filter(
-        (expert) =>
-          expert.hospitalId === hospital.id &&
-          expert.active !== false &&
-          matchesService(expert, "讲座")
-      )
+    const hospitalExperts = [
+      ...new Map(
+        state.experts
+          .filter(
+            (expert) =>
+              expert.hospitalId === hospital.id &&
+              expert.active !== false &&
+              matchesService(expert, "讲座")
+          )
+          .map((expert) => [String(expert.id), expert])
+      ).values()
+    ]
       .sort(
         (a, b) =>
           CLIENT_TIER_ORDER.indexOf(a.tier) - CLIENT_TIER_ORDER.indexOf(b.tier) ||
@@ -7387,6 +7769,7 @@
         state.adminTab = el.dataset.value;
         state.overlay = null;
         state.adminThemeDraft = null;
+        state.adminTemplateDraft = null;
         renderApp({ scrollTo: 0 });
         break;
       case "admin-filter":
@@ -7577,6 +7960,23 @@
       case "admin-doctor-save":
         saveAdminDoctor();
         break;
+      case "admin-template-add":
+        openAdminTemplateEditor();
+        break;
+      case "admin-template-edit":
+        openAdminTemplateEditor(el.dataset.templateId || "");
+        break;
+      case "admin-template-delete":
+        deleteAdminTemplate(el.dataset.templateId || "");
+        break;
+      case "admin-template-save":
+        saveAdminTemplate();
+        break;
+      case "review-import-template": {
+        const select = document.querySelector("[data-review-template]");
+        importReviewTemplate(select?.value || "");
+        break;
+      }
       case "open-admin-theme":
         openAdminThemeEditor(el.dataset.month);
         break;
@@ -7590,10 +7990,10 @@
       case "theme-expert-toggle": {
         if (!state.adminThemeDraft) return;
         const id = el.dataset.id;
-        const list = state.adminThemeDraft.expertIds || [];
-        state.adminThemeDraft.expertIds = list.includes(id)
-          ? list.filter((item) => item !== id)
-          : list.concat(id);
+        const ids = new Set(state.adminThemeDraft.expertIds || []);
+        if (ids.has(id)) ids.delete(id);
+        else ids.add(id);
+        state.adminThemeDraft.expertIds = [...ids];
         el.classList.toggle("is-active");
         break;
       }

@@ -885,6 +885,24 @@ textarea {
   color: #97a1b2;
 }
 
+.field-static {
+  display: flex;
+  min-height: 45px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #f6f8fc;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.field-static svg {
+  color: var(--brand);
+}
+
 .field-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5429,6 +5447,185 @@ textarea {
 
 .review-form {
   margin-top: 10px;
+}
+
+.plan-template-import {
+  margin-bottom: 10px;
+  padding: 13px;
+  border: 1px solid rgba(10, 52, 120, 0.1);
+  border-radius: 18px;
+  background: linear-gradient(145deg, #f7faff 0%, #eef4ff 100%);
+}
+
+.plan-template-import__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.plan-template-import__head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.plan-template-import__head small {
+  color: var(--ink-3);
+  font-size: 8px;
+}
+
+.plan-template-import__control {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.plan-template-import__control select {
+  min-width: 0;
+  height: 39px;
+  flex: 1;
+  padding: 0 28px 0 10px;
+  border: 1px solid rgba(10, 52, 120, 0.1);
+  border-radius: 11px;
+  background-color: #fff;
+  color: var(--ink-2);
+  font-size: 10px;
+}
+
+.plan-template-import__control .btn {
+  flex: 0 0 auto;
+  min-height: 39px;
+  padding-inline: 12px;
+  white-space: nowrap;
+}
+
+.plan-template-import > p {
+  margin: 8px 0 0;
+  color: var(--ink-3);
+  font-size: 8px;
+  line-height: 1.55;
+}
+
+.plan-template-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 14px 28px;
+}
+
+.plan-template-card {
+  padding: 14px;
+  border: 1px solid rgba(15, 23, 38, 0.07);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+.plan-template-card__top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 3px 8px;
+}
+
+.plan-template-card__top > span {
+  grid-row: span 2;
+  align-self: start;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: var(--blue-soft);
+  color: var(--brand);
+  font-size: 7.5px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.plan-template-card__top strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-template-card__top small {
+  color: var(--ink-3);
+  font-size: 7.5px;
+}
+
+.plan-template-card__topic {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: #f6f8fc;
+  color: var(--ink-2);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.plan-template-card__topic svg {
+  flex: 0 0 auto;
+  color: var(--gold);
+}
+
+.plan-template-card__preview {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 9px 0 0;
+  color: var(--ink-2);
+  font-size: 9px;
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.plan-template-card__meta {
+  margin-top: 8px;
+  color: var(--ink-3);
+  font-size: 8px;
+}
+
+.plan-template-card__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plan-template-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.template-form-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 9px 10px;
+  border-radius: 11px;
+  background: #f1f6ff;
+  color: var(--brand);
+  font-size: 8.5px;
+  line-height: 1.55;
+}
+
+.template-form-note svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
 }
 
 .form-card {
