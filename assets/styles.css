@@ -1685,7 +1685,8 @@ textarea {
   gap: 6px;
   overflow-x: auto;
   margin-top: 11px;
-  padding-bottom: 2px;
+  padding: 0 10px 2px 0;
+  scroll-padding-inline: 0 10px;
   scrollbar-width: none;
 }
 
@@ -5759,6 +5760,31 @@ textarea {
     radial-gradient(220px 120px at 100% 0%, rgba(75, 132, 255, 0.13), transparent 72%),
     linear-gradient(150deg, #fff, #f4f8ff);
   box-shadow: 0 9px 26px rgba(20, 48, 105, 0.055);
+}
+
+.batch-card--compact {
+  margin-top: 10px;
+  padding: 12px 13px 13px;
+}
+
+.batch-card--compact .batch-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.batch-card--compact .batch-card__head span {
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+.batch-card--compact .batch-card__quick {
+  margin-top: 9px;
+}
+
+.batch-card--compact .batch-card__quick button {
+  min-height: 44px;
 }
 
 .batch-card__head h3 {

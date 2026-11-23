@@ -20,7 +20,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261123-5";
+  const DATA_VERSION = "20261123-6";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -5132,11 +5132,34 @@
             .join("")}
         </select>
       </div>
+      ${renderSlotQuickBatch(doctor)}
       ${renderSlotMonthNav()}
       ${renderSlotCalendar(doctor)}
       ${renderSlotBatchCard(doctor)}
     `;
     refreshSlotSaveBar();
+  }
+
+  function renderSlotQuickBatch(doctor) {
+    return `
+      <section class="batch-card batch-card--compact">
+        <div class="batch-card__head">
+          <h3>${icon("sparkles", 15)} 快捷批量</h3>
+          <span>当前专家 · 从首约日起直接保存</span>
+        </div>
+        <div class="batch-card__quick">
+          <button type="button" data-action="slot-quick-batch" data-days="7" data-capacity="1">
+            <strong>7 天</strong><small>每日 1 个</small>
+          </button>
+          <button type="button" data-action="slot-quick-batch" data-days="14" data-capacity="2">
+            <strong>14 天</strong><small>每日 2 个</small>
+          </button>
+          <button type="button" data-action="slot-quick-batch" data-days="30" data-capacity="2">
+            <strong>30 天</strong><small>每日 2 个</small>
+          </button>
+        </div>
+      </section>
+    `;
   }
 
   function refreshSlotSaveBar() {
