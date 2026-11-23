@@ -1861,7 +1861,8 @@ textarea {
   text-overflow: ellipsis;
 }
 
-.season-banner > p {
+.season-banner > p,
+.season-banner__content > p {
   margin: 10px 0 0;
   color: var(--ink-2);
   font-size: 9.5px;
@@ -1869,13 +1870,11 @@ textarea {
 }
 
 .season-banner__topics {
-  display: flex;
+  display: grid;
   gap: 6px;
-  overflow-x: auto;
+  overflow: visible;
   margin-top: 11px;
-  padding: 0 10px 2px 0;
-  scroll-padding-inline: 0 10px;
-  scrollbar-width: none;
+  padding: 0;
 }
 
 .season-banner__topics::-webkit-scrollbar {
@@ -1885,10 +1884,11 @@ textarea {
 .season-banner__topics button {
   display: inline-flex;
   min-height: 34px;
-  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 4px;
-  max-width: 250px;
+  max-width: none;
   padding: 0 10px;
   border: 1px solid rgba(234, 85, 4, 0.12);
   border-radius: 11px;
@@ -1896,6 +1896,14 @@ textarea {
   color: var(--ink-2);
   font-size: 9px;
   text-align: left;
+}
+
+.season-banner__topics button span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .season-banner__topics button i {
@@ -7542,8 +7550,20 @@ textarea {
 .season-banner__shade {
   z-index: 1;
   background:
-    linear-gradient(180deg, rgba(4, 17, 43, 0.08) 0%, rgba(4, 17, 43, 0.2) 32%, rgba(4, 17, 43, 0.86) 100%),
-    linear-gradient(100deg, rgba(4, 17, 43, 0.7) 0%, rgba(4, 17, 43, 0.12) 68%);
+    linear-gradient(
+      180deg,
+      rgba(3, 14, 37, 0.92) 0%,
+      rgba(3, 14, 37, 0.52) 24%,
+      rgba(3, 14, 37, 0.52) 56%,
+      rgba(3, 14, 37, 0.96) 100%
+    ),
+    linear-gradient(
+      95deg,
+      rgba(3, 14, 37, 0.94) 0%,
+      rgba(3, 14, 37, 0.68) 44%,
+      rgba(3, 14, 37, 0.2) 78%,
+      rgba(3, 14, 37, 0.32) 100%
+    );
 }
 
 .season-banner__content {
@@ -7603,7 +7623,7 @@ textarea {
   -webkit-backdrop-filter: blur(12px);
 }
 
-.season-banner--media > p {
+.season-banner--media .season-banner__content > p {
   overflow: hidden;
   margin-top: 8px;
   color: rgba(255, 255, 255, 0.72);
@@ -7616,7 +7636,7 @@ textarea {
 
 .season-banner--media .season-banner__topics {
   margin-top: 9px;
-  padding-right: 1px;
+  padding-right: 0;
 }
 
 .season-banner--media .season-banner__topics button {

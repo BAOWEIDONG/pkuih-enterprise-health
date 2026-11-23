@@ -22,7 +22,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261123-15";
+  const DATA_VERSION = "20261123-16";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -2571,7 +2571,7 @@
     const hospital = nearestHospital() || state.hospitals[0];
     const currentTheme = hospital ? hospitalTheme(hospital.id, month) : null;
     const season = seasonalOf(month);
-    const topics = (currentTheme?.topics || season?.topics || []).slice(0, 4);
+    const topics = (currentTheme?.topics || season?.topics || []).slice(0, 2);
     return `
       <div class="screen">
         <section class="hero">
@@ -2626,7 +2626,7 @@
                     <button type="button" data-action="theme-topic" data-month="${month}"
                       data-hospital-id="${esc(hospital?.id || "")}"
                       data-topic-index="${index}">
-                      <i>${esc(topic.dept)}</i>${esc(topic.title)}
+                      <i>${esc(topic.dept)}</i><span>${esc(topic.title)}</span>
                     </button>
                   `
                 )
