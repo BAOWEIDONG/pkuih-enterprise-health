@@ -23,7 +23,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261123-18";
+  const DATA_VERSION = "20261124-01";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -2610,7 +2610,7 @@
         : state.geoStatus === "loading"
         ? "定位中…"
         : locationFailed
-        ? "未获取定位 · 请选择所在城市"
+        ? "未获取定位 · 选择城市"
         : state.homeHospitalId
         ? "已手动切换"
         : state.geoStatus === "ready"
