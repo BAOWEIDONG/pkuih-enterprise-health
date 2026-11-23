@@ -13,6 +13,7 @@
     adminAccounts: "pkuih_h6_admin_accounts",
     adminSession: "pkuih_h6_admin_session",
     doctorConfig: "pkuih_h6_doctor_config",
+    themeConfig: "pkuih_h6_theme_config",
     slots: "pkuih_h6_slots",
     smsLogs: "pkuih_h6_sms_logs",
     lastPortal: "pkuih_h6_portal",
@@ -20,7 +21,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261123-8";
+  const DATA_VERSION = "20261123-9";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -34,6 +35,7 @@
   };
   const SERVICE_LINK = "https://baoweidong.github.io/pkuih-enterprise-health/";
   const AVATARS = {
+    neutral: "assets/avatars/doctor-neutral.svg",
     male: "assets/avatars/doctor-male.svg",
     maleSenior: "assets/avatars/doctor-male-senior.svg",
     female: "assets/avatars/doctor-female.svg",
@@ -70,9 +72,9 @@
   const CLIENT_TIER_ORDER = ["specialist", "director", "elite"];
 
   const SERVICES = {
-    讲座: { id: "讲座", label: "专家讲座", desc: "主题分享 + 现场问答" },
-    巡诊: { id: "巡诊", label: "现场巡诊", desc: "健康筛查 + 现场咨询" },
-    "1对1": { id: "1对1", label: "1 对 1", desc: "院方协调 · 一对一问诊" }
+    讲座: { id: "讲座", label: "健康讲座", desc: "主题分享 + 现场问答" },
+    巡诊: { id: "巡诊", label: "健康咨询", desc: "健康筛查 + 现场咨询" },
+    "1对1": { id: "1对1", label: "1v1报告解读", desc: "报告解读 · 院方协调" }
   };
   const SERVICE_IDS = ["讲座", "巡诊", "1对1"];
 
@@ -154,6 +156,8 @@
     expertScope: "nearby",
     expertTier: "all",
     expertService: "all",
+    expertMonth: 0,
+    expertDept: "all",
     expertAvailability: "bookable",
     expertSearch: "",
     expertSearchOpen: false,
@@ -187,6 +191,8 @@
     adminFilter: "all",
     adminSearch: "",
     adminDoctorSearch: "",
+    adminThemeMonth: 0,
+    adminThemeDraft: null,
     adminDemandFilter: "all",
     adminHospitalId: "",
     adminReviewId: "",
@@ -539,17 +545,66 @@
   }
 
   function expertAvatar(expert) {
-    if (!expert) return AVATARS.male;
+    if (!expert) return AVATARS.neutral;
     if (expert.photoCard) return expert.photoCard;
     if (expert.photo) return expert.photo;
     if (expert.gender === "female") {
       return expert.senior ? AVATARS.femaleSenior : AVATARS.female;
     }
-    return expert.senior || expert.tier === "elite" ? AVATARS.maleSenior : AVATARS.male;
+    if (expert.gender === "male") return expert.senior ? AVATARS.maleSenior : AVATARS.male;
+    return AVATARS.neutral;
+  }
+
+  function derivedCoverageCities(raw = "") {
+    const value = String(raw || "").trim();
+    if (!value || value.includes("全国") || value.includes("省外")) return ["全国"];
+    const cities = [];
+    [
+      ["北京", "北京市"],
+      ["天津", "天津市"],
+      ["深圳", "深圳市"],
+      ["淄博", "淄博市"],
+      ["长治", "长治市"],
+      ["株洲", "株洲市"],
+      ["太原", "太原市"]
+    ].forEach(([keyword, city]) => {
+      if (value.includes(keyword) && !cities.includes(city)) cities.push(city);
+    });
+    if (value.includes("山东")) {
+      ["济南市", "青岛市", "淄博市"].forEach((city) => {
+        if (!cities.includes(city)) cities.push(city);
+      });
+    }
+    if (value.includes("山西")) {
+      ["太原市", "长治市"].forEach((city) => {
+        if (!cities.includes(city)) cities.push(city);
+      });
+    }
+    if (value.includes("湖南")) {
+      ["长沙市", "株洲市"].forEach((city) => {
+        if (!cities.includes(city)) cities.push(city);
+      });
+    }
+    return cities.length ? cities : [value];
+  }
+
+  function coverageCitiesFor(expert) {
+    const stored = Array.isArray(expert?.coverageCities) ? expert.coverageCities.filter(Boolean) : [];
+    return stored.length ? stored : derivedCoverageCities(expert?.coverage);
+  }
+
+  function coverageText(expertOrCities) {
+    const cities = Array.isArray(expertOrCities)
+      ? expertOrCities.filter(Boolean)
+      : coverageCitiesFor(expertOrCities);
+    if (!cities.length) return "待配置";
+    if (cities.includes("全国")) return "全国";
+    if (cities.length <= 3) return cities.join(" / ");
+    return `${cities.slice(0, 2).join(" / ")} 等 ${cities.length} 城`;
   }
 
   function expertAvatarDetail(expert) {
-    if (!expert) return AVATARS.male;
+    if (!expert) return AVATARS.neutral;
     return expert.photoDetail || expertAvatar(expert);
   }
 
@@ -1159,6 +1214,16 @@
     return state.seasonal.find((item) => item.month === Number(month)) || state.seasonal[0] || null;
   }
 
+  function seasonalTerm(value) {
+    const match = String(value || "").match(/^[（(]([^）)]+)[）)]/);
+    return match?.[1] || "";
+  }
+
+  function seasonalHeadline(value) {
+    const text = String(value || "").replace(/^[（(][^）)]+[）)]\s*/, "").trim();
+    return text || String(value || "");
+  }
+
   const DEPT_ALIASES = {
     心血管: ["心血管"],
     呼吸科: ["呼吸"],
@@ -1182,44 +1247,165 @@
   };
 
   function themesForExpert(expert, month) {
-    const season = seasonalOf(month);
-    if (!season) return [];
-    const exact = state.themeMatches
-      .filter((row) => row.doctor === expert.name && row.month === Number(month))
-      .map((row) => ({
-        dept: row.dept,
-        title: row.topic,
-        month: row.month,
-        hospital: row.hospital,
-        professionalTitle: row.title,
-        coverage: row.coverage,
+    const theme = hospitalTheme(expert?.hospitalId, month);
+    if (!theme) return [];
+    return (theme.topics || [])
+      .filter((topic) => String(topic.expertId || "") === String(expert.id))
+      .map((topic) => ({
+        id: topic.id,
+        dept: topic.dept || "综合",
+        title: topic.title,
+        month: Number(month),
+        hospital: expert.hospital,
+        professionalTitle: expert.deptTitle,
+        coverage: coverageText(theme.coverageCities || []),
+        season: theme.season,
         matched: true
-      }));
-    if (exact.length) return exact;
-    const seen = new Set();
-    const aliases = DEPT_ALIASES[expert.dept] || [expert.dept];
-    const keywords = [expert.dept].concat(aliases).filter(Boolean);
-    const related = [];
-    season.topics.forEach((topic) => {
-      if (seen.has(topic.title)) return;
-      if (keywords.some((keyword) => keyword && topic.dept.includes(keyword))) {
-        related.push({ dept: topic.dept, title: topic.title, matched: false });
-        seen.add(topic.title);
-      }
-    });
-    const list = exact.concat(related);
-    if (!list.length) {
-      season.topics.slice(0, 2).forEach((topic) =>
-        list.push({ dept: topic.dept, title: topic.title, matched: false })
-      );
-    }
-    return list.slice(0, 6);
+      }))
+      .slice(0, 8);
+  }
+
+  function monthsForExpert(expert) {
+    if (!expert) return new Set();
+    return new Set(
+      hospitalThemes(expert.hospitalId)
+        .filter((theme) =>
+          (theme.topics || []).some(
+            (topic) => String(topic.expertId || "") === String(expert.id)
+          )
+        )
+        .map((theme) => Number(theme.month))
+    );
   }
 
   function seasonSummary(month) {
     const season = seasonalOf(month);
     if (!season) return "";
     return `${season.season} · ${season.focus}`;
+  }
+
+  function themeImageFor(month) {
+    return `assets/themes/theme-${String(Number(month) || 1).padStart(2, "0")}.jpg`;
+  }
+
+  function defaultThemeCoverage(hospital) {
+    if (!hospital) return ["全国"];
+    const region = normalizeRegion(hospital.province, hospital.city);
+    return [region.city || region.province];
+  }
+
+  function defaultThemeConfig(hospitalId, month) {
+    const hospital = hospitalById(hospitalId);
+    const season = seasonalOf(month);
+    if (!hospital || !season) return null;
+    const hospitalExperts = state.experts.filter(
+      (expert) =>
+        expert.hospitalId === hospital.id &&
+        expert.active !== false &&
+        matchesService(expert, "讲座")
+    );
+    const byName = new Map(hospitalExperts.map((expert) => [expert.name, expert]));
+    const exact = state.themeMatches
+      .filter((row) => row.month === Number(month) && byName.has(row.doctor))
+      .map((row) => {
+        const expert = byName.get(row.doctor);
+        return {
+          id: `${month}-${row.doctor}-${row.topic}`,
+          dept: row.dept,
+          title: row.topic,
+          expertId: expert?.id || ""
+        };
+      });
+    const seen = new Set();
+    const topics = exact
+      .filter((topic) => {
+        if (seen.has(topic.title)) return false;
+        seen.add(topic.title);
+        return true;
+      })
+      .slice(0, 8);
+    if (!topics.length) {
+      season.topics.slice(0, 6).forEach((topic) => {
+        const expert = hospitalExperts.find((item) => {
+          const deptAliases = DEPT_ALIASES[item.dept] || [item.dept];
+          return [...new Set([item.dept, ...deptAliases].filter(Boolean))].some(
+            (keyword) => topic.dept.includes(keyword) || keyword.includes(topic.dept)
+          );
+        });
+        topics.push({
+          id: `${month}-fallback-${topics.length}`,
+          dept: topic.dept,
+          title: topic.title,
+          expertId: expert?.id || ""
+        });
+      });
+    }
+    const expertIds = [...new Set(topics.map((topic) => topic.expertId).filter(Boolean))];
+    return {
+      month: Number(month),
+      season: season.season,
+      focus: season.focus,
+      intro: `本月时令聚焦「${season.season.replace(/^（.*?）\s*/, "")}」。由${hospital.name}专家团队围绕${season.focus}开展企业健康讲座，重点关注${season.diseases}。`,
+      diseases: season.diseases,
+      industries: season.industries,
+      image: themeImageFor(month),
+      coverageCities: defaultThemeCoverage(hospital),
+      expertIds,
+      topics
+    };
+  }
+
+  function getThemeConfigStore() {
+    return readJSON(STORAGE.themeConfig, {});
+  }
+
+  function saveThemeConfigStore(store) {
+    writeJSON(STORAGE.themeConfig, store);
+  }
+
+  function hospitalThemes(hospitalId) {
+    const hospital = hospitalById(hospitalId);
+    if (!hospital) return [];
+    const store = getThemeConfigStore();
+    const saved = store?.[hospital.id] || {};
+    return Array.from({ length: 12 }, (_, index) => {
+      const month = index + 1;
+      const base = defaultThemeConfig(hospital.id, month);
+      return {
+        ...base,
+        ...(saved[month] || {}),
+        month,
+        coverageCities:
+          saved[month]?.coverageCities !== undefined
+            ? saved[month].coverageCities
+            : base?.coverageCities || [],
+        expertIds:
+          saved[month]?.expertIds !== undefined ? saved[month].expertIds : base?.expertIds || [],
+        topics: saved[month]?.topics !== undefined ? saved[month].topics : base?.topics || [],
+        image: saved[month]?.image || base?.image || themeImageFor(month)
+      };
+    });
+  }
+
+  function hospitalTheme(hospitalId, month) {
+    return hospitalThemes(hospitalId).find((theme) => theme.month === Number(month)) || null;
+  }
+
+  function saveHospitalTheme(hospitalId, draft) {
+    if (!hospitalId || !draft?.month) return;
+    const store = getThemeConfigStore();
+    store[hospitalId] = store[hospitalId] || {};
+    store[hospitalId][draft.month] = {
+      ...draft,
+      month: Number(draft.month),
+      coverageCities: [...(draft.coverageCities || [])],
+      expertIds: [...(draft.expertIds || [])],
+      topics: (draft.topics || []).map((topic, index) => ({
+        ...topic,
+        id: topic.id || `${draft.month}-custom-${index}-${Date.now()}`
+      }))
+    };
+    saveThemeConfigStore(store);
   }
 
   /* =========================================================
@@ -1371,6 +1557,8 @@
     state.adminDemandDraft = null;
     state.adminAccountDraft = null;
     state.adminDoctorDraft = null;
+    state.adminThemeDraft = null;
+    state.adminThemeMonth = 0;
     state.slotDay = "";
   }
 
@@ -1415,11 +1603,13 @@
     if (type === "demand-create") return paint(renderDemandCreateSheet());
     if (type === "demand") return paint(renderDemandSheet());
     if (type === "profile") return paint(renderProfileSheet());
+    if (type === "theme") return paint(renderThemeSheet());
     if (type === "poster") return paint(renderPosterSheet());
     if (type === "admin-review") return paint(renderAdminReviewSheet());
     if (type === "admin-demand") return paint(renderAdminDemandSheet());
     if (type === "admin-account") return paint(renderAdminAccountSheet());
     if (type === "admin-doctor") return paint(renderAdminDoctorSheet());
+    if (type === "admin-theme") return paint(renderAdminThemeSheet());
     if (type === "slot-day") return paint(renderSlotDaySheet());
     if (!state.overlay) {
       overlayRoot.innerHTML = "";
@@ -1455,7 +1645,7 @@
         <div class="auth-visual">
           <span class="auth-visual__badge">${icon("shield", 13)} 企业健康服务</span>
           <h1>登录后，<br>把专家请到企业身边</h1>
-          <p>手机号登录即可预约专家讲座、巡诊与 1 对 1 健康咨询，院方项目组全程跟进。</p>
+          <p>手机号登录即可预约健康讲座、健康咨询与 1v1 报告解读，院方项目组全程跟进。</p>
         </div>
         <div class="auth-card">
           <div class="auth-steps">
@@ -1666,7 +1856,12 @@
     if (pending?.type === "booking") {
       state.tab = "experts";
       renderApp({ scrollTo: 0 });
-      openBooking(pending.doctorId || "", pending.tier || "", pending.service || "");
+      openBooking(
+        pending.doctorId || "",
+        pending.tier || "",
+        pending.service || "",
+        pending.topic || ""
+      );
     } else if (pending?.type === "tab") {
       state.tab = pending.tab || "me";
       renderApp({ scrollTo: 0 });
@@ -1729,6 +1924,36 @@
           `<option value="${esc(city)}" ${city === selected ? "selected" : ""}>${esc(city)}</option>`
       )
       .join("");
+  }
+
+  function renderCoverageCityOptions() {
+    const provinces = Object.keys(state.chinaCities || {}).sort((a, b) =>
+      a.localeCompare(b, "zh-CN")
+    );
+    return `
+      <option value="">选择城市…</option>
+      <option value="全国">全国（不限城市）</option>
+      ${provinces
+        .map(
+          (province) => `
+            <optgroup label="${esc(province)}">
+              ${(state.chinaCities[province] || [])
+                .map((city) => `<option value="${esc(city)}">${esc(city)}</option>`)
+                .join("")}
+            </optgroup>
+          `
+        )
+        .join("")}
+    `;
+  }
+
+  function addCoverageCity(list, city) {
+    const next = Array.isArray(list) ? [...list] : [];
+    if (!city) return next;
+    if (city === "全国") return ["全国"];
+    const filtered = next.filter((item) => item !== "全国");
+    if (!filtered.includes(city)) filtered.push(city);
+    return filtered;
   }
 
   function setLoginCity(province, city) {
@@ -1840,6 +2065,14 @@
         if (scope === "nearby" && expert.hospitalId !== hospital?.id) return false;
         if (state.expertAvailability === "bookable" && !doctorAvailability(expert).bookable) return false;
         if (!matchesService(expert, state.expertService)) return false;
+        if (state.expertMonth > 0) {
+          const theme = hospitalTheme(expert.hospitalId, state.expertMonth);
+          const bound =
+            theme?.expertIds?.includes(expert.id) ||
+            theme?.topics?.some((topic) => topic.expertId === expert.id);
+          if (!bound) return false;
+        }
+        if (state.expertDept !== "all" && expert.dept !== state.expertDept) return false;
         if (state.expertTier !== "all" && expert.tier !== state.expertTier) return false;
         const q = state.expertSearch.trim().toLowerCase();
         if (q) {
@@ -1878,7 +2111,7 @@
           <span class="expert-mini__name">${esc(expert.name)}<i>${esc(expert.deptTitle)}</i></span>
           <span class="expert-mini__hospital">${esc(expert.hospital)}</span>
           <span class="expert-mini__services">${(expert.services || [])
-            .map((service) => `<span>${esc(service)}</span>`)
+            .map((service) => `<span>${esc(serviceLabel(service))}</span>`)
             .join("")}</span>
           <span class="expert-mini__avail ${availability.bookable ? "is-open" : "is-full"}">
             ${availability.bookable ? `最近可约 ${formatMD(availability.next)}` : "暂无可约档期"}
@@ -1991,7 +2224,11 @@
   }
 
   function renderHomePage() {
-    const season = seasonalOf();
+    const month = currentMonth();
+    const hospital = nearestHospital() || state.hospitals[0];
+    const currentTheme = hospital ? hospitalTheme(hospital.id, month) : null;
+    const season = seasonalOf(month);
+    const topics = (currentTheme?.topics || season?.topics || []).slice(0, 4);
     return `
       <div class="screen">
         <section class="hero">
@@ -2003,7 +2240,7 @@
             <div id="home-hospital-picker">${renderHomeHospitalPicker()}</div>
             <span class="hero__kicker"><i></i> 白大褂到企 · 名医入企计划</span>
             <h1>把医学专家<br><em>请到企业身边</em></h1>
-            <p>面向保险公司与企业，提供讲座、巡诊与 1 对 1 健康咨询。按医院、科室与时令主题匹配专家，院方项目组全程跟进。</p>
+            <p>面向保险公司与企业，提供健康讲座、健康咨询与 1v1 报告解读。按医院、科室与时令主题匹配专家，院方项目组全程跟进。</p>
             <div class="hero__actions">
               <button class="btn btn--accent" type="button" data-action="open-booking">
                 发起活动预约 ${icon("arrowRight", 15)}
@@ -2020,27 +2257,40 @@
           </div>
         </section>
 
-        <section class="season-banner">
-          <div class="season-banner__head">
-            <span class="season-banner__month">${currentMonth()}月</span>
-            <div>
-              <small>本月时令主题</small>
-              <strong>${esc(season?.season || "")}</strong>
+        <section class="season-banner season-banner--media" data-action="theme-open"
+          data-month="${month}" data-hospital-id="${esc(hospital?.id || "")}">
+          <img class="season-banner__image" src="${themeImageFor(
+            month
+          )}" alt="${month}月时令主题" width="900" height="560" loading="lazy" decoding="async">
+          <div class="season-banner__shade"></div>
+          <div class="season-banner__content">
+            <div class="season-banner__head">
+              <span class="season-banner__month">${month}月</span>
+              <div>
+                <small>${esc(hospital?.short || "本院")} · 本月时令主题</small>
+                <strong>${esc(
+                  seasonalHeadline(currentTheme?.season || season?.season || "")
+                )}</strong>
+              </div>
+              <button class="season-banner__cta" type="button" data-action="theme-open"
+                data-month="${month}" data-hospital-id="${esc(
+                  hospital?.id || ""
+                )}">查看主题 ${icon("arrowRight", 13)}</button>
             </div>
-            <button class="text-link" type="button" data-action="tab" data-tab="experts">按主题找专家 ${icon("chevronRight", 13)}</button>
-          </div>
-          <p>${esc(season?.focus || "")} · ${esc(season?.diseases || "")}</p>
-          <div class="season-banner__topics">
-            ${(season?.topics || [])
-              .slice(0, 4)
-              .map(
-                (topic) => `
-                  <button type="button" data-action="search-topic" data-value="${esc(topic.title)}">
-                    <i>${esc(topic.dept)}</i>${esc(topic.title)}
-                  </button>
-                `
-              )
-              .join("")}
+            <p>${esc(currentTheme?.focus || season?.focus || "")}</p>
+            <div class="season-banner__topics">
+              ${topics
+                .map(
+                  (topic, index) => `
+                    <button type="button" data-action="theme-topic" data-month="${month}"
+                      data-hospital-id="${esc(hospital?.id || "")}"
+                      data-topic-index="${index}">
+                      <i>${esc(topic.dept)}</i>${esc(topic.title)}
+                    </button>
+                  `
+                )
+                .join("")}
+            </div>
           </div>
         </section>
 
@@ -2070,7 +2320,7 @@
 
         <section class="section">
           <div class="section-head">
-            <div><h2>到企服务类型</h2><p>讲座、巡诊与 1 对 1 灵活组合</p></div>
+            <div><h2>到企服务类型</h2><p>健康讲座、健康咨询与 1v1 报告解读</p></div>
           </div>
           <div class="service-grid">
             ${SERVICE_IDS.map((id, index) => {
@@ -2144,6 +2394,180 @@
   }
 
   /* =========================================================
+     Seasonal theme detail
+     ========================================================= */
+  function themeExpertList(theme, hospitalId) {
+    const ids = new Set([
+      ...(theme?.expertIds || []).map(String),
+      ...(theme?.topics || []).map((topic) => String(topic.expertId || "")).filter(Boolean)
+    ]);
+    const hospitalExperts = state.experts.filter(
+      (expert) =>
+        expert.hospitalId === hospitalId &&
+        expert.active !== false &&
+        matchesService(expert, "讲座")
+    );
+    return hospitalExperts.filter((expert) => ids.has(String(expert.id)));
+  }
+
+  function openTheme(month = currentMonth(), topicIndex = -1, hospitalId = "") {
+    const hospital =
+      hospitalById(hospitalId) || nearestHospital() || state.hospitals[0];
+    if (!hospital) return;
+    state.overlay = {
+      type: "theme",
+      month: Number(month) || currentMonth(),
+      hospitalId: hospital.id,
+      topicIndex: Number(topicIndex)
+    };
+    renderOverlay();
+  }
+
+  function openThemeBooking(month, topicIndex = -1) {
+    const hospital =
+      hospitalById(state.overlay?.hospitalId) || nearestHospital() || state.hospitals[0];
+    const theme = hospitalTheme(hospital?.id, month);
+    const topic =
+      topicIndex >= 0 ? theme?.topics?.[topicIndex] : null;
+    openBooking(
+      topic?.expertId || "",
+      "",
+      "讲座",
+      topic?.title || "",
+      Number(month)
+    );
+  }
+
+  function renderThemeSheet() {
+    const month = Number(state.overlay?.month) || currentMonth();
+    const hospital =
+      hospitalById(state.overlay?.hospitalId) || nearestHospital() || state.hospitals[0];
+    const theme = hospitalTheme(hospital?.id, month) || defaultThemeConfig(hospital?.id, month);
+    if (!theme) return "";
+    const experts = themeExpertList(theme, hospital?.id);
+    const selectedTopic = state.overlay?.topicIndex;
+    return `
+      <div class="sheet-backdrop" data-action="close-overlay"></div>
+      <section class="sheet theme-sheet" role="dialog" aria-modal="true" aria-label="${
+        theme.month
+      }月时令主题">
+        <div class="sheet__grabber theme-sheet__grabber"></div>
+        <div class="theme-hero">
+          <img src="${esc(theme.image || themeImageFor(month))}" alt="${esc(
+            theme.season
+          )}" width="900" height="560" decoding="async">
+          <div class="theme-hero__shade"></div>
+          <div class="theme-hero__top">
+            <span>${icon("leaf", 13)} 时令主题 · 健康讲座</span>
+            <button type="button" data-action="close-overlay" aria-label="关闭">
+              ${icon("close", 15)}
+            </button>
+          </div>
+          <div class="theme-hero__copy">
+            <span class="theme-hero__month">${month}月${
+              seasonalTerm(theme.season) ? ` · ${esc(seasonalTerm(theme.season))}` : ""
+            }</span>
+            <h2>${esc(seasonalHeadline(theme.season))}</h2>
+            <p>${esc(theme.focus)}</p>
+          </div>
+        </div>
+        <div class="sheet__body">
+          <div class="theme-sheet__content">
+            <div class="theme-intro">
+              <span class="theme-kicker">THEME BRIEF</span>
+              <p>${esc(theme.intro)}</p>
+            </div>
+            <div class="theme-stats">
+              <div><strong>${experts.length}</strong><span>位本院专家</span></div>
+              <div><strong>${(theme.topics || []).length}</strong><span>个讲座课题</span></div>
+              <div><strong>${(theme.coverageCities || []).includes("全国") ? "全国" : `${(theme.coverageCities || []).length} 城`}</strong><span>可履约范围</span></div>
+            </div>
+            <section class="theme-section">
+              <div class="theme-section__head">
+                <div><small>本月关注</small><h3>时令健康重点</h3></div>
+                <span>${esc(hospital?.short || "")}</span>
+              </div>
+              <div class="theme-focus-grid">
+                <div><span>重点关注</span><p>${esc(theme.diseases)}</p></div>
+                <div><span>适合行业</span><p>${esc(theme.industries)}</p></div>
+              </div>
+            </section>
+            <section class="theme-section">
+              <div class="theme-section__head">
+                <div><small>Lecture topics</small><h3>本月推荐讲座</h3></div>
+                <span>点击课题直接预约</span>
+              </div>
+              <div class="theme-topic-list">
+                ${(theme.topics || [])
+                  .map((topic, index) => {
+                    const expert = topic.expertId ? expertById(topic.expertId) : null;
+                    return `
+                      <button class="theme-topic-card ${
+                        index === selectedTopic ? "is-focus" : ""
+                      }" type="button" data-action="theme-book" data-month="${month}"
+                        data-topic-index="${index}">
+                        <span class="theme-topic-card__dept">${esc(topic.dept || "综合")}</span>
+                        <strong>${esc(topic.title)}</strong>
+                        <small>${expert ? `${esc(expert.name)} · ${esc(expert.deptTitle)}` : "院方匹配主讲专家"}</small>
+                        <i>${icon("arrowRight", 13)}</i>
+                      </button>
+                    `;
+                  })
+                  .join("")}
+              </div>
+            </section>
+            <section class="theme-section">
+              <div class="theme-section__head">
+                <div><small>Expert team</small><h3>本月绑定专家</h3></div>
+                <button class="theme-text-btn" type="button" data-action="theme-experts"
+                  data-month="${month}">查看全部 ${icon("chevronRight", 12)}</button>
+              </div>
+              <div class="theme-expert-row">
+                ${experts
+                  .slice(0, 4)
+                  .map(
+                    (expert) => `
+                      <div class="theme-expert">
+                        <img src="${esc(expertAvatar(expert))}" alt="${esc(
+                          expert.name
+                        )}" loading="lazy" decoding="async">
+                        <strong>${esc(expert.name)}</strong>
+                        <small>${esc(expert.dept)} · ${esc(expert.deptTitle)}</small>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+            </section>
+            <section class="theme-section">
+              <div class="theme-section__head">
+                <div><small>Service cities</small><h3>讲座覆盖城市</h3></div>
+                <span>${esc(coverageText(theme.coverageCities))}</span>
+              </div>
+              <div class="theme-city-chips">
+                ${(theme.coverageCities || [])
+                  .map((city) => `<span>${icon("mapPin", 11)} ${esc(city)}</span>`)
+                  .join("")}
+              </div>
+            </section>
+            <p class="theme-sheet__note">本月课题、绑定专家与覆盖城市由${esc(
+              hospital?.name || "院方"
+            )}配置，最终出讲安排以院方确认为准。</p>
+          </div>
+        </div>
+        <div class="theme-sheet__footer">
+          <button class="theme-filter-btn" type="button" data-action="theme-experts"
+            data-month="${month}">按月筛专家</button>
+          <button class="btn btn--primary" type="button" data-action="theme-book"
+            data-month="${month}" data-topic-index="${selectedTopic >= 0 ? selectedTopic : 0}">
+            预约本月主题 ${icon("arrowRight", 15)}
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
+  /* =========================================================
      Experts
      ========================================================= */
   function renderExpertCard(expert) {
@@ -2171,7 +2595,9 @@
             <span class="expert-card__services">${serviceTags
               .map(
                 ({ service, coordinated }) =>
-                  `<span class="${coordinated ? "is-coordinated" : ""}">${esc(service)}${
+                  `<span class="${coordinated ? "is-coordinated" : ""}">${esc(
+                    serviceLabel(service)
+                  )}${
                     coordinated ? " · 院方协调" : ""
                   }</span>`
               )
@@ -2264,14 +2690,42 @@
           <div class="filter-scroll filter-scroll--services">
             <span class="filter-label">服务类型</span>
             <button class="chip ${state.expertService === "all" ? "is-active" : ""}" type="button"
-              data-action="expert-service" data-value="all">全部服务</button>
+                  data-action="expert-service" data-value="all">全部服务</button>
             ${SERVICE_IDS.map(
               (id) =>
                 `<button class="chip ${state.expertService === id ? "is-active" : ""}" type="button"
-                  data-action="expert-service" data-value="${esc(id)}">${esc(id)}<span class="chip__count">${
-                    serviceCount(id)
-                  }</span></button>`
+                  data-action="expert-service" data-value="${esc(id)}">${esc(
+                    serviceLabel(id)
+                  )}<span class="chip__count">${serviceCount(id)}</span></button>`
             ).join("")}
+          </div>
+          <div class="expert-select-filters">
+            <label>
+              <span>${icon("leaf", 11)} 月份时令</span>
+              <select data-expert-month>
+                <option value="0" ${state.expertMonth === 0 ? "selected" : ""}>全部月份</option>
+                ${Array.from({ length: 12 }, (_, index) => index + 1)
+                  .map(
+                    (month) =>
+                      `<option value="${month}" ${
+                        state.expertMonth === month ? "selected" : ""
+                      }>${month}月 · ${esc(seasonalOf(month)?.season || "")}</option>`
+                  )
+                  .join("")}
+              </select>
+            </label>
+            <label>
+              <span>${icon("experts", 11)} 科室方向</span>
+              <select data-expert-dept>
+                <option value="all">全部科室</option>
+                ${DEPT_OPTIONS.map(
+                  (dept) =>
+                    `<option value="${esc(dept)}" ${
+                      state.expertDept === dept ? "selected" : ""
+                    }>${esc(dept)}</option>`
+                ).join("")}
+              </select>
+            </label>
           </div>
           <p class="expert-toolbar__hint" id="expert-scope-hint">${icon("mapPin", 11)} ${
             state.expertScope === "nearby"
@@ -2311,14 +2765,10 @@
     const tier = tierOf(expert);
     const availability = doctorAvailability(expert);
     const month = Number(state.overlay?.month) || currentMonth();
-    const season = seasonalOf(month);
+    const monthTheme = hospitalTheme(expert.hospitalId, month);
+    const season = monthTheme || seasonalOf(month);
     const themes = themesForExpert(expert, month);
-    const matchedMonths = new Set(
-      state.themeMatches
-        .filter((row) => row.doctor === expert.name)
-        .map((row) => Number(row.month))
-        .filter((value) => Number.isFinite(value))
-    );
+    const matchedMonths = monthsForExpert(expert);
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet doctor-sheet" role="dialog" aria-modal="true" aria-label="${esc(
@@ -2343,7 +2793,7 @@
           </div>
           <div class="doctor-hero__meta">
             <span>${icon("clock", 12)} ${esc(expert.leadLabel || tier.leadDays + " 天预约周期")}</span>
-            <span>${icon("mapPin", 12)} ${esc(expert.coverage)}</span>
+            <span>${icon("mapPin", 12)} ${esc(coverageText(expert))}</span>
             <span class="doctor-hero__avail ${availability.bookable ? "is-open" : "is-full"}">
               ${availability.bookable ? `最近可约 ${formatMD(availability.next)}` : "暂无可约档期"}
             </span>
@@ -2359,16 +2809,16 @@
                     `<span>${icon(
                       service === "讲座" ? "message" : service === "巡诊" ? "stethoscope" : "users",
                       13
-                    )} ${esc(service)}${coordinated ? " · 院方协调" : ""}</span>`
+                    )} ${esc(serviceLabel(service))}${coordinated ? " · 院方协调" : ""}</span>`
                 )
                 .join("")}
             </div>
-            <p class="doctor-services__note">讲座与巡诊按院方专家资料匹配；1 对 1 由院方结合企业需求协调安排。</p>
+            <p class="doctor-services__note">健康讲座与健康咨询按院方专家资料匹配；1v1 报告解读由院方结合企业需求协调安排。</p>
             <div class="fact-grid">
               <div><small>履约机构</small><strong>${esc(expert.hospital)}</strong></div>
               <div><small>科室 / 任职</small><strong>${esc(expert.deptTitle)}</strong></div>
               <div><small>科室方向</small><strong>${esc(expert.dept)}</strong></div>
-              <div><small>履约地</small><strong>${esc(expert.coverage)}</strong></div>
+              <div><small>履约城市</small><strong>${esc(coverageText(expert))}</strong></div>
             </div>
             <section class="detail-section">
               <h3>${icon("star", 14)} 擅长方向</h3>
@@ -2381,7 +2831,7 @@
             <section class="detail-section season-detail">
               <div class="season-detail__head">
                 <h3>${icon("leaf", 14)} 时令主题讲座</h3>
-                <span>${month}月 · ${themes.some((item) => item.matched) ? "院方匹配课题" : "同科室推荐"}</span>
+                <span>${month}月 · ${themes.length ? "院方配置课题" : "本月暂无课题"}</span>
               </div>
               <div class="month-tabs">
                 ${Array.from({ length: 12 }, (_, index) => index + 1)
@@ -2395,29 +2845,33 @@
                   .join("")}
               </div>
               <div class="season-detail__summary">
-                <strong>${esc(season?.season || "")}</strong>
+                <strong>${esc(seasonalHeadline(season?.season || ""))}</strong>
                 <p>${esc(season?.focus || "")}</p>
               </div>
               <div class="theme-list">
-                ${themes
-                  .map(
-                    (theme) => `
-                      <div class="theme-item ${theme.matched ? "is-matched" : ""}">
-                        <span>${esc(theme.dept)}${theme.month ? ` · ${theme.month}月` : ""}</span>
-                        <strong>${esc(theme.title)}</strong>
-                        ${
-                          theme.matched
-                            ? `<small>${esc(theme.hospital)} · ${esc(theme.professionalTitle)} · ${esc(
-                                theme.coverage
-                              )}</small><i>已匹配</i>`
-                            : "<small>推荐方向</small>"
-                        }
-                      </div>
-                    `
-                  )
-                  .join("")}
+                ${
+                  themes.length
+                    ? themes
+                        .map(
+                          (theme) => `
+                            <button class="theme-item is-matched" type="button" data-action="theme-open"
+                              data-month="${theme.month}" data-hospital-id="${esc(expert.hospitalId)}">
+                              <span>${esc(theme.dept)}${theme.month ? ` · ${theme.month}月` : ""}</span>
+                              <strong>${esc(theme.title)}</strong>
+                              <small>${esc(theme.hospital)} · ${esc(
+                                theme.professionalTitle
+                              )} · ${esc(theme.coverage)}</small><i>查看主题</i>
+                            </button>
+                          `
+                        )
+                        .join("")
+                    : `<div class="theme-empty">${icon(
+                        "leaf",
+                        15
+                      )} 本月未给该专家绑定讲座课题，可切换月份查看。</div>`
+                }
               </div>
-              <p class="season-detail__note">以上课题、机构、职称、时令月份与履约地按院方「病种-主题-专家匹配」表展示；未匹配月份展示同科室推荐方向，最终以项目组确认为准。</p>
+              <p class="season-detail__note">仅展示本院月度主题中绑定到该专家的课题；课题、时令内容与覆盖城市均由医院运营维护。</p>
             </section>
             ${
               expert.profileUrl
@@ -2466,7 +2920,7 @@
     return list;
   }
 
-  function createBookingDraft(doctorId = "", tier = "", preferredService = "") {
+  function createBookingDraft(doctorId = "", tier = "", preferredService = "", preferredTopic = "") {
     const expert = doctorId ? expertById(doctorId) : null;
     const session = state.session || {};
     const region = normalizeRegion(session.province || "北京市", session.city || "北京市");
@@ -2485,7 +2939,7 @@
       address: "",
       venue: "",
       topic: "",
-      customTopic: "",
+      customTopic: preferredTopic || "",
       audience: "",
       headcount: "",
       note: "",
@@ -2495,12 +2949,18 @@
     };
   }
 
-  function openBooking(doctorId = "", tier = "", preferredService = "") {
+  function openBooking(doctorId = "", tier = "", preferredService = "", preferredTopic = "") {
     if (!state.session) {
-      startLogin({ type: "booking", doctorId, tier, service: preferredService });
+      startLogin({
+        type: "booking",
+        doctorId,
+        tier,
+        service: preferredService,
+        topic: preferredTopic
+      });
       return;
     }
-    state.booking = createBookingDraft(doctorId, tier, preferredService);
+    state.booking = createBookingDraft(doctorId, tier, preferredService, preferredTopic);
     state.overlay = { type: "booking" };
     renderOverlay();
   }
@@ -2512,7 +2972,23 @@
   function bookingTopicChoices(booking) {
     const date = parseDate(booking?.date);
     const month = date ? date.getMonth() + 1 : currentMonth();
-    return (seasonalOf(month)?.topics || []).slice(0, 8);
+    const expert = bookingSelectedDoctor(booking);
+    const hospitalId = expert?.hospitalId || nearestHospital()?.id;
+    const theme = hospitalTheme(hospitalId, month);
+    const hospitalTopics = theme?.topics || seasonalOf(month)?.topics || [];
+    const expertTopics = expert
+      ? hospitalTopics.filter((topic) => String(topic.expertId || "") === String(expert.id))
+      : [];
+    const source = expertTopics.length ? expertTopics : hospitalTopics;
+    const seen = new Set();
+    return source
+      .filter((topic) => {
+        const title = String(topic.title || "").trim();
+        if (!title || seen.has(title)) return false;
+        seen.add(title);
+        return true;
+      })
+      .slice(0, 8);
   }
 
   function renderBookingProgress(step) {
@@ -2974,10 +3450,13 @@
   }
 
   function topicOf(appointment) {
+    const month = parseDate(appointment?.date)?.getMonth() + 1;
+    const theme = hospitalTheme(appointment?.hospitalId, month);
     return (
       appointment?.plan?.topic ||
       appointment?.topic ||
-      seasonalOf(parseDate(appointment?.date)?.getMonth() + 1)?.topics?.[0]?.title ||
+      theme?.topics?.[0]?.title ||
+      seasonalOf(month)?.topics?.[0]?.title ||
       "企业健康活动"
     );
   }
@@ -3007,7 +3486,7 @@
         </div>
         <h3>${esc(topicOf(appointment))}</h3>
         <div class="record-card__meta">
-          <span>${icon("briefcase", 12)} ${esc(appointment.serviceType)}</span>
+          <span>${icon("briefcase", 12)} ${esc(serviceLabel(appointment.serviceType))}</span>
           <span>${icon("experts", 12)} ${esc(
             expert ? expert.name : appointment.doctorName || "由院方匹配"
           )}</span>
@@ -3075,7 +3554,7 @@
         </div>
         <h3>${esc(demand.topic || "专家资源提需")}</h3>
         <div class="record-card__meta">
-          <span>${icon("briefcase", 12)} ${esc(demand.serviceType)}</span>
+          <span>${icon("briefcase", 12)} ${esc(serviceLabel(demand.serviceType))}</span>
           <span>${icon("building", 12)} ${esc(hospital?.short || hospital?.name || "")}</span>
           <span>${icon("users", 12)} ${esc(demand.audience || "待沟通")}</span>
         </div>
@@ -3250,7 +3729,9 @@
         </div>
         <div class="plan-row"><span>活动主题</span><strong>${esc(plan.topic || "待确认")}</strong></div>
         <div class="plan-row"><span>出讲专家</span><strong>${esc(plan.speaker || "待确认")}</strong></div>
-        <div class="plan-row"><span>服务类型</span><strong>${esc(plan.serviceType || appointment.serviceType)}</strong></div>
+        <div class="plan-row"><span>服务类型</span><strong>${esc(
+          serviceLabel(plan.serviceType || appointment.serviceType)
+        )}</strong></div>
         <div class="plan-row"><span>活动时间</span><strong>${esc(
           `${formatDateCN(plan.date || appointment.date, true)} ${plan.time || ""}`
         )}</strong></div>
@@ -3313,7 +3794,7 @@
             }
             <div class="record-head">
               <div>
-                <span class="record-head__tag">${esc(appointment.serviceType)} · ${esc(
+                <span class="record-head__tag">${esc(serviceLabel(appointment.serviceType))} · ${esc(
                   hospital?.name || ""
                 )}</span>
                 <h1>${esc(topicOf(appointment))}</h1>
@@ -3483,7 +3964,9 @@
                   (id) =>
                     `<button class="choice-tile ${
                       draft.serviceType === id ? "is-active" : ""
-                    }" type="button" data-action="demand-service" data-value="${esc(id)}">${esc(id)}</button>`
+                    }" type="button" data-action="demand-service" data-value="${esc(id)}">${esc(
+                      serviceLabel(id)
+                    )}</button>`
                 ).join("")}
               </div>
             </div>
@@ -3609,7 +4092,7 @@
           <div class="record-sheet__body">
             <div class="record-head">
               <div>
-                <span class="record-head__tag">${esc(demand.serviceType)} · ${esc(
+                <span class="record-head__tag">${esc(serviceLabel(demand.serviceType))} · ${esc(
                   hospital?.name || ""
                 )}</span>
                 <h1>${esc(demand.topic)}</h1>
@@ -3980,6 +4463,7 @@
       { id: "demands", label: "需求池", icon: "sparkles", badge: adminDemandPendingCount() },
       { id: "slots", label: "号源", icon: "clock" },
       { id: "doctors", label: "专家", icon: "experts" },
+      { id: "themes", label: "时令", icon: "leaf" },
       { id: "marketing", label: "展业", icon: "send" },
       { id: "sms", label: "短信", icon: "message" }
     ];
@@ -4037,6 +4521,8 @@
               ? renderSlotConfigPage()
               : state.adminTab === "doctors"
               ? renderDoctorAdminPage()
+              : state.adminTab === "themes"
+              ? renderAdminThemesPage()
               : state.adminTab === "hospitals"
               ? renderAdminHospitalsPage()
               : state.adminTab === "marketing"
@@ -4118,7 +4604,7 @@
         </div>
         <h3>${esc(topicOf(appointment))}</h3>
         <div class="admin-record__tags">
-          <span>${esc(appointment.serviceType)}</span>
+          <span>${esc(serviceLabel(appointment.serviceType))}</span>
           <span>${esc(hospital?.short || "")}</span>
           <span>${esc(expert ? expert.name : appointment.doctorName || "待匹配专家")}</span>
         </div>
@@ -4533,7 +5019,7 @@
                               (id) =>
                                 `<option value="${esc(id)}" ${
                                   draft.serviceType === id ? "selected" : ""
-                                }>${esc(id)}</option>`
+                                }>${esc(serviceLabel(id))}</option>`
                             ).join("")}
                           </select>
                         </div>
@@ -4733,7 +5219,7 @@
         </div>
         <h3>${esc(demand.topic)}</h3>
         <div class="admin-record__tags">
-          <span>${esc(demand.serviceType)}</span>
+          <span>${esc(serviceLabel(demand.serviceType))}</span>
           <span>${esc(hospital?.short || "")}</span>
           <span>${esc(demand.audience || "人群待沟通")}</span>
         </div>
@@ -4816,7 +5302,7 @@
           <div class="sheet-pad">
             <div class="record-head">
               <div>
-                <span class="record-head__tag">${esc(demand.serviceType)} · ${esc(
+                <span class="record-head__tag">${esc(serviceLabel(demand.serviceType))} · ${esc(
                   hospital?.name || ""
                 )}</span>
                 <h1>${esc(demand.topic)}</h1>
@@ -5432,6 +5918,263 @@
   }
 
   /* =========================================================
+     Admin seasonal theme config
+     ========================================================= */
+  function adminThemeHospital() {
+    if (isSuperadmin()) {
+      return state.adminHospitalId ? hospitalById(state.adminHospitalId) : null;
+    }
+    return operatorHospital();
+  }
+
+  function renderAdminThemesPage() {
+    const hospital = adminThemeHospital();
+    return `
+      <div class="admin-page-head">
+        <div><h1>时令主题</h1><p>按月配置课题、绑定专家与讲座覆盖城市</p></div>
+      </div>
+      ${renderAdminTabs()}
+      ${renderAdminHospitalFilter()}
+      ${
+        hospital
+          ? `
+            <p class="admin-hint">${icon(
+              "leaf",
+              12
+            )} ${esc(
+              hospital.name
+            )} 的 12 个月主题独立生效；机构端看到的课题、专家与覆盖城市以这里保存的内容为准。</p>
+            <div class="admin-theme-grid">
+              ${hospitalThemes(hospital.id)
+                .map(
+                  (theme) => `
+                    <button class="admin-theme-card" type="button" data-action="open-admin-theme"
+                      data-month="${theme.month}">
+                      <span class="admin-theme-card__media">
+                        <img src="${esc(theme.image)}" alt="${theme.month}月时令主题" loading="lazy"
+                          decoding="async">
+                        <i>${theme.month}月</i>
+                      </span>
+                      <span class="admin-theme-card__body">
+                        <strong>${esc(seasonalHeadline(theme.season))}</strong>
+                        <small>${esc(theme.focus)}</small>
+                        <span>
+                          <em>${(theme.expertIds || []).length} 位专家</em>
+                          <em>${esc(coverageText(theme.coverageCities))}</em>
+                        </span>
+                      </span>
+                      ${icon("chevronRight", 15)}
+                    </button>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : `<div class="empty-state"><span class="empty-state__icon">${icon(
+              "building",
+              26
+            )}</span><h3>请选择医院</h3><p>超级管理员需先选择要配置的医院，再进入时令主题。</p></div>`
+      }
+    `;
+  }
+
+  function openAdminThemeEditor(month) {
+    const hospital = adminThemeHospital();
+    if (!hospital) return showToast("请先选择医院。");
+    const theme = hospitalTheme(hospital.id, Number(month));
+    if (!theme) return;
+    state.adminThemeMonth = Number(month);
+    state.adminThemeDraft = clone(theme);
+    state.overlay = { type: "admin-theme" };
+    renderOverlay();
+  }
+
+  function renderAdminThemeSheet() {
+    const hospital = adminThemeHospital();
+    const draft = state.adminThemeDraft;
+    if (!hospital || !draft) return "";
+    const hospitalExperts = state.experts
+      .filter(
+        (expert) =>
+          expert.hospitalId === hospital.id &&
+          expert.active !== false &&
+          matchesService(expert, "讲座")
+      )
+      .sort(
+        (a, b) =>
+          CLIENT_TIER_ORDER.indexOf(a.tier) - CLIENT_TIER_ORDER.indexOf(b.tier) ||
+          a.name.localeCompare(b.name, "zh-CN")
+      );
+    const boundIds = new Set((draft.expertIds || []).map(String));
+    return `
+      <div class="sheet-backdrop" data-action="close-overlay"></div>
+      <section class="sheet theme-editor-sheet" role="dialog" aria-modal="true" aria-label="时令主题配置">
+        <div class="sheet__grabber"></div>
+        <div class="sheet__bar">
+          <div><h2>${draft.month}月 · 时令主题</h2><p>${esc(hospital.name)}</p></div>
+          <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">
+            ${icon("close", 15)}
+          </button>
+        </div>
+        <div class="sheet__body">
+          <div class="sheet-pad">
+            <div class="theme-editor-cover">
+              <img src="${esc(draft.image || themeImageFor(draft.month))}" alt="${draft.month}月主题封面">
+              <div><strong>${draft.month}月时令主题</strong><small>月封面由系统统一维护，内容可配置</small></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>时令名称</label>
+                <input type="text" data-theme-field="season" value="${esc(draft.season || "")}">
+              </div>
+              <div class="field"><label>关注重点</label>
+                <input type="text" data-theme-field="focus" value="${esc(draft.focus || "")}">
+              </div>
+            </div>
+            <div class="field"><label>主题介绍</label>
+              <textarea class="textarea--tall" data-theme-field="intro" placeholder="填写主题介绍、活动价值与讲座方向">${esc(
+                draft.intro || ""
+              )}</textarea>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>本月关注疾病</label>
+                <textarea data-theme-field="diseases">${esc(draft.diseases || "")}</textarea>
+              </div>
+              <div class="field"><label>适合行业</label>
+                <textarea data-theme-field="industries">${esc(draft.industries || "")}</textarea>
+              </div>
+            </div>
+            <div class="field">
+              <label>讲座覆盖城市 <em>*</em></label>
+              <div class="theme-city-editor">
+                <div class="theme-city-chips">
+                  ${(draft.coverageCities || [])
+                    .map(
+                      (city) => `
+                        <span>${icon("mapPin", 11)} ${esc(city)}
+                          <button type="button" data-action="theme-city-remove" data-city="${esc(
+                            city
+                          )}" aria-label="移除${esc(city)}">${icon("close", 10)}</button>
+                        </span>
+                      `
+                    )
+                    .join("") || "<small>尚未选择城市</small>"}
+                </div>
+                <select data-theme-city-add>${renderCoverageCityOptions()}</select>
+              </div>
+            </div>
+            <div class="field">
+              <label>绑定本院专家 <span>仅可选择本院已上架讲座专家</span></label>
+              <div class="theme-expert-picker">
+                ${hospitalExperts
+                  .map(
+                    (expert) => `
+                      <button class="theme-expert-toggle ${
+                        boundIds.has(expert.id) ? "is-active" : ""
+                      }" type="button" data-action="theme-expert-toggle" data-id="${esc(expert.id)}">
+                        <img src="${esc(expertAvatar(expert))}" alt="${esc(expert.name)}" loading="lazy">
+                        <span><strong>${esc(expert.name)}</strong><small>${esc(
+                          expert.dept
+                        )} · ${esc(expert.deptTitle)}</small></span>
+                        <i>${icon("check", 11)}</i>
+                      </button>
+                    `
+                  )
+                  .join("") || "<small>本院暂无可绑定讲座专家</small>"}
+              </div>
+            </div>
+            <div class="field">
+              <label>讲座课题与主讲专家</label>
+              <div class="theme-topic-editor">
+                ${(draft.topics || [])
+                  .map(
+                    (topic, index) => `
+                      <div class="theme-topic-edit" data-topic-index="${index}">
+                        <div class="theme-topic-edit__top">
+                          <span>课题 ${index + 1}</span>
+                          <button type="button" data-action="theme-topic-remove" data-index="${index}"
+                            aria-label="删除课题">${icon("trash", 12)}</button>
+                        </div>
+                        <input type="text" data-theme-topic-field="title" data-index="${index}"
+                          value="${esc(topic.title || "")}" placeholder="填写讲座主题">
+                        <div class="field-row">
+                          <select data-theme-topic-field="dept" data-index="${index}">
+                            ${DEPT_OPTIONS.map(
+                              (dept) =>
+                                `<option value="${esc(dept)}" ${
+                                  topic.dept === dept ? "selected" : ""
+        }>${esc(dept)}</option>`
+                            ).join("")}
+                          </select>
+                          <select data-theme-topic-field="expertId" data-index="${index}">
+                            <option value="">院方匹配主讲专家</option>
+                            ${hospitalExperts
+                              .map(
+                                (expert) =>
+                                  `<option value="${esc(expert.id)}" ${
+                                    topic.expertId === expert.id ? "selected" : ""
+                                  }>${esc(expert.name)} · ${esc(expert.dept)}</option>`
+                              )
+                              .join("")}
+                          </select>
+                        </div>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+              <button class="theme-add-topic" type="button" data-action="theme-topic-add">
+                ${icon("plus", 12)} 添加讲座课题
+              </button>
+            </div>
+            <p class="field-help">机构端将按这里的专家、课题和城市范围展示；绑定专家需已在本院专家配置中上架。</p>
+          </div>
+        </div>
+        <div class="sheet__footer">
+          <button class="btn btn--ghost" type="button" data-action="admin-theme-default">恢复默认</button>
+          <button class="btn btn--primary" type="button" data-action="admin-theme-save">保存主题</button>
+        </div>
+      </section>
+    `;
+  }
+
+  function collectAdminThemeDraft() {
+    const draft = state.adminThemeDraft;
+    if (!draft) return null;
+    document.querySelectorAll("[data-theme-field]").forEach((input) => {
+      draft[input.dataset.themeField] = input.value.trim();
+    });
+    document.querySelectorAll("[data-theme-topic-field]").forEach((input) => {
+      const index = Number(input.dataset.index);
+      if (!draft.topics?.[index]) return;
+      draft.topics[index][input.dataset.themeTopicField] = input.value.trim();
+    });
+    return draft;
+  }
+
+  function saveAdminTheme() {
+    const hospital = adminThemeHospital();
+    const draft = collectAdminThemeDraft();
+    if (!hospital || !draft) return showToast("主题配置已失效。");
+    if (!draft.season?.trim()) return showToast("请填写时令名称。");
+    if (!draft.topics?.length || draft.topics.some((topic) => !topic.title?.trim())) {
+      return showToast("请至少完整填写一个讲座课题。");
+    }
+    if (!draft.coverageCities?.length) return showToast("请至少选择一个覆盖城市。");
+    draft.expertIds = [
+      ...new Set([
+        ...(draft.expertIds || []),
+        ...draft.topics.map((topic) => topic.expertId).filter(Boolean)
+      ])
+    ];
+    saveHospitalTheme(hospital.id, draft);
+    state.overlay = null;
+    state.adminThemeDraft = null;
+    releaseOverlayHistory();
+    renderApp({ scrollTo: currentWindowScroll() });
+    showToast(`${draft.month}月时令主题已保存，机构端将同步更新。`);
+  }
+
+  /* =========================================================
      Admin doctor config
      ========================================================= */
   const DEPT_OPTIONS = [
@@ -5494,9 +6237,11 @@
             }</span>
           </span>
           <span class="doctor-admin-card__role">${esc(expert.deptTitle)} · ${esc(expert.dept)}</span>
-          <span class="doctor-admin-card__hospital">${esc(expert.hospital)}</span>
+          <span class="doctor-admin-card__hospital">${esc(expert.hospital)} · ${esc(
+            coverageText(expert)
+          )}</span>
           <span class="doctor-admin-card__services">${(expert.services || [])
-            .map((service) => `<span>${esc(service)}</span>`)
+        .map((service) => `<span>${esc(serviceLabel(service))}</span>`)
             .join("")}<i>${esc(expert.leadLabel)}</i></span>
         </span>
         <span class="doctor-admin-card__edit">${icon("edit", 13)}</span>
@@ -5524,7 +6269,7 @@
       <p class="admin-hint">${icon(
         "alert",
         12
-      )} 专家字段参考院方整理表：姓名、履约机构、科室/任职、科室方向、服务类型、履约地、擅长、简介、预约提前期。没有照片时使用分性别默认医疗头像。</p>
+      )} 专家字段参考院方整理表：姓名、履约机构、科室/任职、科室方向、服务类型、履约城市、擅长/专业优势、简介/履历、预约时间。表格未提供性别时使用中性医疗头像。</p>
       <div id="doctor-admin-list" class="doctor-admin-list">
         ${
           list.length
@@ -5544,15 +6289,16 @@
       id: "",
       custom: true,
       name: "",
-      gender: "male",
+      gender: "neutral",
       senior: false,
       tier: "specialist",
       hospitalId: hospital?.id || "pkuih",
       hospital: hospital?.name || "",
       deptTitle: "",
       dept: "内科",
-      services: ["讲座", "1对1"],
+      services: ["讲座", "巡诊"],
       coverage: "全国",
+      coverageCities: ["全国"],
       leadDays: 7,
       leadLabel: "提前 7 天申请",
       specialty: "",
@@ -5567,6 +6313,7 @@
   function openAdminDoctorEditor(id = "") {
     const expert = id ? expertById(id) : null;
     state.adminDoctorDraft = expert ? clone(expert) : emptyDoctorDraft();
+    if (expert) state.adminDoctorDraft.coverageCities = coverageCitiesFor(expert);
     state.overlay = { type: "admin-doctor" };
     renderOverlay();
   }
@@ -5575,13 +6322,8 @@
     const draft = state.adminDoctorDraft;
     if (!draft) return "";
     const isNew = !draft.id;
-    const avatar = draft.photoCard || draft.photo || (draft.gender === "female"
-      ? draft.senior
-        ? AVATARS.femaleSenior
-        : AVATARS.female
-      : draft.senior
-      ? AVATARS.maleSenior
-      : AVATARS.male);
+    const avatar = expertAvatar(draft);
+    const draftCoverage = coverageCitiesFor(draft);
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet doctor-editor-sheet" role="dialog" aria-modal="true" aria-label="专家资料">
@@ -5610,6 +6352,7 @@
             </div>
             <div class="avatar-picker">
               ${[
+                ["neutral", false, "中性头像"],
                 ["male", false, "男医生"],
                 ["female", false, "女医生"],
                 ["male", true, "资深男医生"],
@@ -5635,12 +6378,30 @@
               </div>
               <div class="field"><label>性别</label>
                 <select data-doctor-field="gender">
+                  <option value="neutral" ${draft.gender === "neutral" ? "selected" : ""}>未设置（中性头像）</option>
                   <option value="male" ${draft.gender === "male" ? "selected" : ""}>男</option>
                   <option value="female" ${draft.gender === "female" ? "selected" : ""}>女</option>
                 </select>
               </div>
             </div>
             <div class="field-row">
+              <div class="field"><label>履约机构 <em>*</em></label>
+                <select data-doctor-field="hospitalId" ${isSuperadmin() ? "" : "disabled"}>
+                  ${state.hospitals
+                    .map(
+                      (hospital) =>
+                        `<option value="${esc(hospital.id)}" ${
+                          draft.hospitalId === hospital.id ? "selected" : ""
+                        }>${esc(hospital.name)}</option>`
+                    )
+                    .join("")}
+                </select>
+                ${
+                  isSuperadmin()
+                    ? ""
+                    : `<span class="field-help">医院运营仅可维护本院专家。</span>`
+                }
+              </div>
               <div class="field"><label>专家层级</label>
                 <select data-doctor-field="tier">
                   ${TIER_ORDER.map(
@@ -5651,48 +6412,19 @@
                   ).join("")}
                 </select>
               </div>
-              <div class="field"><label>预约提前期（天）</label>
-                <input type="number" min="1" max="90" data-doctor-field="leadDays" value="${esc(
-                  draft.leadDays
-                )}">
-              </div>
-            </div>
-            <div class="field"><label>履约机构 <em>*</em></label>
-              <select data-doctor-field="hospitalId" ${isSuperadmin() ? "" : "disabled"}>
-                ${state.hospitals
-                  .map(
-                    (hospital) =>
-                      `<option value="${esc(hospital.id)}" ${
-                        draft.hospitalId === hospital.id ? "selected" : ""
-                      }>${esc(hospital.name)}</option>`
-                  )
-                  .join("")}
-              </select>
-              ${
-                isSuperadmin()
-                  ? ""
-                  : `<span class="field-help">医院运营仅可维护本院专家。</span>`
-              }
             </div>
             <div class="field"><label>科室 / 任职 <em>*</em></label>
               <input type="text" data-doctor-field="deptTitle" value="${esc(
                 draft.deptTitle
               )}" placeholder="如：心血管内科主任医师">
             </div>
-            <div class="field-row">
-              <div class="field"><label>科室方向</label>
-                <select data-doctor-field="dept">
-                  ${DEPT_OPTIONS.map(
-                    (dept) =>
-                      `<option value="${dept}" ${draft.dept === dept ? "selected" : ""}>${dept}</option>`
-                  ).join("")}
-                </select>
-              </div>
-              <div class="field"><label>履约地</label>
-                <input type="text" data-doctor-field="coverage" value="${esc(
-                  draft.coverage
-                )}" placeholder="如：全国 / 北京 / 山东省内">
-              </div>
+            <div class="field"><label>科室方向</label>
+              <select data-doctor-field="dept">
+                ${DEPT_OPTIONS.map(
+                  (dept) =>
+                    `<option value="${dept}" ${draft.dept === dept ? "selected" : ""}>${dept}</option>`
+                ).join("")}
+              </select>
             </div>
             <div class="field"><label>服务类型</label>
               <div class="choice-grid choice-grid--three">
@@ -5700,8 +6432,29 @@
                   (id) =>
                     `<button class="choice-tile ${
                       draft.services?.includes(id) ? "is-active" : ""
-                    }" type="button" data-action="doctor-service" data-value="${esc(id)}">${esc(id)}</button>`
+                    }" type="button" data-action="doctor-service" data-value="${esc(id)}">${esc(
+                      serviceLabel(id)
+                    )}</button>`
                 ).join("")}
+              </div>
+            </div>
+            <div class="field">
+              <label>履约城市 <em>*</em> <span>可多选</span></label>
+              <div class="theme-city-editor">
+                <div class="theme-city-chips">
+                  ${draftCoverage
+                    .map(
+                      (city) => `
+                        <span>${icon("mapPin", 11)} ${esc(city)}
+                          <button type="button" data-action="doctor-city-remove" data-city="${esc(
+                            city
+                          )}" aria-label="移除${esc(city)}">${icon("close", 10)}</button>
+                        </span>
+                      `
+                    )
+                    .join("")}
+                </div>
+                <select data-doctor-city-add>${renderCoverageCityOptions()}</select>
               </div>
             </div>
             <div class="field"><label>擅长 / 专业优势</label>
@@ -5713,6 +6466,12 @@
               <textarea data-doctor-field="intro" class="textarea--tall" placeholder="填写学术任职、履历与临床经验">${esc(
                 draft.intro
               )}</textarea>
+            </div>
+            <div class="field"><label>预约提前期（天）</label>
+              <input type="number" min="1" max="90" data-doctor-field="leadDays" value="${esc(
+                draft.leadDays
+              )}">
+              <span class="field-help">对应院方表格中的「预约时间 T+N」，用于计算最早可约日期。</span>
             </div>
             <label class="switch-row">
               <span><strong>上架展示</strong><small>关闭后机构端不再展示该专家</small></span>
@@ -5740,6 +6499,9 @@
     });
     const active = document.querySelector("[data-doctor-active]");
     if (active) draft.active = active.checked;
+    draft.coverage = draft.coverageCities?.includes("全国")
+      ? "全国"
+      : (draft.coverageCities || []).join(" / ");
     draft.leadLabel = `提前 ${draft.leadDays} 天申请`;
     return draft;
   }
@@ -5750,6 +6512,7 @@
     if (!draft.hospitalId) return showToast("请选择履约机构。");
     if (!draft.deptTitle) return showToast("请填写科室/任职。");
     if (!draft.services?.length) return showToast("请至少选择一个服务类型。");
+    if (!draft.coverageCities?.length) return showToast("请至少选择一个履约城市。");
     const config = getDoctorConfig();
     if (draft.id && !draft.custom) {
       const payload = { ...draft };
@@ -6434,6 +7197,15 @@
       state.adminDoctorDraft[target.dataset.doctorField] = target.value;
       return;
     }
+    if (target.matches("[data-theme-field]") && state.adminThemeDraft) {
+      state.adminThemeDraft[target.dataset.themeField] = target.value;
+      return;
+    }
+    if (target.matches("[data-theme-topic-field]") && state.adminThemeDraft) {
+      const topic = state.adminThemeDraft.topics?.[Number(target.dataset.index)];
+      if (topic) topic[target.dataset.themeTopicField] = target.value;
+      return;
+    }
     if (target.matches("[data-doctor-active]") && state.adminDoctorDraft) {
       state.adminDoctorDraft.active = target.checked;
     }
@@ -6441,6 +7213,16 @@
 
   function handleChange(event) {
     const target = event.target;
+    if (target.matches("[data-expert-month]")) {
+      state.expertMonth = Math.max(0, Number(target.value) || 0);
+      refreshExpertResults();
+      return;
+    }
+    if (target.matches("[data-expert-dept]")) {
+      state.expertDept = target.value || "all";
+      refreshExpertResults();
+      return;
+    }
     if (target.matches("[data-home-hospital-picker]")) {
       state.homeHospitalId = target.value || "";
       state.expertScope = "nearby";
@@ -6486,6 +7268,27 @@
     }
     if (target.matches("[data-profile-city]") && state.profileDraft) {
       state.profileDraft.city = target.value;
+      return;
+    }
+    if (target.matches("[data-theme-city-add]") && state.adminThemeDraft) {
+      state.adminThemeDraft.coverageCities = addCoverageCity(
+        state.adminThemeDraft.coverageCities,
+        target.value
+      );
+      renderOverlay();
+      return;
+    }
+    if (target.matches("[data-doctor-city-add]") && state.adminDoctorDraft) {
+      state.adminDoctorDraft.coverageCities = addCoverageCity(
+        state.adminDoctorDraft.coverageCities,
+        target.value
+      );
+      renderOverlay();
+      return;
+    }
+    if (target.matches("[data-theme-topic-field]") && state.adminThemeDraft) {
+      const topic = state.adminThemeDraft.topics?.[Number(target.dataset.index)];
+      if (topic) topic[target.dataset.themeTopicField] = target.value;
       return;
     }
     if (target.matches("[data-review-province]")) {
@@ -6614,6 +7417,7 @@
         storeCurrentScroll();
         state.adminTab = el.dataset.value;
         state.overlay = null;
+        state.adminThemeDraft = null;
         renderApp({ scrollTo: 0 });
         break;
       case "admin-filter":
@@ -6808,9 +7612,66 @@
         state.adminDoctorDraft.photoDetail = "";
         renderOverlay();
         break;
+      case "doctor-city-remove":
+        if (!state.adminDoctorDraft) return;
+        state.adminDoctorDraft.coverageCities = (
+          state.adminDoctorDraft.coverageCities || []
+        ).filter((city) => city !== el.dataset.city);
+        renderOverlay();
+        break;
       case "admin-doctor-save":
         saveAdminDoctor();
         break;
+      case "open-admin-theme":
+        openAdminThemeEditor(el.dataset.month);
+        break;
+      case "theme-city-remove":
+        if (!state.adminThemeDraft) return;
+        state.adminThemeDraft.coverageCities = (
+          state.adminThemeDraft.coverageCities || []
+        ).filter((city) => city !== el.dataset.city);
+        renderOverlay();
+        break;
+      case "theme-expert-toggle": {
+        if (!state.adminThemeDraft) return;
+        const id = el.dataset.id;
+        const list = state.adminThemeDraft.expertIds || [];
+        state.adminThemeDraft.expertIds = list.includes(id)
+          ? list.filter((item) => item !== id)
+          : list.concat(id);
+        el.classList.toggle("is-active");
+        break;
+      }
+      case "theme-topic-add":
+        if (!state.adminThemeDraft) return;
+        state.adminThemeDraft.topics = (state.adminThemeDraft.topics || []).concat({
+          id: `${state.adminThemeDraft.month}-custom-${Date.now()}`,
+          dept: "内科",
+          title: "",
+          expertId: ""
+        });
+        renderOverlay();
+        break;
+      case "theme-topic-remove":
+        if (!state.adminThemeDraft) return;
+        state.adminThemeDraft.topics = (state.adminThemeDraft.topics || []).filter(
+          (_, index) => index !== Number(el.dataset.index)
+        );
+        renderOverlay();
+        break;
+      case "admin-theme-save":
+        saveAdminTheme();
+        break;
+      case "admin-theme-default": {
+        const hospital = adminThemeHospital();
+        const month = state.adminThemeDraft?.month;
+        if (hospital && month) {
+          state.adminThemeDraft = clone(defaultThemeConfig(hospital.id, month));
+          renderOverlay();
+          showToast("已恢复系统默认主题，保存后生效。");
+        }
+        break;
+      }
       case "admin-account-add":
         openAdminAccountEditor();
         break;
@@ -6864,6 +7725,39 @@
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
         break;
+      case "theme-open":
+        openTheme(
+          Number(el.dataset.month) || currentMonth(),
+          -1,
+          el.dataset.hospitalId || ""
+        );
+        break;
+      case "theme-topic":
+        openTheme(
+          Number(el.dataset.month) || currentMonth(),
+          Number(el.dataset.topicIndex) >= 0 ? Number(el.dataset.topicIndex) : -1,
+          el.dataset.hospitalId || ""
+        );
+        break;
+      case "theme-book":
+        openThemeBooking(
+          Number(el.dataset.month) || currentMonth(),
+          Number(el.dataset.topicIndex) >= 0 ? Number(el.dataset.topicIndex) : -1
+        );
+        break;
+      case "theme-experts":
+        state.expertMonth = Number(el.dataset.month) || currentMonth();
+        state.expertDept = "all";
+        state.expertService = "讲座";
+        state.expertAvailability = "all";
+        state.expertTier = "all";
+        state.expertScope = "all";
+        releaseOverlayHistory();
+        clearOverlayState();
+        state.screen = "main";
+        state.tab = "experts";
+        renderApp({ scrollTo: 0 });
+        break;
       case "book-doctor":
         openBooking(el.dataset.doctorId || "", "", el.dataset.service || "");
         break;
@@ -6878,6 +7772,8 @@
         break;
       case "tier-open":
         state.expertTier = el.dataset.value;
+        state.expertMonth = 0;
+        state.expertDept = "all";
         state.expertScope = "all";
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
@@ -6885,6 +7781,8 @@
       case "service-open":
         state.expertService = el.dataset.value;
         state.expertTier = "all";
+        state.expertMonth = 0;
+        state.expertDept = "all";
         state.expertScope = "all";
         state.expertSearch = "";
         state.expertSearchOpen = false;
@@ -6897,6 +7795,8 @@
         state.expertSearchOpen = true;
         state.expertTier = "all";
         state.expertService = "all";
+        state.expertMonth = 0;
+        state.expertDept = "all";
         state.expertScope = "all";
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
