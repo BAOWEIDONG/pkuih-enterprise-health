@@ -20,7 +20,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261123-6";
+  const DATA_VERSION = "20261123-8";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -72,7 +72,7 @@
   const SERVICES = {
     讲座: { id: "讲座", label: "专家讲座", desc: "主题分享 + 现场问答" },
     巡诊: { id: "巡诊", label: "现场巡诊", desc: "健康筛查 + 现场咨询" },
-    "1对1": { id: "1对1", label: "1 对 1", desc: "一对一问诊与健康建议" }
+    "1对1": { id: "1对1", label: "1 对 1", desc: "院方协调 · 一对一问诊" }
   };
   const SERVICE_IDS = ["讲座", "巡诊", "1对1"];
 
@@ -707,7 +707,26 @@
   }
 
   function matchesService(expert, service) {
-    return !service || service === "all" || (expert.services || []).includes(service);
+    if (!service || service === "all") return true;
+    if (service === "1对1") return expert.active !== false;
+    return (expert.services || []).includes(service);
+  }
+
+  function serviceCount(service) {
+    return state.experts.filter(
+      (expert) => expert.active !== false && matchesService(expert, service)
+    ).length;
+  }
+
+  function serviceTagsFor(expert, { coordination = false } = {}) {
+    const tags = [...(expert?.services || [])].map((service) => ({
+      service,
+      coordinated: false
+    }));
+    if (coordination && matchesService(expert, "1对1") && !tags.some((tag) => tag.service === "1对1")) {
+      tags.push({ service: "1对1", coordinated: true });
+    }
+    return tags;
   }
 
   function getSlots(doctorId) {
@@ -1167,8 +1186,17 @@
     if (!season) return [];
     const exact = state.themeMatches
       .filter((row) => row.doctor === expert.name && row.month === Number(month))
-      .map((row) => ({ dept: row.dept, title: row.topic, matched: true }));
-    const seen = new Set(exact.map((item) => item.title));
+      .map((row) => ({
+        dept: row.dept,
+        title: row.topic,
+        month: row.month,
+        hospital: row.hospital,
+        professionalTitle: row.title,
+        coverage: row.coverage,
+        matched: true
+      }));
+    if (exact.length) return exact;
+    const seen = new Set();
     const aliases = DEPT_ALIASES[expert.dept] || [expert.dept];
     const keywords = [expert.dept].concat(aliases).filter(Boolean);
     const related = [];
@@ -1214,6 +1242,8 @@
     chevronRight: '<path d="m9 5 7 7-7 7"/>',
     chevronLeft: '<path d="m15 5-7 7 7 7"/>',
     chevronDown: '<path d="m5 9 7 7 7-7"/>',
+    crosshair:
+      '<circle cx="12" cy="12" r="6.8"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2"/><circle cx="12" cy="12" r="2.2"/>',
     close: '<path d="M5.5 5.5 18.5 18.5M18.5 5.5 5.5 18.5"/>',
     check: '<path d="m4.5 12.5 5 5 10-11"/>',
     checkCircle: '<circle cx="12" cy="12" r="9"/><path d="m7.6 12.2 3 3 5.8-6.2"/>',
@@ -1636,7 +1666,7 @@
     if (pending?.type === "booking") {
       state.tab = "experts";
       renderApp({ scrollTo: 0 });
-      openBooking(pending.doctorId || "", pending.tier || "");
+      openBooking(pending.doctorId || "", pending.tier || "", pending.service || "");
     } else if (pending?.type === "tab") {
       state.tab = pending.tab || "me";
       renderApp({ scrollTo: 0 });
@@ -1858,68 +1888,72 @@
     `;
   }
 
-  function renderHomeLocationCard() {
-    const hospital = nearestHospital();
-    const bookable = nearbyExperts({ bookableOnly: true }).length;
-    const relation = state.homeHospitalId
-      ? "已切换到该院"
-      : state.geoStatus === "ready"
-      ? "按当前位置推荐"
-      : "按登录地区推荐";
-    return `
-      <button class="nearby-card ${state.session ? "" : "nearby-card--guest"}" type="button"
-        data-action="home-hospital-experts">
-        <span class="nearby-card__icon">${icon("mapPin", 17)}</span>
-        <span class="nearby-card__copy">
-          <small>${esc(homeLocationText())}</small>
-          <strong>${esc(hospital?.name || "北京大学国际医院")}</strong>
-          <span>${bookable} 位专家近期可预约 · ${relation}</span>
-        </span>
-        <span class="nearby-card__cta">查看 ${icon("chevronRight", 14)}</span>
-      </button>
-    `;
+  function homeHospitalsByDistance() {
+    const current = nearestHospital();
+    const reference =
+      state.geoStatus === "ready" &&
+      Number.isFinite(Number(state.geoLat)) &&
+      Number.isFinite(Number(state.geoLng))
+        ? { lat: Number(state.geoLat), lng: Number(state.geoLng) }
+        : null;
+    return [...state.hospitals].sort((a, b) => {
+      if (
+        reference &&
+        Number.isFinite(Number(a.lat)) &&
+        Number.isFinite(Number(a.lng)) &&
+        Number.isFinite(Number(b.lat)) &&
+        Number.isFinite(Number(b.lng))
+      ) {
+        return (
+          distanceKm(reference.lat, reference.lng, a.lat, a.lng) -
+          distanceKm(reference.lat, reference.lng, b.lat, b.lng)
+        );
+      }
+      if (a.id === current?.id) return -1;
+      if (b.id === current?.id) return 1;
+      const aLocal = a.province === current?.province ? 0 : 1;
+      const bLocal = b.province === current?.province ? 0 : 1;
+      return aLocal - bLocal || a.name.localeCompare(b.name, "zh-CN");
+    });
   }
 
-  function renderHomeHospitalSwitch() {
+  function renderHomeHospitalPicker() {
     const current = nearestHospital();
-    const geolocatedId = state.geoHospitalId;
+    const hospitals = homeHospitalsByDistance();
+    const meta =
+      state.geoStatus === "loading"
+        ? "定位中…"
+        : state.homeHospitalId
+        ? "已手动切换"
+        : state.geoStatus === "ready"
+        ? "按当前位置推荐"
+        : state.session
+        ? `按${regionText(state.session.province, state.session.city)}推荐`
+        : "定位后推荐最近医院";
     return `
-      <section class="section home-hospitals">
-        <div class="section-head">
-          <div>
-            <h2>切换履约医院</h2>
-            <p id="home-location-status">${esc(homeLocationText())}</p>
-          </div>
-          <button class="text-link" type="button" data-action="home-use-location">
-            ${icon("mapPin", 13)} ${state.geoStatus === "loading" ? "定位中…" : "重新定位"}
-          </button>
-        </div>
-        <div class="hospital-switch" role="list" aria-label="切换履约医院">
-          ${state.hospitals
-            .map((hospital) => {
-              const count = state.experts.filter(
-                (expert) =>
-                  expert.active &&
-                  expert.hospitalId === hospital.id &&
-                  doctorAvailability(expert).bookable
-              ).length;
-              const distance = hospitalDistanceText(hospital);
-              return `
-                <button class="hospital-chip ${
-                  hospital.id === current?.id ? "is-active" : ""
-                }" type="button" data-action="home-hospital" data-value="${esc(hospital.id)}">
-                  <span class="hospital-chip__top">
-                    <small>${esc(distance || hospital.province)}</small>
-                    ${hospital.id === geolocatedId ? "<i>最近</i>" : ""}
-                  </span>
-                  <strong>${esc(hospital.short)}</strong>
-                  <span class="hospital-chip__count">${count} 位可约</span>
-                </button>
-              `;
-            })
-            .join("")}
-        </div>
-      </section>
+      <div class="hero-hospital">
+        <span class="hero-hospital__pin">${icon("mapPin", 15)}</span>
+        <span class="hero-hospital__body">
+          <small>当前附近医院 · ${esc(meta)} · 按距离排序</small>
+          <span class="hero-hospital__select-wrap">
+            <select data-home-hospital-picker aria-label="切换履约医院">
+              ${hospitals
+                .map((hospital) => {
+                  const distance = hospitalDistanceText(hospital);
+                  return `<option value="${esc(hospital.id)}" ${
+                    hospital.id === current?.id ? "selected" : ""
+                  }>${esc(hospital.short)}${distance ? ` · ${distance}` : ""}</option>`;
+                })
+                .join("")}
+            </select>
+            <span class="hero-hospital__chevron">${icon("chevronDown", 13)}</span>
+          </span>
+        </span>
+        <button class="hero-hospital__locate" type="button" data-action="home-use-location"
+          aria-label="重新定位" title="重新定位">
+          ${icon("crosshair", 15)}
+        </button>
+      </div>
     `;
   }
 
@@ -1950,11 +1984,9 @@
 
   function refreshHomeLocationViews() {
     if (state.screen !== "main" || state.tab !== "home") return;
-    const card = document.getElementById("home-nearby-card");
-    const hospitals = document.getElementById("home-hospital-block");
+    const picker = document.getElementById("home-hospital-picker");
     const nearby = document.getElementById("home-nearby-section");
-    if (card) card.innerHTML = renderHomeLocationCard();
-    if (hospitals) hospitals.innerHTML = renderHomeHospitalSwitch();
+    if (picker) picker.innerHTML = renderHomeHospitalPicker();
     if (nearby) nearby.innerHTML = renderHomeNearbySection();
   }
 
@@ -1968,6 +2000,7 @@
               fetchpriority="high" decoding="async">
           </div>
           <div class="hero__content">
+            <div id="home-hospital-picker">${renderHomeHospitalPicker()}</div>
             <span class="hero__kicker"><i></i> 白大褂到企 · 名医入企计划</span>
             <h1>把医学专家<br><em>请到企业身边</em></h1>
             <p>面向保险公司与企业，提供讲座、巡诊与 1 对 1 健康咨询。按医院、科室与时令主题匹配专家，院方项目组全程跟进。</p>
@@ -1986,9 +2019,6 @@
             </div>
           </div>
         </section>
-
-        <div id="home-nearby-card">${renderHomeLocationCard()}</div>
-        <div id="home-hospital-block">${renderHomeHospitalSwitch()}</div>
 
         <section class="season-banner">
           <div class="season-banner__head">
@@ -2045,9 +2075,8 @@
           <div class="service-grid">
             ${SERVICE_IDS.map((id, index) => {
               const service = SERVICES[id];
-              const count = state.experts.filter(
-                (expert) => expert.active && matchesService(expert, id)
-              ).length;
+              const count = serviceCount(id);
+              const countLabel = id === "1对1" ? "位可由院方协调" : "位专家可服务";
               return `
                 <button class="service-card" type="button" data-action="service-open" data-value="${esc(id)}">
                   <span class="service-card__num">0${index + 1}</span>
@@ -2057,7 +2086,7 @@
                   )}</span>
                   <strong>${esc(service.label)}</strong>
                   <p>${esc(service.desc)}</p>
-                  <span class="service-card__count">${count} 位专家可服务</span>
+                  <span class="service-card__count">${count} ${countLabel}</span>
                 </button>
               `;
             }).join("")}
@@ -2120,6 +2149,7 @@
   function renderExpertCard(expert) {
     const tier = tierOf(expert);
     const availability = doctorAvailability(expert);
+    const serviceTags = serviceTagsFor(expert, { coordination: state.expertService === "1对1" });
     return `
       <button class="expert-card" type="button" data-action="open-doctor" data-doctor-id="${esc(expert.id)}">
         <span class="expert-card__media">
@@ -2138,8 +2168,13 @@
           )}</span>
           <span class="expert-card__intro">${esc(doctorExpertise(expert))}</span>
           <span class="expert-card__foot">
-            <span class="expert-card__services">${(expert.services || [])
-              .map((service) => `<span>${esc(service)}</span>`)
+            <span class="expert-card__services">${serviceTags
+              .map(
+                ({ service, coordinated }) =>
+                  `<span class="${coordinated ? "is-coordinated" : ""}">${esc(service)}${
+                    coordinated ? " · 院方协调" : ""
+                  }</span>`
+              )
               .join("")}</span>
             <span class="expert-card__more">详情 ${icon("chevronRight", 11)}</span>
           </span>
@@ -2225,11 +2260,17 @@
               data-action="expert-availability" data-value="bookable">只看可约</button>
             <button class="chip ${state.expertAvailability === "all" ? "is-active" : ""}" type="button"
               data-action="expert-availability" data-value="all">全部专家</button>
-            <i class="filter-divider"></i>
+          </div>
+          <div class="filter-scroll filter-scroll--services">
+            <span class="filter-label">服务类型</span>
+            <button class="chip ${state.expertService === "all" ? "is-active" : ""}" type="button"
+              data-action="expert-service" data-value="all">全部服务</button>
             ${SERVICE_IDS.map(
               (id) =>
                 `<button class="chip ${state.expertService === id ? "is-active" : ""}" type="button"
-                  data-action="expert-service" data-value="${esc(id)}">${esc(id)}</button>`
+                  data-action="expert-service" data-value="${esc(id)}">${esc(id)}<span class="chip__count">${
+                    serviceCount(id)
+                  }</span></button>`
             ).join("")}
           </div>
           <p class="expert-toolbar__hint" id="expert-scope-hint">${icon("mapPin", 11)} ${
@@ -2272,6 +2313,12 @@
     const month = Number(state.overlay?.month) || currentMonth();
     const season = seasonalOf(month);
     const themes = themesForExpert(expert, month);
+    const matchedMonths = new Set(
+      state.themeMatches
+        .filter((row) => row.doctor === expert.name)
+        .map((row) => Number(row.month))
+        .filter((value) => Number.isFinite(value))
+    );
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet doctor-sheet" role="dialog" aria-modal="true" aria-label="${esc(
@@ -2304,17 +2351,19 @@
         </div>
         <div class="sheet__body">
           <div class="doctor-sheet__content">
+            <span class="doctor-services__label">可服务类型</span>
             <div class="doctor-services">
-              ${(expert.services || [])
+              ${serviceTagsFor(expert, { coordination: true })
                 .map(
-                  (service) =>
+                  ({ service, coordinated }) =>
                     `<span>${icon(
                       service === "讲座" ? "message" : service === "巡诊" ? "stethoscope" : "users",
                       13
-                    )} ${esc(service)}</span>`
+                    )} ${esc(service)}${coordinated ? " · 院方协调" : ""}</span>`
                 )
                 .join("")}
             </div>
+            <p class="doctor-services__note">讲座与巡诊按院方专家资料匹配；1 对 1 由院方结合企业需求协调安排。</p>
             <div class="fact-grid">
               <div><small>履约机构</small><strong>${esc(expert.hospital)}</strong></div>
               <div><small>科室 / 任职</small><strong>${esc(expert.deptTitle)}</strong></div>
@@ -2332,13 +2381,15 @@
             <section class="detail-section season-detail">
               <div class="season-detail__head">
                 <h3>${icon("leaf", 14)} 时令主题讲座</h3>
-                <span>${currentMonth()}月当前</span>
+                <span>${month}月 · ${themes.some((item) => item.matched) ? "院方匹配课题" : "同科室推荐"}</span>
               </div>
               <div class="month-tabs">
                 ${Array.from({ length: 12 }, (_, index) => index + 1)
                   .map(
                     (item) =>
-                      `<button class="${item === month ? "is-active" : ""}" type="button"
+                      `<button class="${item === month ? "is-active" : ""} ${
+                        matchedMonths.has(item) ? "has-match" : ""
+                      }" type="button"
                         data-action="doctor-month" data-value="${item}">${item}月</button>`
                   )
                   .join("")}
@@ -2352,15 +2403,21 @@
                   .map(
                     (theme) => `
                       <div class="theme-item ${theme.matched ? "is-matched" : ""}">
-                        <span>${esc(theme.dept)}</span>
+                        <span>${esc(theme.dept)}${theme.month ? ` · ${theme.month}月` : ""}</span>
                         <strong>${esc(theme.title)}</strong>
-                        ${theme.matched ? "<i>本院已排期</i>" : ""}
+                        ${
+                          theme.matched
+                            ? `<small>${esc(theme.hospital)} · ${esc(theme.professionalTitle)} · ${esc(
+                                theme.coverage
+                              )}</small><i>已匹配</i>`
+                            : "<small>推荐方向</small>"
+                        }
                       </div>
                     `
                   )
                   .join("")}
               </div>
-              <p class="season-detail__note">主题可按企业人群与行业方向调整，具体课题以院方项目组确认为准。</p>
+              <p class="season-detail__note">以上课题、机构、职称、时令月份与履约地按院方「病种-主题-专家匹配」表展示；未匹配月份展示同科室推荐方向，最终以项目组确认为准。</p>
             </section>
             ${
               expert.profileUrl
@@ -2378,7 +2435,9 @@
           <button class="btn btn--ghost" type="button" data-action="close-overlay">返回</button>
           <button class="btn btn--primary" type="button" data-action="book-doctor" data-doctor-id="${esc(
             expert.id
-          )}" ${availability.bookable ? "" : "disabled"}>
+          )}" data-service="${
+            state.expertService && matchesService(expert, state.expertService) ? esc(state.expertService) : ""
+          }" ${availability.bookable ? "" : "disabled"}>
             ${availability.bookable ? "预约该专家" : "暂无可约档期"} ${icon("arrowRight", 15)}
           </button>
         </div>
@@ -2407,13 +2466,17 @@
     return list;
   }
 
-  function createBookingDraft(doctorId = "", tier = "") {
+  function createBookingDraft(doctorId = "", tier = "", preferredService = "") {
     const expert = doctorId ? expertById(doctorId) : null;
     const session = state.session || {};
     const region = normalizeRegion(session.province || "北京市", session.city || "北京市");
+    const serviceType =
+      preferredService && (!expert || matchesService(expert, preferredService))
+        ? preferredService
+        : expert?.services?.[0] || "讲座";
     return {
       step: 1,
-      serviceType: expert?.services?.[0] || "讲座",
+      serviceType,
       doctorId: expert?.id || "",
       tier: expert?.tier || tier || "specialist",
       date: "",
@@ -2432,12 +2495,12 @@
     };
   }
 
-  function openBooking(doctorId = "", tier = "") {
+  function openBooking(doctorId = "", tier = "", preferredService = "") {
     if (!state.session) {
-      startLogin({ type: "booking", doctorId, tier });
+      startLogin({ type: "booking", doctorId, tier, service: preferredService });
       return;
     }
-    state.booking = createBookingDraft(doctorId, tier);
+    state.booking = createBookingDraft(doctorId, tier, preferredService);
     state.overlay = { type: "booking" };
     renderOverlay();
   }
@@ -2749,7 +2812,7 @@
       button.classList.toggle("is-active", button.dataset.value === value);
     });
     const doctor = bookingSelectedDoctor(state.booking);
-    if (doctor && !doctor.services.includes(value)) {
+    if (doctor && !matchesService(doctor, value)) {
       state.booking.doctorId = "";
       state.booking.date = "";
     }
@@ -2765,7 +2828,7 @@
     const expert = value ? expertById(value) : null;
     if (expert) {
       state.booking.tier = expert.tier;
-      if (!expert.services.includes(state.booking.serviceType)) {
+      if (!matchesService(expert, state.booking.serviceType)) {
         state.booking.serviceType = expert.services[0] || "讲座";
         document.querySelectorAll('[data-action="booking-service"]').forEach((button) => {
           button.classList.toggle("is-active", button.dataset.value === state.booking.serviceType);
@@ -6378,6 +6441,12 @@
 
   function handleChange(event) {
     const target = event.target;
+    if (target.matches("[data-home-hospital-picker]")) {
+      state.homeHospitalId = target.value || "";
+      state.expertScope = "nearby";
+      refreshHomeLocationViews();
+      return;
+    }
     if (target.matches("[data-login-province]")) {
       state.login.province = target.value;
       state.login.city = (state.chinaCities?.[target.value] || [target.value])[0];
@@ -6796,7 +6865,7 @@
         renderApp({ scrollTo: 0 });
         break;
       case "book-doctor":
-        openBooking(el.dataset.doctorId || "");
+        openBooking(el.dataset.doctorId || "", "", el.dataset.service || "");
         break;
       case "open-doctor":
         openDoctorSheet(el.dataset.doctorId);
