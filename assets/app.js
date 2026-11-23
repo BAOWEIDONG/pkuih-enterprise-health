@@ -21,7 +21,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261123-9";
+  const DATA_VERSION = "20261123-11";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -1768,6 +1768,16 @@
 
   function startLogin(pending = null) {
     if (state.session) return;
+    const hadOverlay = Boolean(
+      state.overlay || overlayRoot?.querySelector(".sheet, .sheet-backdrop, .flow")
+    );
+    const reuseOverlayHistory = hadOverlay && state.overlayHistoryDepth > 0;
+    if (hadOverlay) {
+      clearOverlayState();
+      if (overlayRoot) overlayRoot.innerHTML = "";
+      document.body.classList.remove("is-locked");
+      if (reuseOverlayHistory) state.overlayHistoryDepth = 0;
+    }
     applyLocationToLogin(nearestHospital());
     state.pendingAuth = pending;
     state.screen = "auth";
@@ -1777,7 +1787,7 @@
     state.adminAuthed = false;
     if (!state.authHistory) {
       state.authHistory = true;
-      pushAppHistory("auth");
+      if (!reuseOverlayHistory) pushAppHistory("auth");
     }
     renderApp();
   }
@@ -2215,12 +2225,33 @@
     `;
   }
 
+  function homeMetricsMarkup() {
+    const hospital = nearestHospital() || state.hospitals[0];
+    const hospitalExperts = hospital
+      ? state.experts.filter(
+          (expert) => expert.hospitalId === hospital.id && expert.active !== false
+        )
+      : [];
+    const departments = new Set(
+      hospitalExperts.map((expert) => String(expert.dept || "").trim()).filter(Boolean)
+    );
+    const theme = hospital ? hospitalTheme(hospital.id, currentMonth()) : null;
+    const topicCount = (theme?.topics || []).length;
+    return `
+      <div><strong>${hospitalExperts.length}<span>位</span></strong><small>本院专家</small></div>
+      <div><strong>${departments.size}<span>个</span></strong><small>覆盖科室</small></div>
+      <div><strong>${topicCount}<span>个</span></strong><small>本月课题</small></div>
+    `;
+  }
+
   function refreshHomeLocationViews() {
     if (state.screen !== "main" || state.tab !== "home") return;
     const picker = document.getElementById("home-hospital-picker");
     const nearby = document.getElementById("home-nearby-section");
+    const metrics = document.getElementById("home-metrics");
     if (picker) picker.innerHTML = renderHomeHospitalPicker();
     if (nearby) nearby.innerHTML = renderHomeNearbySection();
+    if (metrics) metrics.innerHTML = homeMetricsMarkup();
   }
 
   function renderHomePage() {
@@ -2249,10 +2280,8 @@
                 浏览专家库
               </button>
             </div>
-            <div class="hero__metrics">
-              <div><strong>${state.experts.length}<span>位</span></strong><small>在库专家</small></div>
-              <div><strong>${state.hospitals.length}<span>家</span></strong><small>履约医院</small></div>
-              <div><strong>3<span>类</span></strong><small>到企服务</small></div>
+            <div class="hero__metrics" id="home-metrics">
+              ${homeMetricsMarkup()}
             </div>
           </div>
         </section>
@@ -2701,9 +2730,9 @@
           </div>
           <div class="expert-select-filters">
             <label>
-              <span>${icon("leaf", 11)} 月份时令</span>
+              <span>${icon("leaf", 11)} 月份时令 <em>可选</em></span>
               <select data-expert-month>
-                <option value="0" ${state.expertMonth === 0 ? "selected" : ""}>全部月份</option>
+                <option value="0" ${state.expertMonth === 0 ? "selected" : ""}>不筛选月令</option>
                 ${Array.from({ length: 12 }, (_, index) => index + 1)
                   .map(
                     (month) =>
@@ -4690,18 +4719,15 @@
       : null;
   }
 
-  function acceptAppointment(username = "") {
+  function acceptAppointment() {
     const appointment = appointmentById(state.adminReviewId);
     if (!appointment) return;
     if (appointment.assignedStaff) {
       showToast("该预约已有项目对接人。");
       return;
     }
-    let account = state.adminUser;
-    if (username) {
-      account = getAdminAccounts().find((item) => item.username === username && item.active);
-    }
-    if (!account) return showToast("请选择项目对接人。");
+    const account = state.adminUser;
+    if (!account) return showToast("登录状态已失效，请重新登录。");
     if (
       account.role === "operator" &&
       account.hospitalId !== appointment.hospitalId &&
@@ -4718,20 +4744,6 @@
     state.adminDraft = buildReviewDraft(updated);
     renderOverlay();
     showToast(`已接单，项目对接人为 ${account.name}。`);
-  }
-
-  function reassignAppointment(username) {
-    if (!isSuperadmin()) return;
-    const appointment = appointmentById(state.adminReviewId);
-    const account = getAdminAccounts().find((item) => item.username === username && item.active);
-    if (!appointment || !account) return;
-    const updated = updateAppointment(appointment.id, {
-      assignedStaff: staffSnapshot(account),
-      acceptedAt: appointment.acceptedAt || new Date().toISOString()
-    });
-    state.adminDraft = buildReviewDraft(updated);
-    renderOverlay();
-    showToast(`项目对接人已调整为 ${account.name}。`);
   }
 
   function buildReviewDraft(appointment) {
@@ -4874,7 +4886,6 @@
     const assignee = appointmentAssignee(appointment);
     const draft = state.adminDraft || buildReviewDraft(appointment);
     const canEdit = Boolean(assignee);
-    const operators = isSuperadmin() ? hospitalOperators(appointment.hospitalId) : [];
     const smsLog = getSmsLogs()[appointment.id];
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
@@ -4942,38 +4953,13 @@
               !assignee
                 ? `<section class="assignment-card">
                     <span class="assignment-card__eyebrow">下一步 · 接单</span>
-                    <h3>由谁负责这个项目？</h3>
-                    <p>接单后，项目人员姓名 ${esc(state.adminUser?.name || "")} 与手机号 ${phoneLink(
+                    <h3>确认由你跟进这个项目</h3>
+                    <p>当前登录账号 ${esc(state.adminUser?.name || "")} 与手机号 ${phoneLink(
                       state.adminUser?.phone || "",
                       state.adminUser?.phone || ""
-                    )} 会自动带入方案与机构联系人。机构端在接单后才会显示具体项目对接人。</p>
-                    ${
-                      isSuperadmin()
-                        ? `<div class="field">
-                            <label>指派医院运营</label>
-                            <select data-assignee-select>
-                              <option value="">选择本院运营人员</option>
-                              ${operators
-                                .map(
-                                  (account) =>
-                                    `<option value="${esc(account.username)}">${esc(
-                                      account.name
-                                    )} · ${esc(account.phone)}</option>`
-                                )
-                                .join("")}
-                            </select>
-                            ${
-                              operators.length
-                                ? ""
-                                : `<span class="field-help">该医院尚未分配运营人员，请先在“医院账号”中配置。</span>`
-                            }
-                          </div>`
-                        : ""
-                    }
+                    )} 将自动成为项目对接人，并带入方案与机构联系人。机构端在接单后才会显示具体项目对接人。</p>
                     <button class="btn btn--primary btn--block" type="button" data-action="review-accept">
-                      ${icon("user", 15)} ${
-                        isSuperadmin() ? "接单并分配" : "接单并分配给我"
-                      }
+                      ${icon("user", 15)} 确认接单
                     </button>
                   </section>`
                 : `
@@ -4983,20 +4969,7 @@
                       <div><small>项目对接人</small><strong>${esc(assignee.name)}</strong>
                         <p>${phoneLink(assignee.phone, assignee.phone)}</p></div>
                     </div>
-                    ${
-                      isSuperadmin()
-                        ? `<select data-review-reassign>
-                            ${operators
-                              .map(
-                                (account) =>
-                                  `<option value="${esc(account.username)}" ${
-                                    account.username === assignee.username ? "selected" : ""
-                                  }>${esc(account.name)} · ${esc(account.phone)}</option>`
-                              )
-                              .join("")}
-                          </select>`
-                        : `<span class="assignee-panel__locked">${icon("lock", 11)} 超管可调整</span>`
-                    }
+                    <span class="assignee-panel__locked">${icon("lock", 11)} 由接单账号自动带入</span>
                   </section>
                 `
             }
@@ -5141,7 +5114,7 @@
                   保存方案并发送 ${icon("send", 14)}
                 </button>`
               : `<button class="btn btn--primary" type="button" data-action="review-accept">
-                  ${isSuperadmin() ? "接单并分配" : "接单"}
+                  确认接单
                 </button>`
           }
         </div>
@@ -7325,10 +7298,6 @@
       state.slotBatch.scope = target.value;
       return;
     }
-    if (target.matches("[data-review-reassign]")) {
-      reassignAppointment(target.value);
-      return;
-    }
     if (target.matches("[data-doctor-photo]")) {
       handleDoctorPhotoUpload(target.files?.[0]);
     }
@@ -7444,21 +7413,7 @@
         renderOverlay();
         break;
       case "review-accept": {
-        if (isSuperadmin()) {
-          const select = document.querySelector("[data-assignee-select]");
-          const username = select?.value || "";
-          if (!username) {
-            showToast(
-              hospitalOperators(appointmentById(state.adminReviewId)?.hospitalId).length
-                ? "请选择该医院的运营人员。"
-                : "该医院尚未配置运营人员，请先在“医院账号”中分配。"
-            );
-            return;
-          }
-          acceptAppointment(username);
-        } else {
-          acceptAppointment();
-        }
+        acceptAppointment();
         break;
       }
       case "review-save":
