@@ -5798,6 +5798,11 @@ textarea {
   font-weight: 600;
 }
 
+.admin-record__tags span.is-push {
+  background: var(--amber-soft, #fff4df);
+  color: var(--amber-text, #9a5b00);
+}
+
 .admin-record__info {
   display: grid;
   gap: 4px;

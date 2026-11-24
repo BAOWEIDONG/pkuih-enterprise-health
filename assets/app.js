@@ -26,7 +26,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261124-13";
+  const DATA_VERSION = "20261124-14";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -7880,6 +7880,10 @@
     const hospital = hospitalById(appointment.hospitalId);
     const expert = appointment.doctorId ? expertById(appointment.doctorId) : null;
     const assignee = appointmentAssignee(appointment);
+    const pushPending =
+      Boolean(appointment.plan) &&
+      ["review", "revision", "confirmed"].includes(appointment.status) &&
+      !smsLogIsCurrent(appointment, getSmsLogs()[appointment.id]);
     return `
       <article class="admin-record" role="button" tabindex="0" data-action="open-admin-appointment"
         data-appointment-id="${esc(appointment.id)}">
@@ -7892,6 +7896,7 @@
           <span>${esc(serviceLabel(appointment.serviceType))}</span>
           <span>${esc(hospital?.short || "")}</span>
           <span>${esc(expert ? expert.name : appointment.doctorName || "待匹配专家")}</span>
+          ${pushPending ? '<span class="is-push">推送待发送</span>' : ""}
         </div>
         <div class="admin-record__info">
           <span>${icon("building", 12)} ${esc(appointment.orgName)}</span>
