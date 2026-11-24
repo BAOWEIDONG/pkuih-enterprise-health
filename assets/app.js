@@ -10,6 +10,7 @@
     session: "pkuih_h6_session",
     appointments: "pkuih_h6_appointments",
     demands: "pkuih_h6_demands",
+    institutionAccounts: "pkuih_h6_institution_accounts",
     adminAccounts: "pkuih_h6_admin_accounts",
     adminSession: "pkuih_h6_admin_session",
     doctorConfig: "pkuih_h6_doctor_config",
@@ -20,11 +21,12 @@
     homeRegion: "pkuih_h6_home_region",
     homeHospital: "pkuih_h6_home_hospital",
     lastPortal: "pkuih_h6_portal",
+    operationLogs: "pkuih_h6_operation_logs",
     seed: "pkuih_h6_seed"
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261124-09";
+  const DATA_VERSION = "20261124-10";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -33,9 +35,84 @@
     orgName: "示例保险有限公司",
     orgType: "保险公司",
     title: "客户健康负责人",
+    email: "wangjingli@example.com",
     province: "北京市",
     city: "北京市"
   };
+  const DEFAULT_INSTITUTION_ACCOUNTS = [
+    {
+      phone: DEMO_PHONE,
+      name: "王经理",
+      orgName: "示例保险有限公司",
+      orgType: "保险公司",
+      title: "客户健康负责人",
+      contactPhone: DEMO_PHONE,
+      email: "wangjingli@example.com",
+      province: "北京市",
+      city: "北京市",
+      active: true
+    },
+    {
+      phone: "13800000009",
+      name: "全链路验收",
+      orgName: "全链路测试集团",
+      orgType: "企业",
+      title: "员工健康负责人",
+      contactPhone: "13800000009",
+      email: "qa.fullflow@example.com",
+      province: "北京市",
+      city: "北京市",
+      active: true
+    },
+    {
+      phone: "13800138000",
+      name: "王测试",
+      orgName: "测试保险有限公司",
+      orgType: "保险公司",
+      title: "健康服务经理",
+      contactPhone: "13800138000",
+      email: "qa.client@example.com",
+      province: "北京市",
+      city: "北京市",
+      active: true
+    },
+    {
+      phone: "13911112222",
+      name: "李老师",
+      orgName: "华北企业健康中心",
+      orgType: "企业",
+      title: "人力资源负责人",
+      contactPhone: "13911112222",
+      email: "qa.north@example.com",
+      province: "北京市",
+      city: "北京市",
+      active: true
+    },
+    {
+      phone: "13911113333",
+      name: "赵老师",
+      orgName: "华东员工关怀中心",
+      orgType: "企业",
+      title: "员工关怀负责人",
+      contactPhone: "13911113333",
+      email: "qa.east@example.com",
+      province: "上海市",
+      city: "上海市",
+      active: true
+    },
+    {
+      phone: "13900000001",
+      name: "孙老师",
+      orgName: "大湾区企业健康服务有限公司",
+      orgType: "保险公司",
+      title: "客户服务负责人",
+      contactPhone: "13900000001",
+      email: "qa.south@example.com",
+      province: "广东省",
+      city: "深圳市",
+      active: true
+    }
+  ];
   const SERVICE_LINK = "https://baoweidong.github.io/pkuih-enterprise-health/";
   const AVATARS = {
     neutral: "assets/avatars/doctor-neutral.svg",
@@ -263,8 +340,10 @@
       orgType: "保险公司",
       title: "",
       contactPhone: "",
+      email: "",
       province: "北京市",
-      city: "北京市"
+      city: "北京市",
+      error: ""
     },
     pendingAuth: null,
     codeTimer: null,
@@ -307,6 +386,7 @@
     },
     slotDay: "",
     adminAccountDraft: null,
+    institutionAccountDraft: null,
     adminDoctorDraft: null,
     adminTemplateDraft: null,
     // history & scroll
@@ -550,6 +630,103 @@
     else users.push(next);
     saveUsers(users);
     return next;
+  }
+
+  function normalizeInstitutionAccount(account = {}) {
+    const phone = String(account.phone || "").replace(/\s+/g, "");
+    const region = normalizeRegion(
+      account.province || "北京市",
+      account.city || account.province || "北京市"
+    );
+    return {
+      phone,
+      name: String(account.name || "").trim(),
+      orgName: String(account.orgName || "").trim(),
+      orgType: String(account.orgType || "保险公司").trim(),
+      title: String(account.title || "").trim(),
+      contactPhone: String(account.contactPhone || phone).replace(/\s+/g, ""),
+      email: String(account.email || "").trim(),
+      province: region.province,
+      city: region.city,
+      active: account.active !== false,
+      source: account.source || "manual",
+      createdAt: account.createdAt || new Date().toISOString(),
+      updatedAt: account.updatedAt || new Date().toISOString()
+    };
+  }
+
+  function getInstitutionAccounts() {
+    let accounts = readJSON(STORAGE.institutionAccounts, null);
+    if (!Array.isArray(accounts)) {
+      const legacyUsers = getUsers().map((user) =>
+        normalizeInstitutionAccount({
+          ...user,
+          source: "legacy"
+        })
+      );
+      const merged = [...DEFAULT_INSTITUTION_ACCOUNTS, ...legacyUsers].reduce(
+        (list, account) => {
+          const normalized = normalizeInstitutionAccount(account);
+          if (
+            normalized.phone &&
+            !list.some((item) => item.phone === normalized.phone)
+          ) {
+            list.push(normalized);
+          }
+          return list;
+        },
+        []
+      );
+      accounts = merged;
+      writeJSON(STORAGE.institutionAccounts, accounts);
+    }
+    return accounts.map(normalizeInstitutionAccount);
+  }
+
+  function saveInstitutionAccounts(accounts) {
+    writeJSON(
+      STORAGE.institutionAccounts,
+      (accounts || []).map(normalizeInstitutionAccount)
+    );
+  }
+
+  function institutionAccountByPhone(phone) {
+    return (
+      getInstitutionAccounts().find(
+        (account) => account.phone === String(phone || "").replace(/\s+/g, "")
+      ) || null
+    );
+  }
+
+  function upsertInstitutionAccount(account) {
+    const normalized = normalizeInstitutionAccount(account);
+    const accounts = getInstitutionAccounts();
+    const index = accounts.findIndex((item) => item.phone === normalized.phone);
+    const next = {
+      ...normalized,
+      createdAt: index >= 0 ? accounts[index].createdAt : normalized.createdAt,
+      updatedAt: new Date().toISOString()
+    };
+    if (index >= 0) accounts[index] = next;
+    else accounts.push(next);
+    saveInstitutionAccounts(accounts);
+    return next;
+  }
+
+  function syncInstitutionProfile(user) {
+    const account = institutionAccountByPhone(user?.phone);
+    if (!account) return null;
+    return upsertInstitutionAccount({
+      ...account,
+      name: user.name || account.name,
+      orgName: user.orgName || account.orgName,
+      orgType: user.orgType || account.orgType,
+      title: user.title || account.title,
+      contactPhone: user.contactPhone || account.contactPhone,
+      email: user.email || account.email,
+      province: user.province || account.province,
+      city: user.city || account.city
+    });
   }
 
   function setSession(user) {
@@ -1757,6 +1934,18 @@
     return getDemands().find((item) => item.id === id) || null;
   }
 
+  function demandTargetName(demand) {
+    if (!demand) return "";
+    if (demand.targetType === "group") return "集团企康版";
+    return hospitalById(demand.hospitalId)?.name || "医院待分配";
+  }
+
+  function adminCanManageDemand(demand) {
+    if (!demand || !state.adminUser) return false;
+    if (demand.targetType === "group" || !demand.hospitalId) return isSuperadmin();
+    return adminCanManageHospital(demand.hospitalId);
+  }
+
   function updateDemand(id, patch) {
     let updated = null;
     const items = getDemands().map((item) => {
@@ -1776,6 +1965,9 @@
       : operatorHospital();
     return getDemands()
       .filter((item) => {
+        if (item.targetType === "group" || !item.hospitalId) {
+          return isSuperadmin();
+        }
         if (!hospital) return true;
         return item.hospitalId === hospital.id;
       })
@@ -1804,6 +1996,34 @@
     const logs = getSmsLogs();
     logs[id] = payload;
     writeJSON(STORAGE.smsLogs, logs);
+  }
+
+  function getOperationLogs() {
+    const logs = readJSON(STORAGE.operationLogs, []);
+    return Array.isArray(logs) ? logs : [];
+  }
+
+  function logOperation(action, detail, meta = {}) {
+    const actor = state.adminUser
+      ? {
+          username: state.adminUser.username,
+          name: state.adminUser.name,
+          role: state.adminUser.role,
+          hospitalId: state.adminUser.hospitalId || ""
+        }
+      : null;
+    const logs = getOperationLogs();
+    logs.unshift({
+      id: `LOG-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`,
+      action,
+      detail: String(detail || ""),
+      actor,
+      entityType: meta.entityType || "",
+      entityId: meta.entityId || "",
+      hospitalId: meta.hospitalId || actor?.hospitalId || "",
+      at: new Date().toISOString()
+    });
+    writeJSON(STORAGE.operationLogs, logs.slice(0, 300));
   }
 
   /* =========================================================
@@ -2161,10 +2381,33 @@
     });
   }
 
-  function pushAppHistory(layer = "overlay", overlayDepth = null) {
+  function replaceCurrentHistoryEntry(extra = {}) {
+    try {
+      window.history.replaceState(
+        {
+          ...(window.history.state || {}),
+          ...extra
+        },
+        "",
+        window.location.href
+      );
+    } catch {
+      // History updates are best effort; navigation remains usable.
+    }
+  }
+
+  function pushAppHistory(layer = "overlay", overlayDepth = null, extra = {}) {
     if (state.screen === "auth" && layer !== "auth") return false;
     try {
-      const nextState = { ...(window.history.state || {}), pkuihLayer: layer };
+      const nextState = {
+        ...(window.history.state || {}),
+        pkuihLayer: layer,
+        pkuihTab: extra.tab || state.tab,
+        pkuihScroll:
+          extra.scroll !== undefined
+            ? Math.max(0, Number(extra.scroll) || 0)
+            : Math.max(0, currentWindowScroll())
+      };
       if (overlayDepth == null) delete nextState.pkuihOverlayDepth;
       else nextState.pkuihOverlayDepth = overlayDepth;
       window.history.pushState(
@@ -2304,6 +2547,7 @@
     state.adminDemandId = "";
     state.adminDemandDraft = null;
     state.adminAccountDraft = null;
+    state.institutionAccountDraft = null;
     state.adminDoctorDraft = null;
     state.adminTemplateDraft = null;
     state.adminThemeDraft = null;
@@ -2418,6 +2662,7 @@
     if (type === "admin-review") return paint(renderAdminReviewSheet());
     if (type === "admin-demand") return paint(renderAdminDemandSheet());
     if (type === "admin-account") return paint(renderAdminAccountSheet());
+    if (type === "admin-institution") return paint(renderInstitutionAccountSheet());
     if (type === "admin-doctor") return paint(renderAdminDoctorSheet());
     if (type === "admin-theme") return paint(renderAdminThemeSheet());
     if (type === "admin-template") return paint(renderAdminTemplateSheet());
@@ -2449,6 +2694,10 @@
   function renderAuthScreen() {
     const { step } = state.login;
     const existing = /^1\d{10}$/.test(state.login.phone) ? getUser(state.login.phone) : null;
+    const configured =
+      /^1\d{10}$/.test(state.login.phone)
+        ? institutionAccountByPhone(state.login.phone)
+        : null;
     return `
       <div class="auth-screen">
         <div class="auth-top">
@@ -2481,6 +2730,13 @@
                       autocomplete="tel">
                   </div>
                 </div>
+                ${
+                  state.login.error
+                    ? `<p class="auth-inline-error">${icon("alert", 13)} ${esc(
+                        state.login.error
+                      )}</p>`
+                    : ""
+                }
                 <div class="field">
                   <label for="login-code">验证码 <em>*</em></label>
                   <div class="input-shell">
@@ -2503,12 +2759,24 @@
                 </button>
                 <button class="demo-login" type="button" data-action="demo-login">
                   <span>
-                    <small>机构演示账号 · 任意手机号均可登录</small>
+                    <small>机构演示账号 · 仅限已开通手机号</small>
                     <strong>13800000001 · 验证码 888888</strong>
                   </span>
                   <i>一键进入 ${icon("arrowRight", 13)}</i>
                 </button>
-                <p class="auth-tip">${icon("lock", 12)} 机构账号无需预分配：任意手机号 + 验证码 888888 即可登录</p>
+                ${
+                  configured
+                    ? `<div class="auth-account-preview">${icon(
+                        "building",
+                        14
+                      )}<span><strong>${esc(
+                        configured.orgName || "已开通机构"
+                      )}</strong><small>${esc(configured.name || "")} · ${esc(
+                        configured.city || configured.province || ""
+                      )}</small></span></div>`
+                    : ""
+                }
+                <p class="auth-tip">${icon("shield", 12)} 机构手机号由集团超级管理员开通，未配置的手机号无法登录。演示验证码固定为 888888。</p>
               `
               : `
                 <div class="auth-profile-head">
@@ -2562,6 +2830,13 @@
                     )}" data-login-field="contactPhone">
                 </div>
                 <div class="field">
+                  <label for="login-email">通知邮箱 <span>用于接收方案更新提醒</span></label>
+                  <input id="login-email" type="email" inputmode="email"
+                    placeholder="name@company.com" value="${esc(
+                      state.login.email || ""
+                    )}" data-login-field="email">
+                </div>
+                <div class="field">
                   <label>所在省市 <span>用于优先展示就近医院</span></label>
                   <div class="field-row">
                     <select data-login-province>${renderProvinceOptions(state.login.province)}</select>
@@ -2572,7 +2847,7 @@
                   </div>
                 </div>
                 <button class="btn btn--primary btn--block auth-submit" type="button" data-action="login-submit">
-                  ${existing ? "进入平台" : "完成注册并进入"} ${icon("arrowRight", 15)}
+                  ${existing ? "进入平台" : "完善资料并进入"} ${icon("arrowRight", 15)}
                 </button>
                 <button class="auth-back" type="button" data-action="login-back">返回修改手机号</button>
               `
@@ -2627,8 +2902,10 @@
     state.login.orgType = "保险公司";
     state.login.title = "";
     state.login.contactPhone = "";
+    state.login.email = "";
     state.login.code = "";
     state.login.agree = false;
+    state.login.error = "";
     state.adminAuthed = false;
     state.reuseHistoryForOverlay = false;
     if (!state.authHistory) {
@@ -2639,6 +2916,12 @@
   }
 
   function loginDemoUser() {
+    const account = institutionAccountByPhone(DEMO_PHONE);
+    if (!account || !account.active) {
+      state.login.error = "演示机构账号尚未开通，请联系院方超级管理员。";
+      renderApp();
+      return showToast(state.login.error);
+    }
     const hospital = nearestHospital();
     const region = normalizeRegion(hospital?.province || "北京市", hospital?.city || "北京市");
     const existing = getUser(DEMO_PHONE);
@@ -2650,6 +2933,7 @@
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
+    syncInstitutionProfile(user);
     finishLogin(user);
   }
 
@@ -2672,34 +2956,71 @@
 
   function loginNext() {
     const { phone, code, agree } = state.login;
+    state.login.error = "";
     if (!/^1\d{10}$/.test(phone)) {
-      showToast("请输入正确的 11 位手机号。");
+      state.login.error = "请输入正确的 11 位手机号。";
+      renderApp();
+      showToast(state.login.error);
       return;
     }
     if (code !== DEMO_CODE) {
-      showToast("验证码不正确，演示环境请输入 888888。");
+      state.login.error = "验证码不正确，演示环境请输入 888888。";
+      renderApp();
+      showToast(state.login.error);
       return;
     }
     if (!agree) {
-      showToast("请先阅读并同意预约须知。");
+      state.login.error = "请先阅读并同意预约须知。";
+      renderApp();
+      showToast(state.login.error);
+      return;
+    }
+    const account = institutionAccountByPhone(phone);
+    if (!account) {
+      state.login.error =
+        "该手机号尚未开通机构预约权限，请联系院方超级管理员配置后再登录。";
+      renderApp();
+      showToast(state.login.error);
+      return;
+    }
+    if (!account.active) {
+      state.login.error = "该机构账号已停用，请联系院方超级管理员。";
+      renderApp();
+      showToast(state.login.error);
       return;
     }
     const existing = getUser(phone);
     if (existing) {
-      finishLogin(existing);
+      const normalized = upsertUser({
+        ...existing,
+        name: account.name || existing.name,
+        orgName: account.orgName || existing.orgName,
+        orgType: account.orgType || existing.orgType,
+        title: account.title || existing.title,
+        contactPhone: account.contactPhone || existing.contactPhone || phone,
+        email: account.email || existing.email || "",
+        province: account.province || existing.province,
+        city: account.city || existing.city
+      });
+      syncInstitutionProfile(normalized);
+      finishLogin(normalized);
       return;
     }
-    state.login.name = "";
-    state.login.orgName = "";
-    state.login.orgType = "保险公司";
-    state.login.title = "";
+    state.login.name = account.name || "";
+    state.login.orgName = account.orgName || "";
+    state.login.orgType = account.orgType || "保险公司";
+    state.login.title = account.title || "";
+    state.login.email = account.email || "";
+    state.login.province = account.province || state.login.province;
+    state.login.city = account.city || state.login.city;
     state.login.step = 2;
-    state.login.contactPhone = phone;
+    state.login.contactPhone = account.contactPhone || phone;
     renderApp();
     window.scrollTo(0, 0);
   }
 
   function finishLogin(user) {
+    const pending = state.pendingAuth;
     setSession(user);
     state.adminAuthed = false;
     state.expertVisited = false;
@@ -2715,6 +3036,8 @@
           {
             ...(window.history.state || {}),
             pkuihLayer: "main",
+            pkuihTab: pending?.returnTab || state.tab || "home",
+            pkuihScroll: pending?.returnScroll || 0,
             pkuihOverlayDepth: 0
           },
           "",
@@ -2724,7 +3047,6 @@
         // History replacement is best effort; navigation still remains usable.
       }
     }
-    const pending = state.pendingAuth;
     state.pendingAuth = null;
     state.screen = "main";
     state.login.step = 1;
@@ -2761,11 +3083,31 @@
   }
 
   function submitProfileLogin() {
-    const { phone, name, orgName, orgType, title, contactPhone, province, city } = state.login;
+    const {
+      phone,
+      name,
+      orgName,
+      orgType,
+      title,
+      contactPhone,
+      email,
+      province,
+      city
+    } = state.login;
+    const account = institutionAccountByPhone(phone);
+    if (!account || !account.active) {
+      state.login.step = 1;
+      state.login.error = "机构账号状态已变更，请联系院方超级管理员。";
+      renderApp();
+      return showToast(state.login.error);
+    }
     if (!name.trim()) return showToast("请填写姓名。");
     if (!orgName.trim()) return showToast("请填写单位名称。");
     if (contactPhone && !/^1\d{10}$/.test(contactPhone)) {
       return showToast("联系方式格式不正确。");
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return showToast("通知邮箱格式不正确。");
     }
     const now = new Date().toISOString();
     const region = normalizeRegion(province, city);
@@ -2776,12 +3118,14 @@
       orgType,
       title: title.trim(),
       contactPhone: contactPhone || phone,
+      email: email.trim(),
       province: region.province,
       city: region.city,
       createdAt: getUser(phone)?.createdAt || now,
       updatedAt: now
     };
     const saved = upsertUser(user);
+    syncInstitutionProfile(saved);
     finishLogin(saved);
   }
 
@@ -4981,19 +5325,22 @@
     const booking = state.booking;
     if (!booking) return "";
     return `
-      <div class="flow-section">
+      <div class="flow-section ${bookingErrorClass("service")}">
         <div class="flow-section__head"><h2>服务类型</h2><span>选择到企服务形式</span></div>
         ${renderBookingServiceSection(booking)}
+        ${bookingFieldErrorMarkup("service")}
       </div>
-      <div class="flow-section">
+      <div class="flow-section ${bookingErrorClass("doctor")}" data-booking-error="doctor">
         <div class="flow-section__head"><h2>专家 <em>*</em></h2><span>必选 · 已选专家可直接继续</span></div>
         <div id="booking-doctors">${renderBookingDoctorSection(booking)}</div>
+        ${bookingFieldErrorMarkup("doctor")}
       </div>
-      <div class="flow-section">
+      <div class="flow-section ${bookingErrorClass("date")}">
         <div class="flow-section__head"><h2>期望日期</h2><span>号源按整天配置，不区分时段</span></div>
         ${renderBookingDates(booking)}
+        ${bookingFieldErrorMarkup("date")}
       </div>
-      <div class="flow-section">
+      <div class="flow-section ${bookingErrorClass("address")}">
         <div class="flow-section__head"><h2>活动地点</h2><span>地址为必填</span></div>
         <div class="field-row">
           <div class="field"><label>省份</label>
@@ -5005,9 +5352,12 @@
         </div>
         <div class="field">
           <label>详细地址 <em>*</em></label>
-          <input type="text" data-booking-field="address" value="${esc(
+          <input class="${bookingInputErrorClass(
+            "address"
+          )}" type="text" data-booking-field="address" data-booking-error="address" value="${esc(
             booking.address
           )}" placeholder="请输入企业详细地址，如：XX路XX号XX大厦">
+          ${bookingFieldErrorMarkup("address")}
         </div>
         <div class="field">
           <label>场地名称 <span>选填</span></label>
@@ -5016,11 +5366,12 @@
           )}" placeholder="如：总部大楼 3 层报告厅">
         </div>
       </div>
-      <div class="flow-section">
+      <div class="flow-section ${bookingErrorClass("topics")}">
         <div class="flow-section__head"><h2>活动需求</h2><span id="booking-demand-hint">${esc(
           bookingDemandHint(booking.serviceType)
         )}</span></div>
         ${renderBookingTopics(booking)}
+        ${bookingFieldErrorMarkup("topics")}
         <div class="field">
           <label>活动主题 <span id="booking-topic-field-hint">${esc(
             bookingTopicFieldHint(booking.serviceType)
@@ -5036,9 +5387,12 @@
             )}" placeholder="如：企业员工 / 高客">
           </div>
           <div class="field"><label>预计人数</label>
-            <input type="number" inputmode="numeric" data-booking-field="headcount" value="${esc(
+            <input class="${bookingInputErrorClass(
+              "headcount"
+            )}" type="number" inputmode="numeric" data-booking-field="headcount" data-booking-error="headcount" value="${esc(
               booking.headcount
             )}" placeholder="如：80">
+            ${bookingFieldErrorMarkup("headcount")}
           </div>
         </div>
         <div class="field">
@@ -5048,16 +5402,24 @@
           )}</textarea>
         </div>
       </div>
-      <div class="flow-section">
+      <div class="flow-section ${bookingErrorClass("contact")}">
         <div class="flow-section__head"><h2>联系人</h2><span>默认带入登录信息</span></div>
         <div class="field-row">
           <div class="field"><label>联系人</label>
-            <input type="text" data-booking-field="contactName" value="${esc(booking.contactName)}">
+            <input class="${bookingInputErrorClass(
+              "contactName"
+            )}" type="text" data-booking-field="contactName" data-booking-error="contactName" value="${esc(
+              booking.contactName
+            )}">
+            ${bookingFieldErrorMarkup("contactName")}
           </div>
           <div class="field"><label>联系电话</label>
-            <input type="tel" inputmode="numeric" maxlength="11" data-booking-field="contactPhone" value="${esc(
+            <input class="${bookingInputErrorClass(
+              "contactPhone"
+            )}" type="tel" inputmode="numeric" maxlength="11" data-booking-field="contactPhone" data-booking-error="contactPhone" value="${esc(
               booking.contactPhone
             )}">
+            ${bookingFieldErrorMarkup("contactPhone")}
           </div>
         </div>
       </div>
@@ -5109,10 +5471,15 @@
         <strong>${icon("alert", 14)} 提交后流程</strong>
         <p>提交后进入“待接单”。医院运营接单后显示具体项目对接人，并填写活动主题、时间、地点、课题大纲与项目组成员；机构确认方案后预约正式生效。</p>
       </div>
-      <label class="check-row check-row--block">
+      <label class="check-row check-row--block ${
+        booking.validationErrors?.some((issue) => issue.key === "agree")
+          ? "is-invalid"
+          : ""
+      }" data-booking-error="agree">
         <input type="checkbox" data-booking-agree ${booking.agree ? "checked" : ""}>
         <span>我已确认以上信息，并同意由院方项目组联系确认活动细节。</span>
       </label>
+      ${bookingFieldErrorMarkup("agree")}
     `;
   }
 
@@ -5130,6 +5497,26 @@
         </header>
         <div class="flow__body">
           ${renderBookingProgress(booking.step)}
+          ${
+            booking.validationErrors?.length
+              ? `<div class="booking-validation-summary" role="alert">
+                  <div class="booking-validation-summary__head">
+                    ${icon("alert", 16)}
+                    <div><strong>还有 ${booking.validationErrors.length} 项需要补充</strong><small>已为你定位到第一个问题</small></div>
+                  </div>
+                  <ul>
+                    ${booking.validationErrors
+                      .map(
+                        (issue) =>
+                          `<li><button type="button" data-action="booking-error-focus" data-target="${esc(
+                            issue.focus
+                          )}">${esc(issue.message)}</button></li>`
+                      )
+                      .join("")}
+                  </ul>
+                </div>`
+              : ""
+          }
           ${booking.step === 1 ? renderBookingStepOne() : renderBookingSummary()}
         </div>
         <footer class="flow__footer">
@@ -5167,6 +5554,7 @@
 
   function setBookingService(value) {
     if (!state.booking) return;
+    clearBookingValidation();
     const service = concreteService(value);
     if (!service) return;
     state.booking.serviceType = service;
@@ -5207,6 +5595,7 @@
 
   function setBookingDoctor(value) {
     if (!state.booking) return;
+    clearBookingValidation();
     const booking = state.booking;
     const currentDoctorId = booking.doctorId || "";
     const nextDoctorId = value && value !== currentDoctorId ? value : "";
@@ -5248,6 +5637,7 @@
 
   function chooseBookingDoctor(doctorId) {
     const booking = state.booking;
+    clearBookingValidation();
     const expert = doctorId ? expertById(doctorId) : null;
     if (!booking || !expert) return;
     const entry = bookingDoctorEntry(expert, booking);
@@ -5347,6 +5737,7 @@
   function selectBookingTopicByTitle(title) {
     const booking = state.booking;
     if (!booking || !title) return;
+    clearBookingValidation();
     const active =
       Boolean(booking.themeMonth && booking.themeTopicId) &&
       String(booking.customTopic || "").trim() === String(title).trim() &&
@@ -5397,6 +5788,7 @@
 
   function setBookingDate(value) {
     if (!state.booking) return;
+    clearBookingValidation();
     state.booking.date = value;
     document.querySelectorAll('[data-action="booking-date"]').forEach((button) => {
       button.classList.toggle("is-active", button.dataset.value === value);
@@ -5415,6 +5807,7 @@
 
   function setBookingProvince(value) {
     if (!state.booking) return;
+    clearBookingValidation();
     state.booking.province = value;
     state.booking.city = (state.chinaCities?.[value] || [value])[0];
     const citySelect = document.querySelector("[data-booking-city]");
@@ -5422,63 +5815,175 @@
     refreshBookingForLocation();
   }
 
-  function validateBookingStepOne() {
+  function bookingIssue(key) {
+    return (
+      state.booking?.validationErrors?.find((issue) => issue.key === key) || null
+    );
+  }
+
+  function bookingErrorClass(key) {
+    return bookingIssue(key) ? "is-invalid" : "";
+  }
+
+  function bookingInputErrorClass(key) {
+    return bookingIssue(key) ? "is-invalid" : "";
+  }
+
+  function bookingFieldErrorMarkup(key) {
+    const issue = bookingIssue(key);
+    return issue
+      ? `<span class="field-error-text">${icon("alert", 11)} ${esc(
+          issue.message
+        )}</span>`
+      : "";
+  }
+
+  function clearBookingValidation() {
+    if (state.booking) state.booking.validationErrors = [];
+    document.querySelector(".booking-validation-summary")?.remove();
+    document
+      .querySelectorAll(".booking-flow .is-invalid")
+      .forEach((element) => element.classList.remove("is-invalid"));
+    document
+      .querySelectorAll(".booking-flow .field-error-text")
+      .forEach((element) => element.remove());
+  }
+
+  function bookingValidationIssues() {
     const booking = state.booking;
-    if (!booking) return "预约信息已失效。";
-    if (!booking.serviceType) return "请选择服务类型。";
-    if (!booking.doctorId) return "请选择专家；当前无合适专家可直接发起提需。";
-    const expert = expertById(booking.doctorId);
-    if (!expert) return "专家信息已失效，请重新选择。";
-    const doctorEntry = bookingDoctorEntry(expert, booking);
-    if (!doctorEntry) {
-      return bookingThemeContext(booking).active
-        ? "所选专家不符合当前时令主题或课题，请重新选择专家。"
-        : "所选专家不提供当前服务类型或不在当前医院，请重新选择。";
+    if (!booking) {
+      return [{ key: "expired", message: "预约信息已失效，请重新发起。", focus: "service" }];
     }
-    if (!doctorEntry.bookable) {
-      return doctorEntry.status === "city"
-        ? "所选专家不覆盖当前活动城市，请更换专家或重新选择履约地。"
-        : "所选专家当前暂无可约号源，请选择其他专家或发起提需。";
+    const issues = [];
+    const add = (key, message, focus = key) =>
+      issues.push({ key, message, focus });
+    if (!booking.serviceType) add("service", "请选择服务类型。");
+    if (!booking.doctorId) {
+      add(
+        "doctor",
+        "请选择专家：需选择一位当前可预约专家；没有合适专家时，请点击下方“发起提需”。"
+      );
+    } else {
+      const expert = expertById(booking.doctorId);
+      if (!expert) {
+        add("doctor", "所选专家信息已失效，请重新选择。");
+      } else {
+        const doctorEntry = bookingDoctorEntry(expert, booking);
+        if (!doctorEntry) {
+          add(
+            "doctor",
+            bookingThemeContext(booking).active
+              ? "所选专家不符合当前时令主题或课题，请重新选择专家。"
+              : "所选专家不提供当前服务类型或不在当前医院，请重新选择。"
+          );
+        } else if (!doctorEntry.bookable) {
+          add(
+            "doctor",
+            doctorEntry.status === "city"
+              ? "所选专家不覆盖当前活动城市，请更换专家或调整活动地点。"
+              : "所选专家当前暂无可约号源，请选择其他专家或发起提需。"
+          );
+        }
+        if (!booking.date) {
+          add("date", "请选择期望日期。");
+        } else if (!doctorAvailability(expert).dates.includes(booking.date)) {
+          add("date", "该日期不在专家当前可约范围内，请重新选择。");
+        } else if (dayRemaining(expert.id, booking.date) <= 0) {
+          add("date", "该日期号源已约满，请选择其他日期。");
+        }
+      }
     }
-    if (!booking.date) return "请选择期望日期。";
-    if (!doctorAvailability(expert).dates.includes(booking.date)) {
-      return "该日期不在专家当前可约范围内，请重新选择。";
+    if (!booking.province || !booking.city) {
+      add("address", "请选择活动省市。");
     }
-    if (dayRemaining(expert.id, booking.date) <= 0) {
-      return "该日期号源已约满，请选择其他日期。";
+    if (!booking.address.trim()) {
+      add("address", "请填写活动详细地址。");
     }
-    if (!booking.province || !booking.city) return "请选择活动省市。";
-    if (!booking.address.trim()) return "请填写活动详细地址。";
-    if (!booking.contactName.trim()) return "请填写联系人。";
+    if (!booking.contactName.trim()) {
+      add("contactName", "请填写联系人姓名。");
+    }
     if (!/^1\d{10}$/.test(booking.contactPhone || "")) {
-      return "联系电话格式不正确。";
+      add("contactPhone", "请填写正确的 11 位联系电话。");
     }
     if (
       String(booking.headcount || "").trim() &&
       (!Number.isInteger(Number(booking.headcount)) || Number(booking.headcount) <= 0)
     ) {
-      return "预计人数需填写大于 0 的整数。";
+      add("headcount", "预计人数需填写大于 0 的整数。");
     }
     const selectedTopic = bookingSelectedTopicCoverage(booking);
     if (selectedTopic && !selectedTopic.available) {
-      return `所选时令主题「${selectedTopic.topic.title}」履约地不含${regionText(
-        booking.province,
-        booking.city
-      )}，请更换课题或活动城市。`;
+      add(
+        "topics",
+        `所选时令主题「${selectedTopic.topic.title}」履约地不含${regionText(
+          booking.province,
+          booking.city
+        )}，请更换课题或活动城市。`
+      );
     }
     if (
       selectedTopic?.topic?.expertId &&
-      String(selectedTopic.topic.expertId) !== String(expert.id)
+      booking.doctorId &&
+      String(selectedTopic.topic.expertId) !== String(booking.doctorId)
     ) {
-      return "所选时令主题不属于当前专家，请重新选择主题。";
+      add("topics", "所选时令主题不属于当前专家，请重新选择主题或专家。");
     }
-    return "";
+    return issues;
+  }
+
+  function bookingErrorFocusSelector(focus) {
+    const map = {
+      service: '[data-action="booking-service"]',
+      doctor: '[data-booking-error="doctor"]',
+      date: "#booking-dates",
+      address: '[data-booking-field="address"]',
+      contactName: '[data-booking-field="contactName"]',
+      contactPhone: '[data-booking-field="contactPhone"]',
+      headcount: '[data-booking-field="headcount"]',
+      topics: "#booking-topics",
+      agree: '[data-booking-agree]'
+    };
+    return map[focus] || ".booking-validation-summary";
+  }
+
+  function scrollToBookingIssue(focus, { focusField = false } = {}) {
+    window.requestAnimationFrame(() => {
+      const target = overlayRoot.querySelector(bookingErrorFocusSelector(focus));
+      target?.scrollIntoView({ block: "center", behavior: "smooth" });
+      if (
+        focusField &&
+        target &&
+        /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) &&
+        !target.disabled
+      ) {
+        target.focus({ preventScroll: true });
+      }
+    });
+  }
+
+  function presentBookingIssues(issues, { step = 1 } = {}) {
+    if (!state.booking) return;
+    state.booking.step = step;
+    state.booking.validationErrors = issues;
+    renderOverlay();
+    const first = issues[0];
+    scrollToBookingIssue(first?.focus || "service");
+    showToast(
+      issues.length > 1
+        ? `请先完善 ${issues.length} 项信息：${first?.message || "请检查标红字段"}`
+        : first?.message || "请完善预约信息。"
+    );
+  }
+
+  function validateBookingStepOne() {
+    return bookingValidationIssues()[0]?.message || "";
   }
 
   function bookingNext() {
-    const error = validateBookingStepOne();
-    if (error) return showToast(error);
+    const issues = bookingValidationIssues();
+    if (issues.length) return presentBookingIssues(issues, { step: 1 });
     state.booking.step = 2;
+    state.booking.validationErrors = [];
     renderOverlay();
     overlayRoot.querySelector(".flow__body")?.scrollTo(0, 0);
   }
@@ -5491,13 +5996,24 @@
       startLogin({ type: "booking" });
       return;
     }
-    const error = validateBookingStepOne();
-    if (error) {
-      state.booking.step = 1;
-      renderOverlay();
-      return showToast(error);
+    const issues = bookingValidationIssues();
+    if (issues.length) {
+      presentBookingIssues(issues, { step: 1 });
+      return;
     }
-    if (!booking.agree) return showToast("请勾选确认信息后再提交。");
+    if (!booking.agree) {
+      presentBookingIssues(
+        [
+          {
+            key: "agree",
+            message: "请勾选“已确认以上信息”后再提交。",
+            focus: "agree"
+          }
+        ],
+        { step: 2 }
+      );
+      return;
+    }
     const expert = bookingSelectedDoctor(booking);
     const hospital = bookingHospital(booking);
     const now = new Date().toISOString();
@@ -5551,6 +6067,103 @@
      ========================================================= */
   function appointmentStatus(appointment) {
     return STATUS[appointment?.status] || STATUS.pending;
+  }
+
+  function appointmentServiceDate(appointment) {
+    return appointment?.plan?.date || appointment?.date || "";
+  }
+
+  function appointmentDaysUntil(appointment) {
+    const date = parseDate(appointmentServiceDate(appointment));
+    if (!date) return null;
+    return Math.ceil(
+      (date.getTime() - startOfDay().getTime()) / (24 * 60 * 60 * 1000)
+    );
+  }
+
+  function appointmentChangePolicy(appointment) {
+    if (!appointment) {
+      return {
+        canModify: false,
+        canCancel: false,
+        canEditLocation: false,
+        days: null,
+        remainingDays: null,
+        cycleDays: 0,
+        cancelLeadDays: 7,
+        usedChanges: 0,
+        modifyReason: "预约记录不存在。",
+        cancelReason: "预约记录不存在。",
+        reason: "预约记录不存在。"
+      };
+    }
+    const expert = appointment.doctorId ? expertById(appointment.doctorId) : null;
+    const cycleDays = Math.max(
+      7,
+      Number(expert?.leadDays) || TIERS[appointment.tier]?.leadDays || 7
+    );
+    const days = appointmentDaysUntil(appointment);
+    const usedChanges = Number(appointment.clientChangeCount) || 0;
+    const accepted = Boolean(appointment.assignedStaff || appointment.acceptedAt);
+    const terminal = ["completed", "cancelled"].includes(appointment.status);
+    const past = days !== null && days < 0;
+    const changeLimit = cycleDays >= 30 ? 0 : 1;
+    const cancelLeadDays = appointment.tier === "elite" ? 30 : 7;
+    let baseReason = "";
+    if (terminal) {
+      baseReason =
+        appointment.status === "cancelled"
+          ? "预约已取消，不能再修改。"
+          : "活动已完成归档，不能再修改或取消。";
+    } else if (past) {
+      baseReason = "活动日期已过，不能再修改或取消。";
+    }
+    let modifyReason = baseReason;
+    let cancelReason = baseReason;
+    if (!baseReason && days !== null && days < 7) {
+      modifyReason = `距活动不足 7 天（剩余 ${Math.max(0, days)} 天），已锁定修改。`;
+    }
+    if (!baseReason && days !== null && days < cancelLeadDays) {
+      cancelReason =
+        appointment.tier === "elite"
+          ? `大咖医生预约需提前至少 30 天取消，当前剩余 ${Math.max(
+              0,
+              days
+            )} 天，已锁定取消。`
+          : `主任专家和专业医生预约需提前至少 7 天取消，当前剩余 ${Math.max(
+              0,
+              days
+            )} 天，已锁定取消。`;
+    }
+    if (!modifyReason && cycleDays >= 30 && accepted) {
+      modifyReason =
+        "该预约属于 30 天预约周期，院方接单后机构侧不可修改；如需调整请联系项目对接人。";
+    }
+    if (!modifyReason && changeLimit && usedChanges >= changeLimit) {
+      modifyReason =
+        "该预约属于 14 天预约周期，机构侧已使用 1 次修改机会，不能再次修改。";
+    }
+    const modifiableStatuses = ["review", "revision", "confirmed"];
+    const canModify =
+      !modifyReason && modifiableStatuses.includes(appointment.status);
+    const canCancel = !cancelReason && !terminal;
+    return {
+      canModify,
+      canCancel,
+      canEditLocation:
+        canModify &&
+        !["completed", "cancelled"].includes(appointment.status),
+      days,
+      remainingDays: days,
+      cycleDays,
+      cancelLeadDays,
+      usedChanges,
+      changeLimit,
+      accepted,
+      modifyReason,
+      cancelReason,
+      reason: canModify ? cancelReason : modifyReason
+    };
   }
 
   function statusPill(status) {
@@ -5760,7 +6373,7 @@
   }
 
   function renderDemandCard(demand) {
-    const hospital = hospitalById(demand.hospitalId);
+    const targetName = demandTargetName(demand);
     const meta = DEMAND_STATUS[demand.status] || DEMAND_STATUS.pending;
     return `
       <article class="record-card" role="button" tabindex="0" data-action="open-demand-detail"
@@ -5772,7 +6385,7 @@
         <h3>${esc(demand.topic || "专家资源提需")}</h3>
         <div class="record-card__meta">
           <span>${icon("briefcase", 12)} ${esc(serviceLabel(demand.serviceType))}</span>
-          <span>${icon("building", 12)} ${esc(hospital?.short || hospital?.name || "")}</span>
+          <span>${icon("building", 12)} ${esc(targetName)}</span>
           <span>${icon("users", 12)} ${esc(demand.audience || "待沟通")}</span>
         </div>
         <div class="record-card__assignee">
@@ -5999,6 +6612,16 @@
             ? `<div class="plan-message">${esc(plan.message)}</div>`
             : ""
         }
+        ${
+          plan.pdf?.dataUrl
+            ? `<a class="plan-pdf-link" href="${esc(
+                plan.pdf.dataUrl
+              )}" target="_blank" rel="noopener">${icon(
+                "clipboard",
+                14
+              )} 查看方案附件 · ${esc(plan.pdf.name || "PDF")}</a>`
+            : ""
+        }
       </section>
     `;
   }
@@ -6011,6 +6634,7 @@
     const assignee = appointmentAssignee(appointment);
     const status = appointmentStatus(appointment);
     const action = state.overlay?.action || "";
+    const policy = appointmentChangePolicy(appointment);
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet record-sheet" role="dialog" aria-modal="true" aria-label="预约详情">
@@ -6051,15 +6675,17 @@
                 appointmentLocationText(appointment)
               )}</strong></div>
               ${
-                ["pending", "planning", "review", "revision", "confirmed"].includes(
-                  appointment.status
-                )
+                policy.canEditLocation
                   ? `<button class="location-edit-link" type="button"
                       data-action="appointment-location-edit" data-appointment-id="${esc(
                         appointment.id
                       )}">
                       ${icon("edit", 12)} 修改活动地点
                     </button>`
+                  : !["completed", "cancelled"].includes(appointment.status)
+                  ? `<p class="policy-lock-note">${icon("lock", 12)} ${esc(
+                      policy.modifyReason || "当前阶段暂不可修改活动地点"
+                    )}</p>`
                   : ""
               }
               <div class="info-row"><span>参与人群</span><strong>${esc(
@@ -6103,32 +6729,106 @@
                         <button class="btn btn--primary btn--sm" type="button" data-action="appointment-revise-submit">提交修改意见</button>
                       </div>
                     </div>`
-                  : `<div class="review-actions">
+                  : policy.canModify
+                  ? `<div class="review-actions">
                       <button class="btn btn--primary" type="button" data-action="appointment-action" data-value="confirm">确认最终预约</button>
                       <button class="btn btn--ghost" type="button" data-action="appointment-action" data-value="revise">提出修改</button>
                     </div>`
+                  : `<div class="policy-lock-card">${icon("lock", 16)}<div><strong>修改窗口已锁定</strong><p>${esc(
+                      policy.modifyReason
+                    )}</p><span>仍可确认最终方案；如需协调，请联系项目对接人。</span></div></div>`
                 : ""
             }
             ${
               appointment.status === "confirmed"
-                ? `<div class="confirmed-banner">${icon("checkCircle", 18)}<div><strong>预约已确认</strong><p>院方将按最终方案执行。如需调整，请联系项目对接人 ${
-                    assignee ? phoneLink(assignee.phone, assignee.phone) : ""
-                  }。</p></div></div>`
+                ? `<div class="confirmed-banner">${icon("checkCircle", 18)}<div><strong>预约已确认</strong><p>院方将按最终方案执行。${
+                    assignee
+                      ? `如需协调，请联系项目对接人 ${phoneLink(
+                          assignee.phone,
+                          assignee.phone
+                        )}。`
+                      : ""
+                  }</p></div></div>
+                  ${
+                    policy.canModify || policy.canCancel
+                      ? `<div class="appointment-change-policy">
+                          <span>${icon("shield", 13)} 剩余 ${
+                            policy.remainingDays == null
+                              ? "--"
+                              : policy.remainingDays
+                          } 天 · 取消需提前 ${policy.cancelLeadDays} 天 · ${
+                            policy.cycleDays >= 30
+                              ? "30 天预约周期"
+                              : "14 天预约周期"
+                          } · 已修改 ${policy.usedChanges}/${
+                            policy.cycleDays >= 30 ? "0" : "1"
+                          } 次</span>
+                          <div>
+                            ${
+                              policy.canModify
+                                ? `<button class="btn btn--ghost btn--sm" type="button" data-action="appointment-action" data-value="change">申请修改</button>`
+                                : ""
+                            }
+                            ${
+                              policy.canCancel
+                                ? `<button class="btn btn--danger-soft btn--sm" type="button" data-action="appointment-action" data-value="cancel">取消预约</button>`
+                                : ""
+                            }
+                          </div>
+                        </div>`
+                      : `<div class="policy-lock-card">${icon("lock", 16)}<div><strong>修改与取消已锁定</strong>${
+                          policy.modifyReason
+                            ? `<p>修改：${esc(policy.modifyReason)}</p>`
+                            : ""
+                        }${
+                          policy.cancelReason &&
+                          policy.cancelReason !== policy.modifyReason
+                            ? `<p>取消：${esc(policy.cancelReason)}</p>`
+                            : ""
+                        }${
+                          !policy.modifyReason && !policy.cancelReason
+                            ? "<p>当前阶段不可修改或取消。</p>"
+                            : ""
+                        }</div></div>`
+                  }`
                 : ""
             }
             ${
-              ["pending", "planning", "review", "revision"].includes(appointment.status)
-                ? action === "cancel"
-                  ? `<div class="confirm-card">
-                      <h3>取消本次预约？</h3>
-                      <p>取消后号源会释放，如需重新预约请再次提交。</p>
-                      <div class="confirm-card__actions">
-                        <button class="btn btn--ghost btn--sm" type="button" data-action="appointment-action" data-value="">保留预约</button>
-                        <button class="btn btn--danger btn--sm" type="button" data-action="appointment-cancel-submit">确认取消</button>
-                      </div>
-                    </div>`
-                  : `<button class="text-link text-link--danger record-cancel" type="button"
-                      data-action="appointment-action" data-value="cancel">取消本次预约</button>`
+              action === "change"
+                ? `<div class="confirm-card">
+                    <h3>申请修改已确认方案</h3>
+                    <p>提交后院方会更新方案并再次发送确认。${
+                      policy.cycleDays < 30
+                        ? "本次会占用 14 天周期内 1 次修改机会。"
+                        : ""
+                    }</p>
+                    <textarea data-change-note placeholder="请说明需要修改的主题、时间、地点、流程或其他内容"></textarea>
+                    <div class="confirm-card__actions">
+                      <button class="btn btn--ghost btn--sm" type="button" data-action="appointment-action" data-value="">取消</button>
+                      <button class="btn btn--primary btn--sm" type="button" data-action="appointment-change-submit">提交修改申请</button>
+                    </div>
+                  </div>`
+                : ""
+            }
+            ${
+              action === "cancel"
+                ? `<div class="confirm-card">
+                    <h3>取消本次预约？</h3>
+                    <p>取消后号源会释放，如需重新预约请再次提交。${
+                      appointment.status === "confirmed"
+                        ? "已确认预约取消后将同步通知院方。"
+                        : ""
+                    }</p>
+                    <div class="confirm-card__actions">
+                      <button class="btn btn--ghost btn--sm" type="button" data-action="appointment-action" data-value="">保留预约</button>
+                      <button class="btn btn--danger btn--sm" type="button" data-action="appointment-cancel-submit">确认取消</button>
+                    </div>
+                  </div>`
+                : ["pending", "planning", "review", "revision"].includes(
+                    appointment.status
+                  ) && policy.canCancel
+                ? `<button class="text-link text-link--danger record-cancel" type="button"
+                    data-action="appointment-action" data-value="cancel">取消本次预约</button>`
                 : ""
             }
           </div>
@@ -6154,8 +6854,9 @@
     if (!clientOwnsAppointment(appointment)) {
       return showToast(state.session ? "无权修改该预约。" : "请先登录。");
     }
-    if (["completed", "cancelled"].includes(appointment.status)) {
-      return showToast("该预约已结束，活动地点仅供查看。");
+    const policy = appointmentChangePolicy(appointment);
+    if (!policy.canEditLocation) {
+      return showToast(policy.modifyReason || "当前阶段不可修改活动地点。");
     }
     state.appointmentLocationDraft = {
       appointmentId: appointment.id,
@@ -6231,8 +6932,9 @@
     if (!clientOwnsAppointment(appointment)) {
       return showToast(state.session ? "无权修改该预约。" : "请先登录。");
     }
-    if (["completed", "cancelled"].includes(appointment.status)) {
-      return showToast("该预约已结束，活动地点仅供查看。");
+    const policy = appointmentChangePolicy(appointment);
+    if (!policy.canEditLocation) {
+      return showToast(policy.modifyReason || "当前阶段不可修改活动地点。");
     }
     if (!draft.address.trim()) return showToast("请填写活动详细地址。");
     const expert = appointment.doctorId ? expertById(appointment.doctorId) : null;
@@ -6253,10 +6955,21 @@
       venue: draft.venue.trim()
     };
     if (appointment.status === "confirmed") {
-      patch.status = "review";
+      patch.status = "revision";
       patch.confirmedAt = "";
-      patch.feedback = "";
-      patch.feedbackAt = "";
+      patch.feedback = `机构申请修改活动地点：${formatAddress(
+        draft.province,
+        draft.city,
+        draft.address,
+        draft.venue
+      )}`;
+      patch.feedbackAt = new Date().toISOString();
+      patch.changeRequest = {
+        type: "location",
+        note: patch.feedback,
+        at: patch.feedbackAt
+      };
+      patch.clientChangeCount = (Number(appointment.clientChangeCount) || 0) + 1;
     }
     if (appointment.plan) {
       patch.plan = {
@@ -6278,8 +6991,8 @@
       refreshRecordPanel();
     }
     showToast(
-      patch.status === "review"
-        ? "活动地点已更新，院方需重新发送方案后再次确认。"
+      patch.status === "revision"
+        ? "活动地点已更新，院方会重新发送方案后再次确认。"
         : appointment.plan
         ? "活动地点已更新，院方方案与短信内容已同步。"
         : "活动地点已更新，院方接单后会自动带入。"
@@ -6296,7 +7009,8 @@
     state.overlay = {
       type: "demand-create",
       draft: {
-        hospitalId: hospital?.id || "pkuih",
+        targetType: "group",
+        hospitalId: "",
         serviceType: "讲座",
         topic: "",
         audience: "",
@@ -6323,7 +7037,8 @@
     openOverlayLayer({
       type: "demand-create",
       draft: {
-        hospitalId: hospital?.id || "pkuih",
+        targetType: "group",
+        hospitalId: "",
         serviceType: booking.serviceType || "讲座",
         topic: booking.customTopic || "",
         audience: booking.audience || "",
@@ -6366,18 +7081,25 @@
         </div>
         <div class="sheet__body">
           <div class="sheet-pad">
-            <div class="field">
-              <label>目标医院</label>
-              <select data-demand-field="hospitalId">
+            <div class="field demand-target-field">
+              <label>目标机构</label>
+              <select data-demand-target>
+                <option value="group" ${
+                  draft.targetType === "group" ? "selected" : ""
+                }>集团企康版 · 由集团统筹匹配</option>
                 ${state.hospitals
                   .map(
                     (hospital) =>
                       `<option value="${esc(hospital.id)}" ${
-                        draft.hospitalId === hospital.id ? "selected" : ""
+                        draft.targetType === "hospital" &&
+                        draft.hospitalId === hospital.id
+                          ? "selected"
+                          : ""
                       }>${esc(hospital.name)}</option>`
                   )
                   .join("")}
               </select>
+              <span class="field-help">默认提交至集团企康版，也可指定具体履约医院。</span>
             </div>
             <div class="field">
               <label>服务类型</label>
@@ -6469,6 +7191,9 @@
       return showToast("联系电话格式不正确。");
     }
     if (!draft.province || !draft.city) return showToast("请选择活动省市。");
+    if (draft.targetType === "hospital" && !draft.hospitalId) {
+      return showToast("请选择具体目标医院。");
+    }
     if (draft.preferredDate && draft.preferredDate < todayIso()) {
       return showToast("期望日期不能早于今天。");
     }
@@ -6489,7 +7214,9 @@
       phone: draft.contactPhone || state.session.phone,
       province: draft.province,
       city: draft.city,
-      hospitalId: draft.hospitalId,
+      targetType: draft.targetType === "hospital" ? "hospital" : "group",
+      hospitalId:
+        draft.targetType === "hospital" ? draft.hospitalId || "" : "",
       serviceType: draft.serviceType,
       topic: draft.topic.trim(),
       audience: draft.audience.trim(),
@@ -6516,7 +7243,7 @@
   function renderDemandSheet() {
     const demand = demandById(state.overlay?.demandId);
     if (!demand) return "";
-    const hospital = hospitalById(demand.hospitalId);
+    const targetName = demandTargetName(demand);
     const meta = DEMAND_STATUS[demand.status] || DEMAND_STATUS.pending;
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
@@ -6533,7 +7260,7 @@
             <div class="record-head">
               <div>
                 <span class="record-head__tag">${esc(serviceLabel(demand.serviceType))} · ${esc(
-                  hospital?.name || ""
+                  targetName
                 )}</span>
                 <h1>${esc(demand.topic)}</h1>
                 <p>${esc(demand.audience || "参与人群待沟通")} · ${esc(
@@ -6543,7 +7270,9 @@
               <span class="status-pill ${meta.cls}">${esc(meta.label)}</span>
             </div>
             <section class="info-card">
-              <div class="info-row"><span>目标医院</span><strong>${esc(hospital?.name || "")}</strong></div>
+              <div class="info-row"><span>目标机构</span><strong>${esc(
+                targetName
+              )}</strong></div>
               <div class="info-row"><span>期望日期</span><strong>${esc(
                 demand.preferredDate ? formatDateCN(demand.preferredDate, true) : "待沟通"
               )}</strong></div>
@@ -6733,7 +7462,23 @@
                 draft.contactPhone || draft.phone
               )}">
             </div>
-            <p class="field-help">所在城市请在首页定位区域手动选择，用于推荐附近医院与可履约专家。</p>
+            <div class="field"><label>通知邮箱 <span>用于接收方案与确认提醒</span></label>
+              <input type="email" inputmode="email" data-profile-field="email" value="${esc(
+                draft.email || ""
+              )}" placeholder="name@company.com">
+            </div>
+            <div class="field">
+              <label>所在省市 <span>用于推荐就近医院</span></label>
+              <div class="field-row">
+                <select data-profile-province>${renderProvinceOptions(
+                  draft.province || "北京市"
+                )}</select>
+                <select data-profile-city>${renderCityOptions(
+                  draft.province || "北京市",
+                  draft.city || "北京市"
+                )}</select>
+              </div>
+            </div>
           </div>
         </div>
         <div class="sheet__footer">
@@ -6759,6 +7504,9 @@
     if (draft.contactPhone && !/^1\d{10}$/.test(draft.contactPhone)) {
       return showToast("联系方式格式不正确。");
     }
+    if (draft.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
+      return showToast("通知邮箱格式不正确。");
+    }
     const region = normalizeRegion(draft.province, draft.city);
     const saved = upsertUser({
       ...state.session,
@@ -6769,6 +7517,7 @@
       city: region.city
     });
     setSession(saved);
+    syncInstitutionProfile(saved);
     state.overlay = null;
     releaseOverlayHistory();
     renderApp();
@@ -6898,6 +7647,10 @@
     ];
     if (isSuperadmin()) {
       tabs.splice(4, 0, { id: "hospitals", label: "医院账号", icon: "building" });
+      tabs.push(
+        { id: "institutions", label: "机构账号", icon: "users" },
+        { id: "logs", label: "操作日志", icon: "history" }
+      );
     }
     return tabs;
   }
@@ -6956,6 +7709,10 @@
               ? renderAdminTemplatesPage()
               : state.adminTab === "hospitals"
               ? renderAdminHospitalsPage()
+              : state.adminTab === "institutions"
+              ? renderInstitutionAccountsPage()
+              : state.adminTab === "logs"
+              ? renderAdminLogsPage()
               : state.adminTab === "marketing"
               ? renderMarketingPage()
               : state.adminTab === "sms"
@@ -7142,6 +7899,11 @@
       assignedStaff: staffSnapshot(account),
       acceptedAt: appointment.acceptedAt || now
     });
+    logOperation("接单并指定项目负责人", `${appointment.id} · ${appointment.orgName}`, {
+      entityType: "appointment",
+      entityId: appointment.id,
+      hospitalId: appointment.hospitalId
+    });
     state.adminDraft = buildReviewDraft(updated);
     state.adminReviewSaved = false;
     renderOverlay();
@@ -7177,6 +7939,7 @@
       message:
         plan.message ||
         "院方已完成专家与课题匹配，请确认活动时间、地点与流程。如人数或场地有变化，请提前联系项目对接人。",
+      planPdf: plan.pdf || null,
       internalNote: appointment.internalNote || ""
     };
   }
@@ -7288,6 +8051,7 @@
       agenda: fields.agenda || "",
       team: fields.team || "",
       message: fields.message || "",
+      pdf: state.adminDraft?.planPdf || appointment.plan?.pdf || null,
       contact: staff ? `${staff.name} · ${staff.phone}` : "",
       themeMonth: keepsTheme ? appointment.themeMonth || "" : "",
       themeTopicId: keepsTheme ? appointment.themeTopicId || "" : "",
@@ -7319,6 +8083,11 @@
     appointmentPatch.doctorName = finalSpeaker.name;
     appointmentPatch.tier = finalSpeaker.tier;
     const updated = updateAppointment(appointment.id, appointmentPatch);
+    logOperation("发送或更新活动方案", `${appointment.id} · ${plan.topic}`, {
+      entityType: "appointment",
+      entityId: appointment.id,
+      hospitalId: appointment.hospitalId
+    });
     state.adminReviewId = updated.id;
     state.adminDraft = buildReviewDraft(updated);
     state.adminNoteEditing = false;
@@ -7356,6 +8125,11 @@
     const notePatch = collectInternalNotePatch();
     if (notePatch) Object.assign(patch, notePatch);
     updateAppointment(appointment.id, patch);
+    logOperation("标记活动已完成", appointment.id, {
+      entityType: "appointment",
+      entityId: appointment.id,
+      hospitalId: appointment.hospitalId
+    });
     state.adminReviewId = "";
     state.adminDraft = null;
     releaseOverlayHistory();
@@ -7376,6 +8150,11 @@
     const notePatch = collectInternalNotePatch();
     if (!notePatch) return;
     updateAppointment(appointment.id, notePatch);
+    logOperation("更新预约内部备注", appointment.id, {
+      entityType: "appointment",
+      entityId: appointment.id,
+      hospitalId: appointment.hospitalId
+    });
     state.adminNoteEditing = false;
     renderOverlay();
     showToast("内部备注已保存，机构端不可见。");
@@ -7609,6 +8388,22 @@
                       <div class="field"><label>给机构的说明</label>
                         <textarea data-review-field="message">${esc(draft.message)}</textarea>
                       </div>
+                      <div class="field">
+                        <label>方案附件 PDF <span>选填 · 不超过 2MB</span></label>
+                        <div class="plan-pdf-upload">
+                          <label class="btn btn--ghost btn--sm">
+                            ${icon("clipboard", 13)} 上传 PDF
+                            <input type="file" accept="application/pdf,.pdf" data-review-pdf hidden>
+                          </label>
+                          ${
+                            draft.planPdf
+                              ? `<span>${icon("checkCircle", 13)} ${esc(
+                                  draft.planPdf.name
+                                )}<button type="button" data-action="review-pdf-clear">移除</button></span>`
+                              : `<small>可上传完整方案、课题提纲或执行手册</small>`
+                          }
+                        </div>
+                      </div>
                     </div>
                     <div class="internal-note">
                       <div class="internal-note__head">
@@ -7667,6 +8462,28 @@
                   </section>`
                 : ""
             }
+            ${
+              appointment.plan &&
+              ["review", "revision", "confirmed", "completed"].includes(
+                appointment.status
+              )
+                ? `<section class="email-card">
+                    <div class="sms-card__head">
+                      <h3>${icon("send", 14)} 邮件提醒</h3>
+                      <span>${esc(
+                        buildEmailText(appointment).recipient || "机构未配置邮箱"
+                      )}</span>
+                    </div>
+                    <p>${esc(buildEmailText(appointment).body)}</p>
+                    <button class="btn btn--ghost btn--sm" type="button"
+                      data-action="review-email-copy" data-appointment-id="${esc(
+                        appointment.id
+                      )}">
+                      ${icon("send", 13)} 复制邮件内容
+                    </button>
+                  </section>`
+                : ""
+            }
           </div>
         </div>
         <div class="sheet__footer">
@@ -7710,6 +8527,32 @@
     }。请提前安排，如需调整请联系项目对接人。`;
   }
 
+  function buildEmailText(appointment) {
+    const account = institutionAccountByPhone(appointment.ownerPhone);
+    const user = getUser(appointment.ownerPhone);
+    const recipient =
+      account?.email || user?.email || "";
+    const subject = `【${hospitalById(appointment.hospitalId)?.name || "北大医疗"}】活动方案待确认 · ${topicOf(
+      appointment
+    )}`;
+    const body = `${appointment.contactName || account?.name || "您好"}：\n\n您预约的「${topicOf(
+      appointment
+    )}」活动方案已更新，请登录企业健康服务平台查看并确认。\n\n活动日期：${formatDateCN(
+      appointment.plan?.date || appointment.date,
+      true
+    )}\n活动地点：${appointmentLocationText(appointment)}\n项目对接人：${
+      appointment.assignedStaff
+        ? `${appointment.assignedStaff.name} ${appointment.assignedStaff.phone}`
+        : "院方项目组"
+    }\n\n如信息有调整，请在平台提交修改申请或联系项目对接人。\n\n北京大学国际医院 · 名医入企`;
+    return {
+      recipient,
+      subject,
+      body,
+      copyText: `收件人：${recipient || "机构未配置邮箱"}\n主题：${subject}\n\n${body}`
+    };
+  }
+
   async function copySmsForAppointment(button) {
     const appointment = appointmentById(button?.dataset.appointmentId || state.adminReviewId);
     if (!appointment) return;
@@ -7724,9 +8567,37 @@
       copiedAt: new Date().toISOString(),
       copiedBy: state.adminUser ? { name: state.adminUser.name, username: state.adminUser.username } : null
     });
+    logOperation("复制客户短信", `${appointment.id} · ${appointment.orgName}`, {
+      entityType: "appointment",
+      entityId: appointment.id,
+      hospitalId: appointment.hospitalId
+    });
     showToast("号码和短信内容已复制，可打开短信应用发送。");
     if (state.overlay?.type === "admin-review") renderOverlay();
     else renderApp();
+  }
+
+  async function copyEmailForAppointment(button) {
+    const appointment = appointmentById(
+      button?.dataset.appointmentId || state.adminReviewId
+    );
+    if (!appointment) return;
+    if (!adminCanManageHospital(appointment.hospitalId)) {
+      return showToast("只能发送本院预约的邮件提醒。");
+    }
+    const mail = buildEmailText(appointment);
+    const copied = await copyText(mail.copyText);
+    if (!copied) return showToast("复制失败，请手动复制。");
+    logOperation("复制客户邮件", `${appointment.id} · ${mail.recipient || "未配置邮箱"}`, {
+      entityType: "appointment",
+      entityId: appointment.id,
+      hospitalId: appointment.hospitalId
+    });
+    showToast(
+      mail.recipient
+        ? "收件人、主题和正文已复制，可打开邮件应用发送。"
+        : "邮件内容已复制；机构尚未配置通知邮箱。"
+    );
   }
 
   async function copyText(text) {
@@ -7757,7 +8628,7 @@
      Admin demands
      ========================================================= */
   function renderAdminDemandCard(demand) {
-    const hospital = hospitalById(demand.hospitalId);
+    const targetName = demandTargetName(demand);
     const meta = DEMAND_STATUS[demand.status] || DEMAND_STATUS.pending;
     return `
       <article class="admin-record" role="button" tabindex="0" data-action="open-admin-demand"
@@ -7769,7 +8640,7 @@
         <h3>${esc(demand.topic)}</h3>
         <div class="admin-record__tags">
           <span>${esc(serviceLabel(demand.serviceType))}</span>
-          <span>${esc(hospital?.short || "")}</span>
+          <span>${esc(targetName)}</span>
           <span>${esc(demand.audience || "人群待沟通")}</span>
         </div>
         <div class="admin-record__info">
@@ -7852,7 +8723,7 @@
   function renderAdminDemandSheet() {
     const demand = demandById(state.adminDemandId);
     if (!demand) return "";
-    const hospital = hospitalById(demand.hospitalId);
+    const targetName = demandTargetName(demand);
     const meta = DEMAND_STATUS[demand.status] || DEMAND_STATUS.pending;
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
@@ -7869,7 +8740,7 @@
             <div class="record-head">
               <div>
                 <span class="record-head__tag">${esc(serviceLabel(demand.serviceType))} · ${esc(
-                  hospital?.name || ""
+                  targetName
                 )}</span>
                 <h1>${esc(demand.topic)}</h1>
                 <p>${esc(demand.audience || "人群待沟通")} · ${esc(
@@ -7880,6 +8751,9 @@
             </div>
             <section class="info-card">
               <div class="info-row"><span>机构</span><strong>${esc(demand.orgName)}</strong></div>
+              <div class="info-row"><span>目标机构</span><strong>${esc(
+                targetName
+              )}</strong></div>
               <div class="info-row"><span>联系人</span><strong>${esc(
                 demand.contactName
               )} · ${phoneLink(demand.phone, demand.phone)}</strong></div>
@@ -7951,8 +8825,12 @@
   function markDemandContacted(note = "") {
     const demand = demandById(state.adminDemandId);
     if (!demand || !state.adminUser) return;
-    if (!adminCanManageHospital(demand.hospitalId)) {
-      return showToast("只能跟进本院需求。");
+    if (!adminCanManageDemand(demand)) {
+      return showToast(
+        demand.targetType === "group"
+          ? "集团企康版需求仅超级管理员可跟进。"
+          : "只能跟进本院需求。"
+      );
     }
     const followUps = (demand.followUps || []).slice();
     if (note) {
@@ -7968,6 +8846,11 @@
       contactedAt: demand.contactedAt || new Date().toISOString(),
       followUps
     });
+    logOperation(note ? "记录提需沟通" : "标记提需已联系", `${demand.id} · ${demand.topic}`, {
+      entityType: "demand",
+      entityId: demand.id,
+      hospitalId: demand.hospitalId
+    });
     renderOverlay();
     showToast(note ? "沟通记录已保存。" : "已标记为已联系。");
   }
@@ -7975,13 +8858,22 @@
   function adminDemandMatch() {
     const demand = demandById(state.adminDemandId);
     if (!demand) return;
-    if (!adminCanManageHospital(demand.hospitalId)) {
-      return showToast("只能跟进本院需求。");
+    if (!adminCanManageDemand(demand)) {
+      return showToast(
+        demand.targetType === "group"
+          ? "集团企康版需求仅超级管理员可跟进。"
+          : "只能跟进本院需求。"
+      );
     }
     updateDemand(demand.id, {
       status: "matched",
       assignedStaff: demand.assignedStaff || staffSnapshot(state.adminUser),
       matchedAt: new Date().toISOString()
+    });
+    logOperation("提需标记已匹配", `${demand.id} · ${demand.topic}`, {
+      entityType: "demand",
+      entityId: demand.id,
+      hospitalId: demand.hospitalId
     });
     renderOverlay();
     showToast("需求已标记为已匹配。");
@@ -7990,10 +8882,19 @@
   function adminDemandClose() {
     const demand = demandById(state.adminDemandId);
     if (!demand) return;
-    if (!adminCanManageHospital(demand.hospitalId)) {
-      return showToast("只能跟进本院需求。");
+    if (!adminCanManageDemand(demand)) {
+      return showToast(
+        demand.targetType === "group"
+          ? "集团企康版需求仅超级管理员可跟进。"
+          : "只能跟进本院需求。"
+      );
     }
     updateDemand(demand.id, { status: "closed", closedAt: new Date().toISOString() });
+    logOperation("关闭机构提需", `${demand.id} · ${demand.topic}`, {
+      entityType: "demand",
+      entityId: demand.id,
+      hospitalId: demand.hospitalId
+    });
     renderOverlay();
     showToast("需求已关闭。");
   }
@@ -8530,6 +9431,18 @@
     saveAllSlots(all);
     state.slotDraft = {};
     renderSlotConfigContent();
+    logOperation(
+      "统一保存专家号源",
+      `${entries.length} 位专家 · ${entries.reduce(
+        (sum, [, dates]) => sum + Object.keys(dates).length,
+        0
+      )} 个日期`,
+      {
+        entityType: "slot",
+        entityId: slotHospital()?.id || "",
+        hospitalId: slotHospital()?.id || ""
+      }
+    );
     showToast("号源已统一保存。");
   }
 
@@ -9639,6 +10552,15 @@
     }
     saveDoctorConfig(config);
     mergeExperts();
+    logOperation(
+      draft.id ? "更新专家资料" : "新增专家",
+      `${draft.name} · ${draft.deptTitle}`,
+      {
+        entityType: "expert",
+        entityId: draft.id || draft.name,
+        hospitalId: draft.hospitalId
+      }
+    );
     state.overlay = null;
     releaseOverlayHistory();
     renderApp();
@@ -9671,6 +10593,32 @@
         showToast("照片已压缩并载入。");
       };
       image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleReviewPdfUpload(file) {
+    if (!file || !state.adminDraft) return;
+    if (
+      file.type &&
+      file.type !== "application/pdf" &&
+      !String(file.name || "").toLowerCase().endsWith(".pdf")
+    ) {
+      return showToast("请选择 PDF 文件。");
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      return showToast("方案附件请控制在 2MB 以内。");
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      state.adminDraft.planPdf = {
+        name: file.name || "活动方案.pdf",
+        size: file.size,
+        dataUrl: String(reader.result || ""),
+        uploadedAt: new Date().toISOString()
+      };
+      renderOverlay();
+      showToast("方案 PDF 已载入，保存方案后机构可查看。");
     };
     reader.readAsDataURL(file);
   }
@@ -9769,6 +10717,292 @@
             `;
           })
           .join("")}
+      </div>
+    `;
+  }
+
+  function renderInstitutionAccountsPage() {
+    if (!isSuperadmin()) {
+      state.adminTab = "appointments";
+      return renderAdminAppointmentsPage();
+    }
+    const accounts = getInstitutionAccounts().sort((a, b) => {
+      const activeOrder = Number(b.active) - Number(a.active);
+      return activeOrder || a.orgName.localeCompare(b.orgName, "zh-CN");
+    });
+    const activeCount = accounts.filter((account) => account.active).length;
+    return `
+      <div class="admin-page-head">
+        <div><h1>机构账号</h1><p>仅已开通手机号可登录机构端</p></div>
+        <button class="btn btn--primary btn--sm" type="button" data-action="institution-account-add">
+          ${icon("plus", 14)} 开通机构
+        </button>
+      </div>
+      ${renderAdminTabs()}
+      <div class="admin-stats admin-stats--three">
+        <div class="admin-stat"><small>已开通</small><strong>${activeCount}</strong><span>可登录机构账号</span></div>
+        <div class="admin-stat"><small>已停用</small><strong>${accounts.length - activeCount}</strong><span>不可登录</span></div>
+        <div class="admin-stat"><small>覆盖机构</small><strong>${new Set(
+          accounts.filter((item) => item.active).map((item) => item.orgName)
+        ).size}</strong><span>集团与分支机构</span></div>
+      </div>
+      <div class="institution-account-note">
+        ${icon("shield", 15)}
+        <span>机构手机号是登录白名单。开通时同步录入姓名、单位、机构类型、职务、联系方式、通知邮箱与省市；未开通手机号将无法获取验证码登录。</span>
+      </div>
+      <div class="account-list institution-account-list">
+        ${
+          accounts.length
+            ? accounts
+                .map(
+                  (account) => `
+                    <button class="account-row ${account.active ? "" : "is-disabled"}" type="button"
+                      data-action="open-institution-account" data-phone="${esc(account.phone)}">
+                      <span class="account-row__avatar">${esc(initialOf(account.orgName || account.name))}</span>
+                      <span class="account-row__body">
+                        <strong>${esc(account.orgName || "未填写单位")}
+                          <i class="role-tag role-tag--operator">${esc(account.orgType || "机构")}</i>
+                          ${account.active ? "" : '<i class="role-tag is-off">已停用</i>'}
+                        </strong>
+                        <span>${esc(account.name || "未填写姓名")} · ${phoneLink(
+                          account.phone,
+                          account.phone
+                        )}</span>
+                        <small>${esc(
+                          regionText(account.province, account.city) || "地区待补充"
+                        )}${account.email ? ` · ${esc(account.email)}` : ""}</small>
+                      </span>
+                      ${icon("chevronRight", 14)}
+                    </button>
+                  `
+                )
+                .join("")
+            : `<div class="empty-state"><span class="empty-state__icon">${icon(
+                "users",
+                26
+              )}</span><h3>尚未开通机构账号</h3><p>点击右上角开通后，该手机号才能登录机构端。</p></div>`
+        }
+      </div>
+    `;
+  }
+
+  function openInstitutionAccountEditor(phone = "") {
+    if (!isSuperadmin()) return showToast("仅超级管理员可配置机构账号。");
+    const account = phone ? institutionAccountByPhone(phone) : null;
+    state.institutionAccountDraft = account
+      ? { ...account, originalPhone: account.phone, isNew: false }
+      : {
+          phone: "",
+          originalPhone: "",
+          name: "",
+          orgName: "",
+          orgType: "保险公司",
+          title: "",
+          contactPhone: "",
+          email: "",
+          province: "北京市",
+          city: "北京市",
+          active: true,
+          isNew: true
+        };
+    state.overlay = { type: "admin-institution" };
+    renderOverlay();
+  }
+
+  function renderInstitutionAccountSheet() {
+    const draft = state.institutionAccountDraft;
+    if (!draft) return "";
+    return `
+      <div class="sheet-backdrop" data-action="close-overlay"></div>
+      <section class="sheet institution-account-sheet" role="dialog" aria-modal="true" aria-label="机构账号">
+        <div class="sheet__grabber"></div>
+        <div class="sheet__bar">
+          <div><h2>${draft.isNew ? "开通机构账号" : "编辑机构账号"}</h2><p>字段与机构端企业资料一致</p></div>
+          <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">
+            ${icon("close", 15)}
+          </button>
+        </div>
+        <div class="sheet__body">
+          <div class="sheet-pad">
+            <div class="institution-account-banner">
+              ${icon("phone", 15)}
+              <span><strong>登录手机号即机构登录白名单</strong><small>停用后该手机号无法登录，但历史预约与提需仍保留。</small></span>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>登录手机号 <em>*</em></label>
+                <input type="tel" inputmode="numeric" maxlength="11" data-institution-field="phone"
+                  value="${esc(draft.phone)}" placeholder="11 位手机号">
+              </div>
+              <div class="field"><label>姓名 <em>*</em></label>
+                <input type="text" data-institution-field="name" value="${esc(
+                  draft.name
+                )}" placeholder="机构联系人姓名">
+              </div>
+            </div>
+            <div class="field"><label>单位名称 <em>*</em></label>
+              <input type="text" data-institution-field="orgName" value="${esc(
+                draft.orgName
+              )}" placeholder="保险公司、集团或企业全称">
+            </div>
+            <div class="field-row">
+              <div class="field"><label>机构类型</label>
+                <select data-institution-field="orgType">
+                  ${["保险公司", "企业", "其他机构"]
+                    .map(
+                      (type) =>
+                        `<option value="${esc(type)}" ${
+                          draft.orgType === type ? "selected" : ""
+                        }>${esc(type)}</option>`
+                    )
+                    .join("")}
+                </select>
+              </div>
+              <div class="field"><label>职务</label>
+                <input type="text" data-institution-field="title" value="${esc(
+                  draft.title
+                )}" placeholder="如：员工健康负责人">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>联系方式</label>
+                <input type="tel" inputmode="numeric" maxlength="11" data-institution-field="contactPhone"
+                  value="${esc(draft.contactPhone || draft.phone)}" placeholder="默认同登录手机号">
+              </div>
+              <div class="field"><label>通知邮箱</label>
+                <input type="email" inputmode="email" data-institution-field="email"
+                  value="${esc(draft.email || "")}" placeholder="name@company.com">
+              </div>
+            </div>
+            <div class="field">
+              <label>所在省市</label>
+              <div class="field-row">
+                <select data-institution-province>${renderProvinceOptions(
+                  draft.province
+                )}</select>
+                <select data-institution-city>${renderCityOptions(
+                  draft.province,
+                  draft.city
+                )}</select>
+              </div>
+            </div>
+            <label class="switch-row">
+              <span><strong>允许登录机构端</strong><small>停用后手机号无法获取验证码登录</small></span>
+              <input type="checkbox" data-institution-active ${draft.active ? "checked" : ""}>
+            </label>
+          </div>
+        </div>
+        <div class="sheet__footer">
+          <button class="btn btn--ghost" type="button" data-action="close-overlay">取消</button>
+          <button class="btn btn--primary" type="button" data-action="institution-account-save">
+            保存机构账号 ${icon("check", 14)}
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
+  function saveInstitutionAccount() {
+    if (!isSuperadmin()) return showToast("仅超级管理员可配置机构账号。");
+    const draft = state.institutionAccountDraft;
+    if (!draft) return;
+    if (!/^1\d{10}$/.test(draft.phone || "")) return showToast("请填写正确的 11 位登录手机号。");
+    if (!draft.name?.trim()) return showToast("请填写机构联系人姓名。");
+    if (!draft.orgName?.trim()) return showToast("请填写单位名称。");
+    if (draft.contactPhone && !/^1\d{10}$/.test(draft.contactPhone)) {
+      return showToast("联系方式格式不正确。");
+    }
+    if (draft.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
+      return showToast("通知邮箱格式不正确。");
+    }
+    const accounts = getInstitutionAccounts();
+    const duplicate = accounts.find(
+      (item) =>
+        item.phone === draft.phone &&
+        (!draft.originalPhone || item.phone !== draft.originalPhone)
+    );
+    if (duplicate) return showToast("该手机号已经开通机构账号。");
+    const region = normalizeRegion(draft.province, draft.city);
+    const payload = normalizeInstitutionAccount({
+      ...draft,
+      phone: draft.phone.trim(),
+      contactPhone: (draft.contactPhone || draft.phone).trim(),
+      province: region.province,
+      city: region.city,
+      updatedAt: new Date().toISOString()
+    });
+    const next = draft.isNew
+      ? accounts.concat(payload)
+      : accounts.map((item) =>
+          item.phone === draft.originalPhone ? { ...item, ...payload } : item
+        );
+    saveInstitutionAccounts(next);
+    const existingUser = getUser(payload.phone);
+    if (existingUser) {
+      upsertUser({
+        ...existingUser,
+        name: payload.name,
+        orgName: payload.orgName,
+        orgType: payload.orgType,
+        title: payload.title,
+        contactPhone: payload.contactPhone,
+        email: payload.email,
+        province: payload.province,
+        city: payload.city
+      });
+    }
+    logOperation(
+      draft.isNew ? "开通机构账号" : "更新机构账号",
+      `${payload.orgName} · ${payload.name} · ${payload.phone}`,
+      { entityType: "institution", entityId: payload.phone }
+    );
+    state.overlay = null;
+    state.institutionAccountDraft = null;
+    releaseOverlayHistory();
+    renderApp();
+    showToast(draft.isNew ? "机构账号已开通，该手机号可登录。" : "机构账号已更新。");
+  }
+
+  function renderAdminLogsPage() {
+    if (!isSuperadmin()) {
+      state.adminTab = "appointments";
+      return renderAdminAppointmentsPage();
+    }
+    const logs = getOperationLogs().filter((item) => {
+      if (!state.adminHospitalId) return true;
+      return !item.hospitalId || item.hospitalId === state.adminHospitalId;
+    });
+    return `
+      <div class="admin-page-head">
+        <div><h1>操作日志</h1><p>关键配置与履约操作留痕</p></div>
+        <span class="admin-page-head__date">最近 ${logs.length} 条</span>
+      </div>
+      ${renderAdminTabs()}
+      ${renderAdminHospitalFilter()}
+      <div class="admin-log-list">
+        ${
+          logs.length
+            ? logs
+                .slice(0, 120)
+                .map(
+                  (item) => `
+                    <article class="admin-log-item">
+                      <div class="admin-log-item__head">
+                        <strong>${esc(item.action)}</strong>
+                        <span>${esc(formatDateTime(item.at))}</span>
+                      </div>
+                      <p>${esc(item.detail)}</p>
+                      <small>${esc(item.actor?.name || "系统")} · ${esc(
+                        item.entityId || item.entityType || ""
+                      )}</small>
+                    </article>
+                  `
+                )
+                .join("")
+            : `<div class="empty-state"><span class="empty-state__icon">${icon(
+                "history",
+                26
+              )}</span><h3>暂无操作日志</h3><p>接单、方案发送、号源与账号变更会自动记录。</p></div>`
+        }
       </div>
     `;
   }
@@ -9912,6 +11146,15 @@
       return showToast("至少需要保留一个启用的超级管理员。");
     }
     saveAdminAccounts(next);
+    logOperation(
+      draft.isNew ? "新增院方账号" : "更新院方账号",
+      `${payload.name} · ${payload.username} · ${ROLE[payload.role]?.label || ""}`,
+      {
+        entityType: "admin-account",
+        entityId: payload.username,
+        hospitalId: payload.hospitalId
+      }
+    );
     if (payload.username === state.adminUser.username) {
       state.adminUser = next.find((item) => item.username === payload.username);
       setAdminSession(state.adminUser);
@@ -10287,6 +11530,9 @@
     if (target.matches("[data-login-field]")) {
       const field = target.dataset.loginField;
       state.login[field] = target.type === "checkbox" ? target.checked : target.value;
+      if (field === "phone" || field === "code" || field === "agree") {
+        state.login.error = "";
+      }
       return;
     }
     if (target.matches("[data-admin-login]")) {
@@ -10301,6 +11547,7 @@
       return;
     }
     if (target.matches("[data-booking-field]") && state.booking) {
+      clearBookingValidation();
       state.booking[target.dataset.bookingField] = target.value;
       if (target.dataset.bookingField === "customTopic") {
         state.booking.themeMonth = 0;
@@ -10317,6 +11564,7 @@
     }
     if (target.matches("[data-booking-agree]") && state.booking) {
       state.booking.agree = target.checked;
+      if (target.checked) clearBookingValidation();
       return;
     }
     if (target.matches("[data-location-field]") && state.appointmentLocationDraft) {
@@ -10343,6 +11591,14 @@
     }
     if (target.matches("[data-account-field]") && state.adminAccountDraft) {
       state.adminAccountDraft[target.dataset.accountField] = target.value;
+      return;
+    }
+    if (target.matches("[data-institution-field]") && state.institutionAccountDraft) {
+      state.institutionAccountDraft[target.dataset.institutionField] = target.value;
+      return;
+    }
+    if (target.matches("[data-institution-active]") && state.institutionAccountDraft) {
+      state.institutionAccountDraft.active = target.checked;
       return;
     }
     if (target.matches("[data-account-active]") && state.adminAccountDraft) {
@@ -10456,6 +11712,13 @@
       if (city) city.innerHTML = renderCityOptions(state.overlay.draft.province, state.overlay.draft.city);
       return;
     }
+    if (target.matches("[data-demand-target]") && state.overlay?.draft) {
+      const value = target.value;
+      state.overlay.draft.targetType = value === "group" ? "group" : "hospital";
+      state.overlay.draft.hospitalId =
+        value === "group" ? "" : value || state.hospitals[0]?.id || "";
+      return;
+    }
     if (target.matches("[data-demand-city]") && state.overlay?.draft) {
       state.overlay.draft.city = target.value;
       return;
@@ -10469,6 +11732,23 @@
     }
     if (target.matches("[data-profile-city]") && state.profileDraft) {
       state.profileDraft.city = target.value;
+      return;
+    }
+    if (target.matches("[data-institution-province]") && state.institutionAccountDraft) {
+      state.institutionAccountDraft.province = target.value;
+      state.institutionAccountDraft.city =
+        (state.chinaCities?.[target.value] || [target.value])[0] || target.value;
+      const city = document.querySelector("[data-institution-city]");
+      if (city) {
+        city.innerHTML = renderCityOptions(
+          state.institutionAccountDraft.province,
+          state.institutionAccountDraft.city
+        );
+      }
+      return;
+    }
+    if (target.matches("[data-institution-city]") && state.institutionAccountDraft) {
+      state.institutionAccountDraft.city = target.value;
       return;
     }
     if (target.matches("[data-theme-coverage-province]") && state.adminThemeDraft) {
@@ -10582,6 +11862,10 @@
     }
     if (target.matches("[data-doctor-photo]")) {
       handleDoctorPhotoUpload(target.files?.[0]);
+      return;
+    }
+    if (target.matches("[data-review-pdf]")) {
+      handleReviewPdfUpload(target.files?.[0]);
     }
   }
 
@@ -10593,8 +11877,25 @@
   async function handleAction(action, el) {
     switch (action) {
       case "tab": {
-        storeCurrentScroll();
         const nextTab = el.dataset.tab || "home";
+        const previousTab = state.tab;
+        const previousScroll = currentWindowScroll();
+        const shouldPushTab =
+          state.screen === "main" &&
+          !state.overlay &&
+          nextTab !== previousTab;
+        storeCurrentScroll();
+        if (shouldPushTab) {
+          replaceCurrentHistoryEntry({
+            pkuihLayer: "tab",
+            pkuihTab: previousTab,
+            pkuihScroll: previousScroll
+          });
+          pushAppHistory("tab", 0, {
+            tab: previousTab,
+            scroll: previousScroll
+          });
+        }
         if (state.overlay) {
           releaseOverlayHistory();
           clearOverlayState();
@@ -10605,7 +11906,15 @@
           resetExpertFilters();
           state.expertVisited = true;
         }
-        renderApp({ scrollTo: storedScrollForView(`main:${state.tab}`) });
+        const targetScroll = storedScrollForView(`main:${state.tab}`);
+        if (shouldPushTab) {
+          replaceCurrentHistoryEntry({
+            pkuihLayer: "tab",
+            pkuihTab: state.tab,
+            pkuihScroll: targetScroll
+          });
+        }
+        renderApp({ scrollTo: targetScroll });
         if (state.tab === "home" && state.geoStatus === "idle") requestLocationRecommendation();
         break;
       }
@@ -10708,8 +12017,12 @@
         {
           const demand = demandById(el.dataset.demandId);
           if (!demand) return showToast("需求记录不存在。");
-          if (!adminCanManageHospital(demand.hospitalId)) {
-            return showToast("无权查看其他医院的需求。");
+          if (!adminCanManageDemand(demand)) {
+            return showToast(
+              demand.targetType === "group"
+                ? "集团企康版需求仅超级管理员可查看。"
+                : "无权查看其他医院的需求。"
+            );
           }
           state.adminDemandId = demand.id;
         }
@@ -10744,6 +12057,16 @@
         break;
       case "review-sms-copy":
         copySmsForAppointment(el);
+        break;
+      case "review-email-copy":
+        copyEmailForAppointment(el);
+        break;
+      case "review-pdf-clear":
+        if (state.adminDraft) {
+          state.adminDraft.planPdf = null;
+          renderOverlay();
+          showToast("已移除方案附件，保存后生效。");
+        }
         break;
       case "admin-sms-copy":
         copySmsForAppointment(el);
@@ -10982,6 +12305,15 @@
       }
       case "admin-account-add":
         openAdminAccountEditor();
+        break;
+      case "institution-account-add":
+        openInstitutionAccountEditor();
+        break;
+      case "open-institution-account":
+        openInstitutionAccountEditor(el.dataset.phone || "");
+        break;
+      case "institution-account-save":
+        saveInstitutionAccount();
         break;
       case "open-admin-account":
         openAdminAccountEditor(el.dataset.username);
@@ -11257,6 +12589,21 @@
         break;
       case "appointment-action":
         if (!state.overlay) return;
+        {
+          const appointment = appointmentById(state.overlay.appointmentId);
+          const policy = appointmentChangePolicy(appointment);
+          if (
+            (["change", "revise"].includes(el.dataset.value) &&
+              !policy.canModify) ||
+            (el.dataset.value === "cancel" && !policy.canCancel)
+          ) {
+            return showToast(
+              el.dataset.value === "cancel"
+                ? policy.cancelReason || "当前阶段不可取消。"
+                : policy.modifyReason || "当前阶段不可修改。"
+            );
+          }
+        }
         state.overlay.action = el.dataset.value || "";
         renderOverlay();
         break;
@@ -11288,15 +12635,55 @@
         }
         const note = document.querySelector("[data-revise-note]")?.value.trim() || "";
         if (!note) return showToast("请填写修改意见。");
+        const policy = appointmentChangePolicy(appointment);
+        if (!policy.canModify) {
+          return showToast(policy.modifyReason || "当前阶段不可提出修改。");
+        }
         updateAppointment(appointment.id, {
           status: "revision",
           feedback: note,
-          feedbackAt: new Date().toISOString()
+          feedbackAt: new Date().toISOString(),
+          changeRequest: {
+            type: "revise",
+            note,
+            at: new Date().toISOString()
+          },
+          clientChangeCount: (Number(appointment.clientChangeCount) || 0) + 1
         });
         state.overlay.action = "";
         renderOverlay();
         renderApp({ scrollTo: currentWindowScroll() });
         showToast("修改意见已提交，院方会更新方案。");
+        break;
+      }
+      case "appointment-change-submit": {
+        const id = state.overlay?.appointmentId;
+        const appointment = appointmentById(id);
+        if (!clientOwnsAppointment(appointment)) {
+          return showToast(state.session ? "无权操作该预约。" : "请先登录。");
+        }
+        const policy = appointmentChangePolicy(appointment);
+        if (!policy.canModify) {
+          return showToast(policy.modifyReason || "当前阶段不可申请修改。");
+        }
+        const note = document.querySelector("[data-change-note]")?.value.trim() || "";
+        if (!note) return showToast("请填写需要修改的内容。");
+        updateAppointment(appointment.id, {
+          status: "revision",
+          feedback: note,
+          feedbackAt: new Date().toISOString(),
+          changeRequest: {
+            type: "confirmed-change",
+            note,
+            at: new Date().toISOString()
+          },
+          clientChangeCount: (Number(appointment.clientChangeCount) || 0) + 1,
+          previousStatus: appointment.status
+        });
+        state.overlay.action = "";
+        renderOverlay();
+        renderApp({ scrollTo: currentWindowScroll() });
+        showToast("修改申请已提交，院方更新方案后会再次发送确认。");
         break;
       }
       case "appointment-cancel-submit": {
@@ -11305,12 +12692,15 @@
         if (!clientOwnsAppointment(appointment)) {
           return showToast(state.session ? "无权操作该预约。" : "请先登录。");
         }
-        if (!["pending", "planning", "review", "revision"].includes(appointment.status)) {
-          return showToast("该预约已进入执行阶段，请联系项目对接人处理。");
+        const policy = appointmentChangePolicy(appointment);
+        if (!policy.canCancel) {
+          return showToast(policy.cancelReason || "当前阶段不可取消预约。");
         }
         updateAppointment(appointment.id, {
           status: "cancelled",
-          cancelledAt: new Date().toISOString()
+          cancelledAt: new Date().toISOString(),
+          cancelledBy: "client",
+          cancelReason: "机构侧主动取消"
         });
         state.overlay = null;
         releaseOverlayHistory();
@@ -11380,6 +12770,9 @@
       }
       case "booking-open-demand":
         openBookingDemand();
+        break;
+      case "booking-error-focus":
+        scrollToBookingIssue(el.dataset.target || "service", { focusField: true });
         break;
       case "booking-next":
         bookingNext();
@@ -11549,10 +12942,20 @@
         renderApp({ scrollTo: storedScrollForView("main:home") });
         return;
       }
-      if (state.screen === "main" && state.tab !== "home") {
-        storeCurrentScroll();
-        state.tab = "home";
-        renderApp({ scrollTo: storedScrollForView("main:home") });
+      if (state.screen === "main") {
+        if (state.historyDepth > 0) {
+          state.historyDepth = Math.max(0, state.historyDepth - 1);
+        }
+        const targetTab = ["home", "experts", "appointments", "me"].includes(
+          event.state?.pkuihTab
+        )
+          ? event.state.pkuihTab
+          : state.tab;
+        const targetScroll = Number.isFinite(Number(event.state?.pkuihScroll))
+          ? Math.max(0, Number(event.state.pkuihScroll))
+          : storedScrollForView(`main:${targetTab}`);
+        state.tab = targetTab;
+        renderApp({ scrollTo: targetScroll });
         return;
       }
       if (state.historyDepth > 0) state.historyDepth = Math.max(0, state.historyDepth - 1);
@@ -11637,6 +13040,12 @@
         pushAppHistory("admin");
       } else {
         state.screen = "main";
+        replaceCurrentHistoryEntry({
+          pkuihLayer: "main",
+          pkuihTab: state.tab,
+          pkuihScroll: 0,
+          pkuihOverlayDepth: 0
+        });
       }
       renderApp({ scrollTo: 0 });
       if (state.screen === "main" && state.tab === "home") {
