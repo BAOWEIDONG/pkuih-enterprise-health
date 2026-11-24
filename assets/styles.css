@@ -4945,6 +4945,69 @@ textarea {
   padding-bottom: calc(110px + var(--safe-bottom));
 }
 
+.profile-completion-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0 14px 12px;
+  padding: 12px;
+  border: 1px solid rgba(201, 117, 24, 0.18);
+  border-radius: 16px;
+  background: linear-gradient(145deg, #fffaf2, #fff4e5);
+  color: var(--amber-text);
+}
+
+.profile-completion-card > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.profile-completion-card > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.profile-completion-card strong {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 780;
+}
+
+.profile-completion-card p {
+  margin: 3px 0 0;
+  color: #7b5b31;
+  font-size: 8.5px;
+  line-height: 1.55;
+}
+
+.profile-completion-card button {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border-radius: 9px;
+  background: var(--amber-text);
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 720;
+}
+
+.profile-form-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 0 0 2px;
+  padding: 10px 11px;
+  border-radius: 12px;
+  background: #f2f6ff;
+  color: var(--brand);
+  font-size: 8.5px;
+  line-height: 1.55;
+}
+
+.profile-form-note svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
 .profile-hero {
   position: relative;
   overflow: hidden;

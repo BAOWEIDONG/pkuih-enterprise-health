@@ -26,7 +26,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261124-10";
+  const DATA_VERSION = "20261124-11";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -729,6 +729,76 @@
     });
   }
 
+  function validProfileEmail(value = "") {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+  }
+
+  function profileValidationErrors(profile = {}) {
+    const issues = [];
+    if (!String(profile.name || "").trim()) issues.push("请填写姓名");
+    if (!String(profile.title || "").trim()) issues.push("请填写职务");
+    if (!String(profile.orgName || "").trim()) issues.push("请填写单位名称");
+    if (!["保险公司", "企业", "其他机构"].includes(profile.orgType)) {
+      issues.push("请选择机构类型");
+    }
+    const contactPhone = String(profile.contactPhone || profile.phone || "").trim();
+    if (!contactPhone) issues.push("请填写联系方式");
+    else if (!/^1\d{10}$/.test(contactPhone)) issues.push("联系方式格式不正确");
+    const email = String(profile.email || "").trim();
+    if (!email) issues.push("请填写通知邮箱");
+    else if (!validProfileEmail(email)) issues.push("通知邮箱格式不正确");
+    return issues;
+  }
+
+  function profileIssueMessage(profile) {
+    const issues = profileValidationErrors(profile);
+    return issues.length ? `${issues.join("、")}。` : "";
+  }
+
+  function profileRegionFromContext(profile = state.session) {
+    if (state.homeRegion?.province) {
+      return normalizeRegion(state.homeRegion.province, state.homeRegion.city);
+    }
+    if (state.geoStatus === "ready" && state.geoHospitalId) {
+      const located = hospitalById(state.geoHospitalId);
+      if (located) return normalizeRegion(located.province, located.city);
+    }
+    if (profile?.province) {
+      return normalizeRegion(profile.province, profile.city);
+    }
+    return currentClientRegion();
+  }
+
+  function primeLoginProfile(profile = {}) {
+    const region = profileRegionFromContext(profile);
+    state.login.name = profile.name || "";
+    state.login.orgName = profile.orgName || "";
+    state.login.orgType = profile.orgType || "保险公司";
+    state.login.title = profile.title || "";
+    state.login.contactPhone = profile.contactPhone || profile.phone || state.login.phone;
+    state.login.email = profile.email || "";
+    state.login.province = region.province;
+    state.login.city = region.city;
+  }
+
+  function syncSessionRegionFromContext() {
+    if (!state.session) return;
+    const region = profileRegionFromContext(state.session);
+    if (
+      state.session.province === region.province &&
+      state.session.city === region.city
+    ) {
+      return;
+    }
+    const saved = upsertUser({
+      ...state.session,
+      province: region.province,
+      city: region.city
+    });
+    setSession(saved);
+    syncInstitutionProfile(saved);
+  }
+
   function setSession(user) {
     state.session = user;
     writeJSON(STORAGE.session, user);
@@ -1195,6 +1265,7 @@
     state.homeHospitalId = hospital?.id || "";
     persistHomeHospital(state.homeHospitalId);
     state.expertScope = "nearby";
+    syncSessionRegionFromContext();
     return hospital;
   }
 
@@ -1213,6 +1284,7 @@
     }
     state.expertHospitalId = "";
     state.expertScope = "nearby";
+    syncSessionRegionFromContext();
     refreshHomeLocationViews();
     if (announce && hospital) {
       showToast(
@@ -1298,6 +1370,7 @@
           state.homeHospitalId = "";
           persistHomeHospital("");
         }
+        syncSessionRegionFromContext();
         applyLocationToLogin(nearest?.hospital);
         refreshHomeLocationViews();
         if (state.screen === "main" && state.tab === "experts" && state.expertScope === "nearby") {
@@ -2783,9 +2856,16 @@
                   <span>${initialOf(state.login.name || state.login.phone)}</span>
                   <div>
                     <strong>${esc(state.login.phone)}</strong>
-                    <small>${existing ? "已创建账号，请确认资料" : "首次登录，请完善联系信息"}</small>
+                    <small>${existing ? "请补全企业与联系资料后登录" : "首次登录，请完善全部联系信息"}</small>
                   </div>
                 </div>
+                ${
+                  state.login.error
+                    ? `<p class="auth-inline-error">${icon("alert", 13)} ${esc(
+                        state.login.error
+                      )}</p>`
+                    : ""
+                }
                 <div class="field-row">
                   <div class="field">
                     <label for="login-name">姓名 <em>*</em></label>
@@ -2794,7 +2874,7 @@
                     )}" data-login-field="name">
                   </div>
                   <div class="field">
-                    <label for="login-title">职务</label>
+                    <label for="login-title">职务 <em>*</em></label>
                     <input id="login-title" type="text" placeholder="如：客户健康负责人" value="${esc(
                       state.login.title
                     )}" data-login-field="title">
@@ -2823,28 +2903,27 @@
                   </div>
                 </div>
                 <div class="field">
-                  <label for="login-contact">联系方式 <span>默认使用登录手机号，可修改</span></label>
+                  <label for="login-contact">联系方式 <em>*</em> <span>默认使用登录手机号，可修改</span></label>
                   <input id="login-contact" type="tel" inputmode="numeric" maxlength="11"
                     placeholder="请输入联系电话" value="${esc(
                       state.login.contactPhone || state.login.phone
                     )}" data-login-field="contactPhone">
                 </div>
                 <div class="field">
-                  <label for="login-email">通知邮箱 <span>用于接收方案更新提醒</span></label>
+                  <label for="login-email">通知邮箱 <em>*</em> <span>用于接收方案与确认提醒</span></label>
                   <input id="login-email" type="email" inputmode="email"
                     placeholder="name@company.com" value="${esc(
                       state.login.email || ""
                     )}" data-login-field="email">
                 </div>
                 <div class="field">
-                  <label>所在省市 <span>用于优先展示就近医院</span></label>
-                  <div class="field-row">
-                    <select data-login-province>${renderProvinceOptions(state.login.province)}</select>
-                    <select data-login-city>${renderCityOptions(
-                      state.login.province,
-                      state.login.city
-                    )}</select>
+                  <label>所在省市 <span>无需填写，自动同步</span></label>
+                  <div class="field-static">
+                    ${icon("mapPin", 14)} ${esc(
+                      regionText(state.login.province, state.login.city)
+                    )}
                   </div>
+                  <span class="field-help">根据当前定位或首页选择的城市自动确定，后续会随城市切换同步更新。</span>
                 </div>
                 <button class="btn btn--primary btn--block auth-submit" type="button" data-action="login-submit">
                   ${existing ? "进入平台" : "完善资料并进入"} ${icon("arrowRight", 15)}
@@ -2922,9 +3001,8 @@
       renderApp();
       return showToast(state.login.error);
     }
-    const hospital = nearestHospital();
-    const region = normalizeRegion(hospital?.province || "北京市", hospital?.city || "北京市");
     const existing = getUser(DEMO_PHONE);
+    const region = profileRegionFromContext(existing || DEMO_PROFILE);
     const user = upsertUser({
       ...(existing || {}),
       ...DEMO_PROFILE,
@@ -2991,6 +3069,7 @@
     }
     const existing = getUser(phone);
     if (existing) {
+      const region = profileRegionFromContext({ ...existing, ...account });
       const normalized = upsertUser({
         ...existing,
         name: account.name || existing.name,
@@ -2999,22 +3078,25 @@
         title: account.title || existing.title,
         contactPhone: account.contactPhone || existing.contactPhone || phone,
         email: account.email || existing.email || "",
-        province: account.province || existing.province,
-        city: account.city || existing.city
+        province: region.province,
+        city: region.city
       });
+      const incompleteMessage = profileIssueMessage(normalized);
+      if (incompleteMessage) {
+        primeLoginProfile(normalized);
+        state.login.step = 2;
+        state.login.error = incompleteMessage;
+        renderApp();
+        showToast("请先补全企业资料后再登录。");
+        window.scrollTo(0, 0);
+        return;
+      }
       syncInstitutionProfile(normalized);
       finishLogin(normalized);
       return;
     }
-    state.login.name = account.name || "";
-    state.login.orgName = account.orgName || "";
-    state.login.orgType = account.orgType || "保险公司";
-    state.login.title = account.title || "";
-    state.login.email = account.email || "";
-    state.login.province = account.province || state.login.province;
-    state.login.city = account.city || state.login.city;
+    primeLoginProfile({ ...account, phone });
     state.login.step = 2;
-    state.login.contactPhone = account.contactPhone || phone;
     renderApp();
     window.scrollTo(0, 0);
   }
@@ -3090,9 +3172,7 @@
       orgType,
       title,
       contactPhone,
-      email,
-      province,
-      city
+      email
     } = state.login;
     const account = institutionAccountByPhone(phone);
     if (!account || !account.active) {
@@ -3101,16 +3181,23 @@
       renderApp();
       return showToast(state.login.error);
     }
-    if (!name.trim()) return showToast("请填写姓名。");
-    if (!orgName.trim()) return showToast("请填写单位名称。");
-    if (contactPhone && !/^1\d{10}$/.test(contactPhone)) {
-      return showToast("联系方式格式不正确。");
-    }
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return showToast("通知邮箱格式不正确。");
+    const issueMessage = profileIssueMessage({
+      phone,
+      name,
+      orgName,
+      orgType,
+      title,
+      contactPhone,
+      email
+    });
+    if (issueMessage) {
+      state.login.error = issueMessage;
+      renderApp();
+      showToast(issueMessage);
+      return;
     }
     const now = new Date().toISOString();
-    const region = normalizeRegion(province, city);
+    const region = profileRegionFromContext(state.login);
     const user = {
       phone,
       name: name.trim(),
@@ -7353,12 +7440,25 @@
     }
     const appointments = appointmentsForUser(session.phone);
     const demands = demandsForUser(session.phone);
+    const profileIssues = profileValidationErrors(session);
     return `
       <div class="screen me-screen">
         <header class="page-head page-head--tight">
           <span class="eyebrow"><i></i> My Account</span>
           <h1>我的</h1>
         </header>
+        ${
+          profileIssues.length
+            ? `<section class="profile-completion-card">
+                ${icon("alert", 17)}
+                <div>
+                  <strong>企业资料待完善</strong>
+                  <p>${esc(profileIssues.join("、"))}，完善后便于院方确认方案和发送通知。</p>
+                </div>
+                <button type="button" data-action="open-profile">去完善</button>
+              </section>`
+            : ""
+        }
         <section class="profile-hero">
           <div class="profile-hero__top">
             <span class="profile-hero__avatar">${esc(initialOf(session.name))}</span>
@@ -7370,7 +7470,7 @@
             <button class="profile-hero__edit" type="button" data-action="open-profile">${icon(
               "edit",
               14
-            )} 编辑</button>
+            )} ${profileIssues.length ? "完善" : "编辑"}</button>
           </div>
           <div class="profile-hero__phone">
             ${icon("phone", 15)}
@@ -7403,7 +7503,7 @@
           </button>
           <button type="button" data-action="open-profile">
             <span class="me-menu__icon">${icon("user", 17)}</span>
-            <span><strong>企业资料</strong><small>姓名、单位与联系方式</small></span>
+            <span><strong>企业资料</strong><small>姓名、职务、单位与通知邮箱</small></span>
             ${icon("chevronRight", 15)}
           </button>
           <a href="${esc(phoneHref("010-69006900"))}">
@@ -7422,6 +7522,7 @@
 
   function renderProfileSheet() {
     const draft = state.profileDraft || { ...state.session };
+    const region = profileRegionFromContext(state.session);
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet" role="dialog" aria-modal="true" aria-label="编辑企业资料">
@@ -7434,18 +7535,19 @@
         </div>
         <div class="sheet__body">
           <div class="sheet-pad">
+            <p class="profile-form-note">${icon("shield", 13)} 姓名、职务、单位、联系方式和通知邮箱用于预约确认与方案通知，请完整填写。</p>
             <div class="field-row">
-              <div class="field"><label>姓名</label>
+              <div class="field"><label>姓名 <em>*</em></label>
                 <input type="text" data-profile-field="name" value="${esc(draft.name)}">
               </div>
-              <div class="field"><label>职务</label>
+              <div class="field"><label>职务 <em>*</em></label>
                 <input type="text" data-profile-field="title" value="${esc(draft.title || "")}">
               </div>
             </div>
-            <div class="field"><label>单位名称</label>
+            <div class="field"><label>单位名称 <em>*</em></label>
               <input type="text" data-profile-field="orgName" value="${esc(draft.orgName)}">
             </div>
-            <div class="field"><label>机构类型</label>
+            <div class="field"><label>机构类型 <em>*</em></label>
               <select data-profile-field="orgType">
                 ${["保险公司", "企业", "其他机构"]
                   .map(
@@ -7457,27 +7559,22 @@
                   .join("")}
               </select>
             </div>
-            <div class="field"><label>联系方式 <span>默认手机号，可修改</span></label>
+            <div class="field"><label>联系方式 <em>*</em> <span>默认手机号，可修改</span></label>
               <input type="tel" inputmode="numeric" maxlength="11" data-profile-field="contactPhone" value="${esc(
                 draft.contactPhone || draft.phone
               )}">
             </div>
-            <div class="field"><label>通知邮箱 <span>用于接收方案与确认提醒</span></label>
+            <div class="field"><label>通知邮箱 <em>*</em> <span>用于接收方案与确认提醒</span></label>
               <input type="email" inputmode="email" data-profile-field="email" value="${esc(
                 draft.email || ""
               )}" placeholder="name@company.com">
             </div>
             <div class="field">
-              <label>所在省市 <span>用于推荐就近医院</span></label>
-              <div class="field-row">
-                <select data-profile-province>${renderProvinceOptions(
-                  draft.province || "北京市"
-                )}</select>
-                <select data-profile-city>${renderCityOptions(
-                  draft.province || "北京市",
-                  draft.city || "北京市"
-                )}</select>
+              <label>所在省市 <span>无需填写，自动同步</span></label>
+              <div class="field-static">
+                ${icon("mapPin", 14)} ${esc(regionText(region.province, region.city))}
               </div>
+              <span class="field-help">根据当前定位或首页选择的城市自动确定，不能手动修改。</span>
             </div>
           </div>
         </div>
@@ -7499,20 +7596,23 @@
   function saveProfile() {
     const draft = state.profileDraft;
     if (!draft) return;
-    if (!draft.name?.trim()) return showToast("请填写姓名。");
-    if (!draft.orgName?.trim()) return showToast("请填写单位名称。");
-    if (draft.contactPhone && !/^1\d{10}$/.test(draft.contactPhone)) {
-      return showToast("联系方式格式不正确。");
+    const issueMessage = profileIssueMessage({
+      ...draft,
+      phone: state.session.phone
+    });
+    if (issueMessage) {
+      return showToast(issueMessage);
     }
-    if (draft.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
-      return showToast("通知邮箱格式不正确。");
-    }
-    const region = normalizeRegion(draft.province, draft.city);
+    const region = profileRegionFromContext(state.session);
     const saved = upsertUser({
       ...state.session,
       ...draft,
       phone: state.session.phone,
-      contactPhone: draft.contactPhone || state.session.phone,
+      name: draft.name.trim(),
+      orgName: draft.orgName.trim(),
+      contactPhone: String(draft.contactPhone || state.session.phone).trim(),
+      title: draft.title.trim(),
+      email: draft.email.trim(),
       province: region.province,
       city: region.city
     });
@@ -10845,7 +10945,7 @@
               )}" placeholder="保险公司、集团或企业全称">
             </div>
             <div class="field-row">
-              <div class="field"><label>机构类型</label>
+              <div class="field"><label>机构类型 <em>*</em></label>
                 <select data-institution-field="orgType">
                   ${["保险公司", "企业", "其他机构"]
                     .map(
@@ -10857,18 +10957,18 @@
                     .join("")}
                 </select>
               </div>
-              <div class="field"><label>职务</label>
+              <div class="field"><label>职务 <em>*</em></label>
                 <input type="text" data-institution-field="title" value="${esc(
                   draft.title
                 )}" placeholder="如：员工健康负责人">
               </div>
             </div>
             <div class="field-row">
-              <div class="field"><label>联系方式</label>
+              <div class="field"><label>联系方式 <em>*</em></label>
                 <input type="tel" inputmode="numeric" maxlength="11" data-institution-field="contactPhone"
                   value="${esc(draft.contactPhone || draft.phone)}" placeholder="默认同登录手机号">
               </div>
-              <div class="field"><label>通知邮箱</label>
+              <div class="field"><label>通知邮箱 <em>*</em></label>
                 <input type="email" inputmode="email" data-institution-field="email"
                   value="${esc(draft.email || "")}" placeholder="name@company.com">
               </div>
@@ -10907,11 +11007,14 @@
     if (!draft) return;
     if (!/^1\d{10}$/.test(draft.phone || "")) return showToast("请填写正确的 11 位登录手机号。");
     if (!draft.name?.trim()) return showToast("请填写机构联系人姓名。");
+    if (!draft.title?.trim()) return showToast("请填写机构联系人职务。");
     if (!draft.orgName?.trim()) return showToast("请填写单位名称。");
-    if (draft.contactPhone && !/^1\d{10}$/.test(draft.contactPhone)) {
+    const contactPhone = String(draft.contactPhone || draft.phone || "").trim();
+    if (!/^1\d{10}$/.test(contactPhone)) {
       return showToast("联系方式格式不正确。");
     }
-    if (draft.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
+    if (!draft.email?.trim()) return showToast("请填写通知邮箱。");
+    if (!validProfileEmail(draft.email)) {
       return showToast("通知邮箱格式不正确。");
     }
     const accounts = getInstitutionAccounts();
@@ -10925,7 +11028,7 @@
     const payload = normalizeInstitutionAccount({
       ...draft,
       phone: draft.phone.trim(),
-      contactPhone: (draft.contactPhone || draft.phone).trim(),
+      contactPhone,
       province: region.province,
       city: region.city,
       updatedAt: new Date().toISOString()
@@ -11530,9 +11633,7 @@
     if (target.matches("[data-login-field]")) {
       const field = target.dataset.loginField;
       state.login[field] = target.type === "checkbox" ? target.checked : target.value;
-      if (field === "phone" || field === "code" || field === "agree") {
-        state.login.error = "";
-      }
+      state.login.error = "";
       return;
     }
     if (target.matches("[data-admin-login]")) {
@@ -11668,17 +11769,6 @@
       state.homeRegionDraft.city = target.value;
       return;
     }
-    if (target.matches("[data-login-province]")) {
-      state.login.province = target.value;
-      state.login.city = (state.chinaCities?.[target.value] || [target.value])[0];
-      const city = document.querySelector("[data-login-city]");
-      if (city) city.innerHTML = renderCityOptions(state.login.province, state.login.city);
-      return;
-    }
-    if (target.matches("[data-login-city]")) {
-      state.login.city = target.value;
-      return;
-    }
     if (target.matches("[data-booking-province]") && state.booking) {
       setBookingProvince(target.value);
       return;
@@ -11721,17 +11811,6 @@
     }
     if (target.matches("[data-demand-city]") && state.overlay?.draft) {
       state.overlay.draft.city = target.value;
-      return;
-    }
-    if (target.matches("[data-profile-province]") && state.profileDraft) {
-      state.profileDraft.province = target.value;
-      state.profileDraft.city = (state.chinaCities?.[target.value] || [target.value])[0];
-      const city = document.querySelector("[data-profile-city]");
-      if (city) city.innerHTML = renderCityOptions(state.profileDraft.province, state.profileDraft.city);
-      return;
-    }
-    if (target.matches("[data-profile-city]") && state.profileDraft) {
-      state.profileDraft.city = target.value;
       return;
     }
     if (target.matches("[data-institution-province]") && state.institutionAccountDraft) {
