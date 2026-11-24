@@ -23,7 +23,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261124-03";
+  const DATA_VERSION = "20261124-04";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -44,12 +44,43 @@
     femaleSenior: "assets/avatars/doctor-female-senior.svg"
   };
   const EXPERT_DATA_FIXES = {
+    "elite-01": { services: ["讲座", "1V1报告解读"] },
+    "elite-02": { services: ["讲座", "1V1报告解读"] },
+    "elite-03": { services: ["讲座", "1V1报告解读"] },
+    "elite-04": { services: ["讲座", "1V1报告解读"] },
+    "elite-05": { services: ["讲座", "1V1报告解读"] },
+    "elite-06": { services: ["讲座", "1V1报告解读"] },
+    "elite-07": { services: ["讲座", "1V1报告解读"] },
+    "director-01": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "director-02": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "director-03": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "director-04": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-01": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-03": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-04": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-05": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-07": { services: ["讲座", "健康咨询", "1V1报告解读"] },
     "specialist-09": {
-      services: ["讲座", "巡诊"],
+      services: ["讲座", "健康咨询"],
       coverage: "全国",
       coverageCities: ["全国"],
       coverageRegions: ["全国"]
-    }
+    },
+    "specialist-11": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-12": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-13": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-15": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-18": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-22": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-26": { services: ["讲座"] },
+    "specialist-27": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-30": { services: ["讲座"] },
+    "specialist-35": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-36": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-40": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-41": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-42": { services: ["讲座", "健康咨询", "1V1报告解读"] },
+    "specialist-44": { services: ["讲座"] }
   };
 
   const TIERS = {
@@ -75,18 +106,22 @@
       short: "专业医生",
       tag: "快速响应",
       leadDays: 7,
-      desc: "各科室骨干医生，适合员工健康课堂、科室科普与现场巡诊。"
+      desc: "各科室骨干医生，适合员工健康课堂、科室科普与现场健康咨询。"
     }
   };
   const TIER_ORDER = ["elite", "director", "specialist"];
   const CLIENT_TIER_ORDER = ["specialist", "director", "elite"];
 
   const SERVICES = {
-    讲座: { id: "讲座", label: "健康讲座", desc: "主题分享 + 现场问答" },
-    巡诊: { id: "巡诊", label: "健康咨询", desc: "健康筛查 + 现场咨询" },
-    "1对1": { id: "1对1", label: "1v1报告解读", desc: "报告解读 · 一对一咨询" }
+    讲座: { id: "讲座", label: "讲座", desc: "主题分享 + 现场问答" },
+    健康咨询: { id: "健康咨询", label: "健康咨询", desc: "健康筛查 + 现场咨询" },
+    "1V1报告解读": {
+      id: "1V1报告解读",
+      label: "1V1报告解读",
+      desc: "报告解读 · 一对一咨询"
+    }
   };
-  const SERVICE_IDS = ["讲座", "巡诊", "1对1"];
+  const SERVICE_IDS = ["讲座", "健康咨询", "1V1报告解读"];
   const THEME_COVERAGE_OPTIONS = [
     "北京",
     "北京/京外",
@@ -565,7 +600,10 @@
         ...(config.overrides?.[expert.id] || {})
       }));
     const added = (config.added || []).map((expert) => ({ ...expert, custom: true }));
-    state.experts = merged.concat(added);
+    state.experts = merged.concat(added).map((expert) => ({
+      ...expert,
+      services: normalizeServiceList(expert.services)
+    }));
   }
 
   function allExperts() {
@@ -593,7 +631,14 @@
 
   function derivedCoverageCities(raw = "") {
     const value = String(raw || "").trim();
-    if (!value || value.includes("全国") || value.includes("省外")) return ["全国"];
+    if (
+      !value ||
+      value.includes("全国") ||
+      value.includes("省外") ||
+      value.includes("京外")
+    ) {
+      return ["全国"];
+    }
     const cities = [];
     [
       ["北京", "北京市"],
@@ -708,7 +753,7 @@
         : [];
     }
     return {
-      label: label || coverageText(cities),
+      label: coverageDisplayLabel(label || coverageText(cities)),
       cities
     };
   }
@@ -730,6 +775,11 @@
           .filter(Boolean)
       )
     ];
+  }
+
+  function coverageDisplayLabel(label) {
+    const value = String(label || "").trim();
+    return /全国|京外|省外/.test(value) ? "全国" : value;
   }
 
   function themeCoverageSummary(theme, hospitalId = "") {
@@ -764,7 +814,26 @@
   }
 
   function serviceLabel(value) {
-    return SERVICES[value]?.label || value;
+    const service = normalizeService(value);
+    return SERVICES[service]?.label || value;
+  }
+
+  function normalizeService(value) {
+    const text = String(value || "").replace(/\s+/g, "").trim();
+    const lower = text.toLowerCase();
+    if (["讲座", "健康讲座"].includes(text)) return "讲座";
+    if (["巡诊", "健康咨询"].includes(text)) return "健康咨询";
+    if (
+      ["1对1", "1v1", "1v1报告解读", "报告解读", "1v1报告解读"].includes(lower) ||
+      ["1对1", "1V1报告解读"].includes(text)
+    ) {
+      return "1V1报告解读";
+    }
+    return text;
+  }
+
+  function normalizeServiceList(list) {
+    return [...new Set((Array.isArray(list) ? list : []).map(normalizeService).filter(Boolean))];
   }
 
   function fallbackHospital(user = state.session) {
@@ -968,15 +1037,8 @@
 
   function matchesService(expert, service) {
     if (!service || service === "all") return true;
-    const normalize = (value) => {
-      const text = String(value || "").trim();
-      if (["讲座", "健康讲座"].includes(text)) return "讲座";
-      if (["巡诊", "健康咨询"].includes(text)) return "巡诊";
-      if (["1对1", "1v1", "1v1报告解读", "报告解读"].includes(text)) return "1对1";
-      return text;
-    };
-    const target = normalize(service);
-    return (expert.services || []).some((item) => normalize(item) === target);
+    const target = normalizeService(service);
+    return (expert.services || []).some((item) => normalizeService(item) === target);
   }
 
   function serviceCount(service, hospitalId = "") {
@@ -994,12 +1056,7 @@
     return state.experts.filter((expert) => {
       if (!expert.active || !matchesService(expert, service)) return false;
       if (scope === "nearby" && expert.hospitalId !== hospital?.id) return false;
-      if (
-        scope === "all" &&
-        !expertCoversRegion(expert, region.province, region.city)
-      ) {
-        return false;
-      }
+      if (!expertCoversRegion(expert, region.province, region.city)) return false;
       if (
         state.expertAvailability !== "all" &&
         !doctorAvailability(expert).bookable
@@ -1017,7 +1074,7 @@
   }
 
   function serviceTagsFor(expert) {
-    return [...(expert?.services || [])].map((service) => ({ service }));
+    return normalizeServiceList(expert?.services).map((service) => ({ service }));
   }
 
   function getSlots(doctorId) {
@@ -1217,21 +1274,21 @@
           city: "北京市",
           address: "北京市朝阳区望京 SOHO T1",
           venue: "B1 员工活动中心",
-          serviceType: "巡诊",
+          serviceType: "健康咨询",
           doctorId: director?.id || "",
           doctorName: director?.name || "",
           tier: director?.tier || "director",
           hospitalId: hospital.id,
           date: confirmedDate,
-          topic: "企业员工代谢健康与体重管理巡诊",
+          topic: "企业员工代谢健康与体重管理咨询",
           audience: "全体职工",
           headcount: "120",
           note: "需要分时段到场，现场提供血压与体脂测量。",
           status: "confirmed",
           assignedStaff: staff,
           plan: {
-            topic: "企业员工代谢健康与体重管理巡诊",
-            serviceType: "巡诊",
+            topic: "企业员工代谢健康与体重管理咨询",
+            serviceType: "健康咨询",
             speakerId: director?.id || "",
             speaker: director ? `${director.name} · ${director.deptTitle}` : "院方安排",
             date: confirmedDate,
@@ -1241,7 +1298,7 @@
             venue: "B1 员工活动中心",
             address: "北京市朝阳区望京 SOHO T1",
             outline: "血压、体脂与腰围测量；代谢风险分层；个体化饮食与运动建议。",
-            agenda: "10:00-10:20 场地准备\n10:20-11:40 分组巡诊\n11:40-12:00 汇总答疑",
+            agenda: "10:00-10:20 场地准备\n10:20-11:40 分组咨询\n11:40-12:00 汇总答疑",
             team: "周老师（项目负责人）、张老师（现场执行）",
             message: "方案已确认，院方将按流程到场执行。",
             contact: "周老师 · 13800001111",
@@ -1273,8 +1330,8 @@
           province: "北京市",
           city: "北京市",
           hospitalId: hospital.id,
-          serviceType: "巡诊",
-          topic: "企业园区颈肩腰腿痛巡诊",
+          serviceType: "健康咨询",
+          topic: "企业园区颈肩腰腿痛健康咨询",
           audience: "一线员工与司机班组",
           headcount: "120",
           preferredDate: isoDate(addDays(today, 20)),
@@ -1296,7 +1353,7 @@
           province: "北京市",
           city: "北京市",
           hospitalId: hospital.id,
-          serviceType: "1对1",
+          serviceType: "1V1报告解读",
           topic: "管理层一对一健康咨询",
           audience: "管理层 12 人",
           headcount: "12",
@@ -1621,7 +1678,7 @@
       month: Number(month),
       season: season.season,
       focus: season.focus,
-      intro: `本月时令聚焦「${season.season.replace(/^（.*?）\s*/, "")}」。由${hospital.name}专家团队围绕${season.focus}开展企业健康讲座，重点关注${season.diseases}。`,
+      intro: `本月时令聚焦「${season.season.replace(/^（.*?）\s*/, "")}」。由${hospital.name}专家团队围绕${season.focus}开展企业讲座，重点关注${season.diseases}。`,
       diseases: season.diseases,
       industries: season.industries,
       image: themeImageFor(month),
@@ -2068,7 +2125,7 @@
         <div class="auth-visual">
           <span class="auth-visual__badge">${icon("shield", 13)} 企业健康服务</span>
           <h1>登录后，<br>把专家请到企业身边</h1>
-          <p>手机号登录即可预约健康讲座、健康咨询与 1v1 报告解读，院方项目组全程跟进。</p>
+          <p>手机号登录即可预约讲座、健康咨询与 1V1 报告解读，院方项目组全程跟进。</p>
         </div>
         <div class="auth-card">
           <div class="auth-steps">
@@ -2411,6 +2468,60 @@
     `;
   }
 
+  function coverageProvinceForCities(cities = [], fallbackProvince = "") {
+    const provinces = Object.keys(state.chinaCities || {});
+    const selected = (cities || []).filter((city) => city && city !== "全国");
+    const matched = provinces.find(
+      (province) =>
+        selected.includes(province) ||
+        selected.some((city) => (state.chinaCities?.[province] || []).includes(city))
+    );
+    if (matched) return matched;
+    const fallback = normalizeRegion(fallbackProvince || "北京市", "");
+    return fallback.province || "北京市";
+  }
+
+  function renderCoverageCitySelectOptions(province = "", selected = "") {
+    const cities = state.chinaCities?.[province] || (province ? [province] : []);
+    return cities
+      .map(
+        (city) =>
+          `<option value="${esc(city)}" ${city === selected ? "selected" : ""}>${esc(city)}</option>`
+      )
+      .join("");
+  }
+
+  function coverageChipsMarkup(cities = []) {
+    return (cities || [])
+      .map(
+        (city) => `
+          <span>${icon("mapPin", 11)} ${esc(city)}
+            <button type="button" data-action="doctor-city-remove" data-city="${esc(
+              city
+            )}" aria-label="移除${esc(city)}">${icon("close", 10)}</button>
+          </span>
+        `
+      )
+      .join("");
+  }
+
+  function refreshDoctorCoverageChips() {
+    if (!state.adminDoctorDraft) return;
+    const chips = document.getElementById("doctor-coverage-chips");
+    if (chips) {
+      chips.innerHTML =
+        coverageChipsMarkup(state.adminDoctorDraft.coverageCities || []) ||
+        "<small>尚未选择履约城市</small>";
+    }
+    const national = document.querySelector('[data-action="doctor-coverage-national"]');
+    if (national) {
+      national.classList.toggle(
+        "is-active",
+        Boolean(state.adminDoctorDraft.coverageCities?.includes("全国"))
+      );
+    }
+  }
+
   function addCoverageCity(list, city) {
     const next = Array.isArray(list) ? [...list] : [];
     if (!city) return next;
@@ -2506,10 +2617,12 @@
      ========================================================= */
   function nearbyExperts({ bookableOnly = false } = {}) {
     const hospital = nearestHospital();
+    const region = currentClientRegion();
     return state.experts
       .filter((expert) => {
         if (!expert.active) return false;
         if (expert.hospitalId !== hospital?.id) return false;
+        if (!expertCoversRegion(expert, region.province, region.city)) return false;
         if (bookableOnly && !doctorAvailability(expert).bookable) return false;
         return true;
       })
@@ -2531,12 +2644,7 @@
       .filter((expert) => {
         if (!expert.active) return false;
         if (scope === "nearby" && expert.hospitalId !== hospital?.id) return false;
-        if (
-          scope === "all" &&
-          !expertCoversRegion(expert, region.province, region.city)
-        ) {
-          return false;
-        }
+        if (!expertCoversRegion(expert, region.province, region.city)) return false;
         if (availability === "local") {
           const expertHospital = hospitalById(expert.hospitalId);
           if (
@@ -2935,19 +3043,18 @@
     return `
         <section class="section">
           <div class="section-head">
-            <div><h2>到企服务类型</h2><p>健康讲座、健康咨询与 1v1 报告解读</p></div>
+            <div><h2>到企服务类型</h2><p>讲座、健康咨询与 1V1 报告解读</p></div>
           </div>
           <div class="service-grid">
             ${SERVICE_IDS.map((id, index) => {
               const service = SERVICES[id];
               const count = serviceCount(id, hospital?.id);
-              const countText =
-                id === "1对1" ? "院方按报告协调" : `${count} 位本院专家可服务`;
+              const countText = `${count} 位本院专家可服务`;
               return `
                 <button class="service-card" type="button" data-action="service-open" data-value="${esc(id)}">
                   <span class="service-card__num">0${index + 1}</span>
                   <span class="service-card__icon">${icon(
-                    id === "讲座" ? "message" : id === "巡诊" ? "stethoscope" : "users",
+                    id === "讲座" ? "message" : id === "健康咨询" ? "stethoscope" : "users",
                     19
                   )}</span>
                   <strong>${esc(service.label)}</strong>
@@ -2973,7 +3080,7 @@
             <div id="home-hospital-picker">${renderHomeHospitalPicker()}</div>
             <span class="hero__kicker"><i></i> 白大褂到企 · 名医入企计划</span>
             <h1>把医学专家<br><em>请到企业身边</em></h1>
-            <p>面向保险公司与企业，提供健康讲座、健康咨询与 1v1 报告解读。按医院、科室与时令主题匹配专家，院方项目组全程跟进。</p>
+            <p>面向保险公司与企业，提供讲座、健康咨询与 1V1 报告解读。按医院、科室与时令主题匹配专家，院方项目组全程跟进。</p>
             <div class="hero__actions">
               <button class="btn btn--accent" type="button" data-action="open-booking">
                 发起活动预约 ${icon("arrowRight", 15)}
@@ -3030,7 +3137,7 @@
         </section>
 
         <p class="source-note">
-          专家资料、医院与服务信息来自院方整理表（2026-11-23），仅用于本演示。实际出讲专家、号源与排期以院方最终确认为准。
+          专家资料、医院与服务信息参考院方整理表（2026-11-24），仅用于本演示。实际出讲专家、号源与排期以院方最终确认为准。
         </p>
         <section class="hospital-entry-section">
           <button class="hospital-entry" type="button" data-action="open-admin">
@@ -3189,7 +3296,7 @@
           )}" width="900" height="560" decoding="async">
           <div class="theme-hero__shade"></div>
           <div class="theme-hero__top">
-            <span>${icon("leaf", 13)} 时令主题 · 健康讲座</span>
+            <span>${icon("leaf", 13)} 时令主题 · 讲座</span>
             <div class="theme-hero__top-actions">
               ${
                 isCurrent
@@ -3463,10 +3570,10 @@
       ${
         list.length
           ? `<div class="expert-list">${list.map(renderExpertCard).join("")}</div>`
-          : state.expertService === "1对1"
+          : state.expertService === "1V1报告解读"
           ? `<div class="empty-state">
               <span class="empty-state__icon">${icon("users", 26)}</span>
-              <h3>当前范围暂无可提供 1v1 的专家</h3>
+              <h3>当前范围暂无可提供 1V1 报告解读的专家</h3>
               <p>专家为预约必选项。可切换到全部地区查看，或发起提需由医院运营人员电话沟通匹配。</p>
               <button class="btn btn--primary btn--sm" type="button" data-action="open-demand">
                 发起提需
@@ -3489,7 +3596,7 @@
           <span class="filter-label">服务类型</span>
           <button class="chip is-active" type="button" data-action="expert-service"
             data-value="讲座">${esc(serviceLabel("讲座"))}<span class="chip__count">本月</span></button>
-          <span class="filter-month-note">${icon("leaf", 10)} 月令主题仅对应健康讲座</span>
+          <span class="filter-month-note">${icon("leaf", 10)} 月令主题仅对应讲座</span>
           <button class="filter-reset-link" type="button" data-action="expert-month-clear">
             清除月令筛选
           </button>
@@ -3507,7 +3614,7 @@
               data-action="expert-service" data-value="${esc(id)}">${esc(
                 serviceLabel(id)
               )}<span class="chip__count">${
-                id === "1对1" ? "提需" : scopedServiceCount(id)
+                scopedServiceCount(id)
               }</span></button>`
         ).join("")}
       </div>
@@ -3750,7 +3857,7 @@
                 .map(
                   ({ service }) =>
                     `<span>${icon(
-                      service === "讲座" ? "message" : service === "巡诊" ? "stethoscope" : "users",
+                      service === "讲座" ? "message" : service === "健康咨询" ? "stethoscope" : "users",
                       13
                     )} ${esc(serviceLabel(service))}</span>`
                 )
@@ -3803,7 +3910,7 @@
                               <strong>${esc(theme.title)}</strong>
                               <small>${esc(theme.hospital)} · ${esc(
                                 theme.professionalTitle
-                              )} · ${esc(theme.coverage)}</small><i>查看主题</i>
+                              )} · ${esc(coverageDisplayLabel(theme.coverage))}</small><i>查看主题</i>
                             </button>
                           `
                         )
@@ -4104,7 +4211,10 @@
           return `
             <button class="choice-card ${booking.serviceType === id ? "is-active" : ""}" type="button"
               data-action="booking-service" data-value="${esc(id)}">
-              <span>${icon(id === "讲座" ? "message" : id === "巡诊" ? "stethoscope" : "users", 17)}</span>
+              <span>${icon(
+                id === "讲座" ? "message" : id === "健康咨询" ? "stethoscope" : "users",
+                17
+              )}</span>
               <strong>${esc(service.label)}</strong>
               <small>${esc(service.desc)}</small>
             </button>
@@ -4411,9 +4521,9 @@
                 })
                 .join("")
             : `<div class="inline-empty">${
-                booking.serviceType === "1对1"
-                  ? "1v1 报告解读不关联讲座课题，可直接填写报告解读方向。"
-                  : booking.serviceType === "巡诊"
+                normalizeService(booking.serviceType) === "1V1报告解读"
+                  ? "1V1 报告解读不关联讲座课题，可直接填写报告解读方向。"
+                  : normalizeService(booking.serviceType) === "健康咨询"
                   ? "健康咨询不展示讲座课题，请直接填写咨询方向或人群健康需求。"
                   : booking.doctorId
                   ? "该专家本月暂未绑定讲座课题，可在下方填写自定义主题，或取消选择其他专家。"
@@ -4468,7 +4578,7 @@
         <div class="flow-section__head"><h2>活动需求</h2><span>${
           booking.serviceType === "讲座"
             ? "时令主题可选，点击已选主题可取消"
-            : booking.serviceType === "巡诊"
+            : normalizeService(booking.serviceType) === "健康咨询"
             ? "填写咨询方向与人群需求"
             : "填写报告解读关注方向"
         }</span></div>
@@ -4524,7 +4634,7 @@
         <span class="summary-card__label">${icon("calendar", 14)} 活动预约</span>
         <h2>${esc(booking.customTopic || "由院方结合时令主题推荐")}</h2>
         <div class="summary-card__pills">
-          <span>${esc(booking.serviceType)}</span>
+          <span>${esc(serviceLabel(booking.serviceType))}</span>
           <span>${esc(formatDateCN(booking.date, true))}</span>
           <span>${esc(hospital?.name || "")}</span>
         </div>
@@ -7564,7 +7674,7 @@
       {
         id: `tpl-${hospital.id}-lecture`,
         hospitalId: hospital.id,
-        name: "标准健康讲座",
+        name: "标准讲座方案",
         serviceType: "讲座",
         topic: "",
         outline:
@@ -7581,7 +7691,7 @@
         id: `tpl-${hospital.id}-consult`,
         hospitalId: hospital.id,
         name: "企业健康咨询",
-        serviceType: "巡诊",
+        serviceType: "健康咨询",
         topic: "",
         outline:
           "1. 健康风险筛查\n2. 分组一对一咨询\n3. 重点人群健康建议\n4. 现场问题汇总",
@@ -7760,7 +7870,7 @@
               <div class="field"><label>模版名称 <em>*</em></label>
                 <input type="text" data-template-field="name" value="${esc(
                   draft.name || ""
-                )}" placeholder="如：标准健康讲座">
+                )}" placeholder="如：标准讲座方案">
               </div>
               <div class="field"><label>服务类型</label>
                 <select data-template-field="serviceType">${templateServiceOptions(
@@ -8028,6 +8138,7 @@
                     .join("") || "<small>尚未选择城市</small>"}
                 </div>
                 <select data-theme-city-add>${renderCoverageCityOptions()}</select>
+                <span class="field-help">含“京外”或“省外”的履约地，机构端统一按全国可履约展示。</span>
               </div>
             </div>
             <div class="field">
@@ -8276,7 +8387,7 @@
       hospital: hospital?.name || "",
       deptTitle: "",
       dept: "内科",
-      services: ["讲座", "巡诊"],
+      services: ["讲座", "健康咨询"],
       coverage: "全国",
       coverageCities: ["全国"],
       leadDays: 7,
@@ -8294,6 +8405,17 @@
     const expert = id ? expertById(id) : null;
     state.adminDoctorDraft = expert ? clone(expert) : emptyDoctorDraft();
     if (expert) state.adminDoctorDraft.coverageCities = coverageCitiesFor(expert);
+    const hospital = hospitalById(state.adminDoctorDraft.hospitalId);
+    const province = coverageProvinceForCities(
+      state.adminDoctorDraft.coverageCities,
+      hospital?.province || "北京市"
+    );
+    const selectedCity = (state.adminDoctorDraft.coverageCities || []).find(
+      (city) => city !== "全国" && (state.chinaCities?.[province] || []).includes(city)
+    );
+    state.adminDoctorDraft.coverageProvince = province;
+    state.adminDoctorDraft.coverageCity =
+      selectedCity || state.chinaCities?.[province]?.[0] || province || "北京市";
     state.overlay = { type: "admin-doctor" };
     renderOverlay();
   }
@@ -8420,21 +8542,35 @@
             </div>
             <div class="field">
               <label>履约城市 <em>*</em> <span>可多选</span></label>
-              <div class="theme-city-editor">
-                <div class="theme-city-chips">
-                  ${draftCoverage
-                    .map(
-                      (city) => `
-                        <span>${icon("mapPin", 11)} ${esc(city)}
-                          <button type="button" data-action="doctor-city-remove" data-city="${esc(
-                            city
-                          )}" aria-label="移除${esc(city)}">${icon("close", 10)}</button>
-                        </span>
-                      `
-                    )
-                    .join("")}
+              <div class="theme-city-editor doctor-coverage-editor">
+                <div class="theme-city-chips" id="doctor-coverage-chips">
+                  ${coverageChipsMarkup(draftCoverage)}
                 </div>
-                <select data-doctor-city-add>${renderCoverageCityOptions()}</select>
+                <div class="doctor-coverage-controls">
+                  <button class="coverage-national ${
+                    draftCoverage.includes("全国") ? "is-active" : ""
+                  }" type="button" data-action="doctor-coverage-national">
+                    <span class="coverage-national__icon">${icon("mapPin", 14)}</span>
+                    <span><strong>全国（不限城市）</strong><small>覆盖全国任意履约城市</small></span>
+                    <span class="coverage-national__check">${icon("check", 12)}</span>
+                  </button>
+                  <div class="field-row doctor-coverage-picker">
+                    <div class="field">
+                      <label>省份</label>
+                      <select data-doctor-coverage-province>${renderProvinceOptions(
+                        draft.coverageProvince
+                      )}</select>
+                    </div>
+                    <div class="field">
+                      <label>城市</label>
+                      <select data-doctor-coverage-city>${renderCoverageCitySelectOptions(
+                        draft.coverageProvince,
+                        draft.coverageCity
+                      )}</select>
+                    </div>
+                  </div>
+                  <span class="field-help">先选省份再选城市，选中城市后自动加入。含“京外”或“省外”的履约地按全国覆盖处理。</span>
+                </div>
               </div>
             </div>
             <div class="field"><label>擅长 / 专业优势</label>
@@ -8493,20 +8629,22 @@
     if (!draft.deptTitle) return showToast("请填写科室/任职。");
     if (!draft.services?.length) return showToast("请至少选择一个服务类型。");
     if (!draft.coverageCities?.length) return showToast("请至少选择一个履约城市。");
+    const payload = { ...draft };
+    delete payload.custom;
+    delete payload.coverageProvince;
+    delete payload.coverageCity;
     const config = getDoctorConfig();
     if (draft.id && !draft.custom) {
-      const payload = { ...draft };
-      delete payload.custom;
       config.overrides = config.overrides || {};
       config.overrides[draft.id] = payload;
     } else if (draft.id) {
       config.added = (config.added || []).map((item) =>
-        item.id === draft.id ? { ...draft } : item
+        item.id === draft.id ? { ...payload } : item
       );
     } else {
       const id = `custom-${Date.now()}`;
       config.added = (config.added || []).concat({
-        ...draft,
+        ...payload,
         id,
         custom: true,
         photo: draft.photo || "",
@@ -9331,12 +9469,26 @@
       renderOverlay();
       return;
     }
-    if (target.matches("[data-doctor-city-add]") && state.adminDoctorDraft) {
+    if (target.matches("[data-doctor-coverage-province]") && state.adminDoctorDraft) {
+      state.adminDoctorDraft.coverageProvince = target.value;
+      state.adminDoctorDraft.coverageCity =
+        (state.chinaCities?.[target.value] || [target.value])[0] || target.value;
+      const city = document.querySelector("[data-doctor-coverage-city]");
+      if (city) {
+        city.innerHTML = renderCoverageCitySelectOptions(
+          state.adminDoctorDraft.coverageProvince,
+          state.adminDoctorDraft.coverageCity
+        );
+      }
+      return;
+    }
+    if (target.matches("[data-doctor-coverage-city]") && state.adminDoctorDraft) {
+      state.adminDoctorDraft.coverageCity = target.value;
       state.adminDoctorDraft.coverageCities = addCoverageCity(
         state.adminDoctorDraft.coverageCities,
         target.value
       );
-      renderOverlay();
+      refreshDoctorCoverageChips();
       return;
     }
     if (target.matches("[data-theme-topic-field]") && state.adminThemeDraft) {
@@ -9638,7 +9790,16 @@
         state.adminDoctorDraft.coverageCities = (
           state.adminDoctorDraft.coverageCities || []
         ).filter((city) => city !== el.dataset.city);
-        renderOverlay();
+        refreshDoctorCoverageChips();
+        break;
+      case "doctor-coverage-national":
+        if (!state.adminDoctorDraft) return;
+        state.adminDoctorDraft.coverageCities = state.adminDoctorDraft.coverageCities?.includes(
+          "全国"
+        )
+          ? [state.adminDoctorDraft.coverageCity || "北京市"]
+          : ["全国"];
+        refreshDoctorCoverageChips();
         break;
       case "admin-doctor-save":
         saveAdminDoctor();
@@ -9875,7 +10036,7 @@
         state.expertService = el.dataset.value;
         if (state.expertMonth > 0 && state.expertService !== "讲座") {
           state.expertMonth = 0;
-          showToast("月令主题仅对应健康讲座，已清除月令筛选。");
+          showToast("月令主题仅对应讲座，已清除月令筛选。");
         }
         refreshExpertFilterChrome();
         refreshExpertResults();
