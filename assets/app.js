@@ -23,7 +23,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261124-05";
+  const DATA_VERSION = "20261124-06";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -2574,12 +2574,12 @@
       .join("");
   }
 
-  function coverageChipsMarkup(cities = []) {
+  function coverageChipsMarkup(cities = [], removeAction = "doctor-city-remove") {
     return (cities || [])
       .map(
         (city) => `
           <span>${icon("mapPin", 11)} ${esc(city)}
-            <button type="button" data-action="doctor-city-remove" data-city="${esc(
+            <button type="button" data-action="${esc(removeAction)}" data-city="${esc(
               city
             )}" aria-label="移除${esc(city)}">${icon("close", 10)}</button>
           </span>
@@ -7713,19 +7713,27 @@
         date = addDays(date, 1);
       }
     });
+    const previousMonth = state.slotMonth;
+    if (applied && /^\d{4}-\d{2}/.test(batch.from)) {
+      state.slotMonth = batch.from.slice(0, 7);
+    }
+    const monthHint =
+      applied && state.slotMonth !== previousMonth
+        ? `，已定位到 ${Number(state.slotMonth.slice(5))} 月`
+        : "";
     if (save) {
       saveSlotDraft();
       showToast(
         `已快速保存：${doctors.length} 位专家、${applied} 个日期${
           adjusted ? `，${adjusted} 天因已有预约自动抬高` : ""
-        }${skipped ? `，跳过 ${skipped} 个早于预约周期的日期` : ""}。`
+        }${skipped ? `，跳过 ${skipped} 个早于预约周期的日期` : ""}${monthHint}。`
       );
     } else {
       renderSlotConfigContent();
       showToast(
         `已应用到草稿：${applied} 个日期${
           adjusted ? `，${adjusted} 天因已有预约自动抬高` : ""
-        }${skipped ? `，跳过 ${skipped} 个早于预约周期的日期` : ""}。`
+        }${skipped ? `，跳过 ${skipped} 个早于预约周期的日期` : ""}${monthHint}。`
       );
     }
   }
@@ -8154,8 +8162,37 @@
     state.adminThemeMonth = Number(month);
     state.adminThemeDraft = clone(theme);
     state.adminThemeDraft.expertIds = [...new Set(state.adminThemeDraft.expertIds || [])];
+    const coverageProvince = coverageProvinceForCities(
+      state.adminThemeDraft.coverageCities,
+      hospital.province
+    );
+    const selectedCity = (state.adminThemeDraft.coverageCities || []).find(
+      (city) =>
+        city !== "全国" &&
+        (state.chinaCities?.[coverageProvince] || []).includes(city)
+    );
+    state.adminThemeDraft.coverageProvince = coverageProvince;
+    state.adminThemeDraft.coverageCity =
+      selectedCity || state.chinaCities?.[coverageProvince]?.[0] || coverageProvince;
     state.overlay = { type: "admin-theme" };
     renderOverlay();
+  }
+
+  function refreshThemeCoverageChips() {
+    if (!state.adminThemeDraft) return;
+    const chips = document.getElementById("theme-coverage-chips");
+    if (chips) {
+      chips.innerHTML =
+        coverageChipsMarkup(state.adminThemeDraft.coverageCities || [], "theme-city-remove") ||
+        "<small>尚未选择覆盖城市</small>";
+    }
+    const national = document.querySelector('[data-action="theme-coverage-national"]');
+    if (national) {
+      national.classList.toggle(
+        "is-active",
+        Boolean(state.adminThemeDraft.coverageCities?.includes("全国"))
+      );
+    }
   }
 
   function renderAdminThemeSheet() {
@@ -8218,23 +8255,42 @@
               </div>
             </div>
             <div class="field">
-              <label>讲座覆盖城市 <em>*</em></label>
-              <div class="theme-city-editor">
-                <div class="theme-city-chips">
-                  ${(draft.coverageCities || [])
-                    .map(
-                      (city) => `
-                        <span>${icon("mapPin", 11)} ${esc(city)}
-                          <button type="button" data-action="theme-city-remove" data-city="${esc(
-                            city
-                          )}" aria-label="移除${esc(city)}">${icon("close", 10)}</button>
-                        </span>
-                      `
-                    )
-                    .join("") || "<small>尚未选择城市</small>"}
+              <label>讲座覆盖城市 <em>*</em> <span>省市级联，可多选</span></label>
+              <div class="theme-city-editor doctor-coverage-editor">
+                <div class="theme-city-chips" id="theme-coverage-chips">
+                  ${coverageChipsMarkup(
+                    draft.coverageCities || [],
+                    "theme-city-remove"
+                  ) || "<small>尚未选择覆盖城市</small>"}
                 </div>
-                <select data-theme-city-add>${renderCoverageCityOptions()}</select>
-                <span class="field-help">含“京外”或“省外”的履约地，机构端统一按全国可履约展示。</span>
+                <div class="doctor-coverage-controls">
+                  <button class="coverage-national ${
+                    draft.coverageCities?.includes("全国") ? "is-active" : ""
+                  }" type="button" data-action="theme-coverage-national">
+                    <span class="coverage-national__icon">${icon("mapPin", 14)}</span>
+                    <span><strong>全国（不限城市）</strong><small>覆盖全国任意履约城市</small></span>
+                    <span class="coverage-national__check">${icon("check", 12)}</span>
+                  </button>
+                  <div class="field-row doctor-coverage-picker">
+                    <div class="field">
+                      <label>省份</label>
+                      <select data-theme-coverage-province>${renderProvinceOptions(
+                        draft.coverageProvince
+                      )}</select>
+                    </div>
+                    <div class="field">
+                      <label>城市</label>
+                      <select data-theme-coverage-city>${renderCoverageCitySelectOptions(
+                        draft.coverageProvince,
+                        draft.coverageCity
+                      )}</select>
+                    </div>
+                  </div>
+                  <button class="btn btn--ghost btn--sm" type="button" data-action="theme-coverage-add">
+                    ${icon("plus", 13)} 添加当前城市
+                  </button>
+                  <span class="field-help">先选省份再选城市，选中城市后自动加入；可继续切换省份添加多个城市。含“京外”或“省外”的履约地，机构端按全国可履约展示。</span>
+                </div>
               </div>
             </div>
             <div class="field">
@@ -9372,6 +9428,10 @@
      ========================================================= */
   function handleInput(event) {
     const target = event.target;
+    if (target.matches("[data-slot-batch]")) {
+      state.slotBatch[target.dataset.slotBatch] = target.value;
+      return;
+    }
     if (target.matches("[data-login-field]")) {
       const field = target.dataset.loginField;
       state.login[field] = target.type === "checkbox" ? target.checked : target.value;
@@ -9563,12 +9623,26 @@
       state.profileDraft.city = target.value;
       return;
     }
-    if (target.matches("[data-theme-city-add]") && state.adminThemeDraft) {
+    if (target.matches("[data-theme-coverage-province]") && state.adminThemeDraft) {
+      state.adminThemeDraft.coverageProvince = target.value;
+      state.adminThemeDraft.coverageCity =
+        (state.chinaCities?.[target.value] || [target.value])[0] || target.value;
+      const city = document.querySelector("[data-theme-coverage-city]");
+      if (city) {
+        city.innerHTML = renderCoverageCitySelectOptions(
+          state.adminThemeDraft.coverageProvince,
+          state.adminThemeDraft.coverageCity
+        );
+      }
+      return;
+    }
+    if (target.matches("[data-theme-coverage-city]") && state.adminThemeDraft) {
+      state.adminThemeDraft.coverageCity = target.value;
       state.adminThemeDraft.coverageCities = addCoverageCity(
         state.adminThemeDraft.coverageCities,
         target.value
       );
-      renderOverlay();
+      refreshThemeCoverageChips();
       return;
     }
     if (target.matches("[data-doctor-coverage-province]") && state.adminDoctorDraft) {
@@ -9931,7 +10005,24 @@
         state.adminThemeDraft.coverageCities = (
           state.adminThemeDraft.coverageCities || []
         ).filter((city) => city !== el.dataset.city);
-        renderOverlay();
+        refreshThemeCoverageChips();
+        break;
+      case "theme-coverage-national":
+        if (!state.adminThemeDraft) return;
+        state.adminThemeDraft.coverageCities = state.adminThemeDraft.coverageCities?.includes(
+          "全国"
+        )
+          ? []
+          : ["全国"];
+        refreshThemeCoverageChips();
+        break;
+      case "theme-coverage-add":
+        if (!state.adminThemeDraft) return;
+        state.adminThemeDraft.coverageCities = addCoverageCity(
+          state.adminThemeDraft.coverageCities,
+          state.adminThemeDraft.coverageCity
+        );
+        refreshThemeCoverageChips();
         break;
       case "theme-expert-toggle": {
         if (!state.adminThemeDraft) return;
