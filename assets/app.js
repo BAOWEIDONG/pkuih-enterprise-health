@@ -26,7 +26,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261124-14";
+  const DATA_VERSION = "20261124-15";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -8560,7 +8560,7 @@
                     </div>
                     <div class="push-channel">
                       <div class="push-channel__head">
-                        <strong>${icon("phone", 12)} 短信推送</strong>
+                        <strong>${icon("phone", 12)} 手机推送</strong>
                         <span>${esc(appointment.phone)}</span>
                       </div>
                       <p>${esc(buildSmsText(appointment))}</p>
@@ -8700,7 +8700,7 @@
       entityId: appointment.id,
       hospitalId: appointment.hospitalId
     });
-    showToast("号码和推送内容已复制，可打开短信应用发送。");
+    showToast("号码和推送内容已复制，可粘贴发送给客户。");
     if (state.overlay?.type === "admin-review") renderOverlay();
     else renderApp();
   }
