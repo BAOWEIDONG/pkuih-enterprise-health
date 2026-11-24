@@ -23,7 +23,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261124-04";
+  const DATA_VERSION = "20261124-05";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -699,6 +699,40 @@
     });
   }
 
+  function expertThemeCoversRegion(
+    expert,
+    month,
+    province = "",
+    city = "",
+    hospitalId = ""
+  ) {
+    if (!expert || !Number(month)) return false;
+    const targetHospitalId = hospitalId || expert.hospitalId;
+    const theme = hospitalTheme(targetHospitalId, month);
+    if (!theme) return false;
+    const topics = (theme.topics || []).filter(
+      (topic) => String(topic.expertId || "") === String(expert.id)
+    );
+    if (topics.length) {
+      return topics.some((topic) =>
+        themeTopicCoversRegion(
+          themeTopicCoverage(topic, theme, targetHospitalId),
+          province,
+          city
+        )
+      );
+    }
+    const bound = (theme.expertIds || []).some(
+      (id) => String(id || "") === String(expert.id)
+    );
+    if (!bound) return false;
+    return themeTopicCoversRegion(
+      { cities: themeCoverageCities(theme, targetHospitalId) },
+      province,
+      city
+    );
+  }
+
   function themeCoverageCitiesFromLabel(raw = "") {
     const value = String(raw || "").trim();
     if (!value) return [];
@@ -1050,27 +1084,76 @@
     ).length;
   }
 
-  function scopedServiceCount(service, scope = state.expertScope) {
-    const hospital = nearestHospital();
-    const region = currentClientRegion();
-    return state.experts.filter((expert) => {
-      if (!expert.active || !matchesService(expert, service)) return false;
-      if (scope === "nearby" && expert.hospitalId !== hospital?.id) return false;
+  function expertMatchesLibrary(expert, overrides = {}) {
+    if (!expert?.active) return false;
+    const scope = overrides.scope ?? state.expertScope;
+    const availability = overrides.availability ?? state.expertAvailability;
+    const service = overrides.service ?? state.expertService;
+    const month = overrides.month ?? state.expertMonth;
+    const hospital = overrides.hospital || nearestHospital();
+    const region = overrides.region || currentClientRegion();
+    if (scope === "nearby" && expert.hospitalId !== hospital?.id) return false;
+    if (
+      availability === "local" &&
+      !hospitalMatchesRegion(hospitalById(expert.hospitalId), region)
+    ) {
+      return false;
+    }
+    if (availability !== "all" && !doctorAvailability(expert).bookable) return false;
+    if (month > 0) {
+      if (!matchesService(expert, "讲座")) return false;
+      if (
+        !expertThemeCoversRegion(
+          expert,
+          month,
+          region.province,
+          region.city,
+          expert.hospitalId
+        )
+      ) {
+        return false;
+      }
+    } else {
       if (!expertCoversRegion(expert, region.province, region.city)) return false;
-      if (
-        state.expertAvailability !== "all" &&
-        !doctorAvailability(expert).bookable
-      ) {
-        return false;
-      }
-      if (
-        state.expertAvailability === "local" &&
-        !hospitalMatchesRegion(hospitalById(expert.hospitalId), region)
-      ) {
-        return false;
-      }
-      return true;
-    }).length;
+      if (!matchesService(expert, service)) return false;
+    }
+    if (state.expertDept !== "all" && expert.dept !== state.expertDept) return false;
+    if (state.expertTier !== "all" && expert.tier !== state.expertTier) return false;
+    const q = state.expertSearch.trim().toLowerCase();
+    if (q) {
+      const haystack = [
+        expert.name,
+        expert.hospital,
+        expert.dept,
+        expert.deptTitle,
+        expert.specialty,
+        expert.coverage,
+        ...(expert.coverageCities || []),
+        ...(expert.services || [])
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  }
+
+  function filteredLibraryExperts(overrides = {}) {
+    const hospital = overrides.hospital || nearestHospital();
+    const region = overrides.region || currentClientRegion();
+    return state.experts
+      .filter((expert) =>
+        expertMatchesLibrary(expert, { ...overrides, hospital, region })
+      )
+      .sort(
+        (a, b) =>
+          CLIENT_TIER_ORDER.indexOf(a.tier) - CLIENT_TIER_ORDER.indexOf(b.tier) ||
+          a.name.localeCompare(b.name, "zh-CN")
+      );
+  }
+
+  function scopedServiceCount(service, scope = state.expertScope) {
+    return filteredLibraryExperts({ service, scope }).length;
   }
 
   function serviceTagsFor(expert) {
@@ -2638,57 +2721,7 @@
     scope = state.expertScope,
     availability = state.expertAvailability
   ) {
-    const hospital = nearestHospital();
-    const region = currentClientRegion();
-    return state.experts
-      .filter((expert) => {
-        if (!expert.active) return false;
-        if (scope === "nearby" && expert.hospitalId !== hospital?.id) return false;
-        if (!expertCoversRegion(expert, region.province, region.city)) return false;
-        if (availability === "local") {
-          const expertHospital = hospitalById(expert.hospitalId);
-          if (
-            scope === "nearby"
-              ? expert.hospitalId !== hospital?.id
-              : !hospitalMatchesRegion(expertHospital, region)
-          ) {
-            return false;
-          }
-        }
-        if (availability !== "all" && !doctorAvailability(expert).bookable) return false;
-        if (state.expertMonth > 0 && !matchesService(expert, "讲座")) return false;
-        if (!matchesService(expert, state.expertService)) return false;
-        if (state.expertMonth > 0) {
-          const theme = hospitalTheme(expert.hospitalId, state.expertMonth);
-          const bound =
-            theme?.expertIds?.includes(expert.id) ||
-            theme?.topics?.some((topic) => topic.expertId === expert.id);
-          if (!bound) return false;
-        }
-        if (state.expertDept !== "all" && expert.dept !== state.expertDept) return false;
-        if (state.expertTier !== "all" && expert.tier !== state.expertTier) return false;
-        const q = state.expertSearch.trim().toLowerCase();
-        if (q) {
-          const haystack = [
-            expert.name,
-            expert.hospital,
-            expert.dept,
-            expert.deptTitle,
-            expert.specialty,
-            expert.coverage,
-            ...(expert.services || [])
-          ]
-            .join(" ")
-            .toLowerCase();
-          if (!haystack.includes(q)) return false;
-        }
-        return true;
-      })
-      .sort(
-        (a, b) =>
-          CLIENT_TIER_ORDER.indexOf(a.tier) - CLIENT_TIER_ORDER.indexOf(b.tier) ||
-          a.name.localeCompare(b.name, "zh-CN")
-      );
+    return filteredLibraryExperts({ scope, availability });
   }
 
   function renderExpertMini(expert) {
@@ -3228,7 +3261,7 @@
     if (!theme) return "";
     const isCurrent = month === currentMonth();
     const fromBooking = state.overlayStack.some((item) => item.type === "booking");
-    const experts = themeExpertList(theme, hospital?.id);
+    const boundExperts = themeExpertList(theme, hospital?.id);
     const topicIndex = Number(state.overlay?.topicIndex);
     const selectedTopic = Number.isInteger(topicIndex) && topicIndex >= 0 ? topicIndex : -1;
     const topics = theme.topics || [];
@@ -3252,6 +3285,15 @@
             };
           })();
     const location = normalizeRegion(rawLocation.province, rawLocation.city);
+    const experts = boundExperts.filter((expert) =>
+      expertThemeCoversRegion(
+        expert,
+        month,
+        location.province,
+        location.city,
+        hospital?.id
+      )
+    );
     const topicRows = topics.map((topic) => {
       const coverage = themeTopicCoverage(topic, theme, hospital?.id);
       const linkedExpert = topic.expertId ? expertById(topic.expertId) : null;
@@ -3412,20 +3454,24 @@
                   data-month="${month}">查看全部 ${icon("chevronRight", 12)}</button>
               </div>
               <div class="theme-expert-row">
-                ${experts
-                  .slice(0, 4)
-                  .map(
-                    (expert) => `
-                      <div class="theme-expert">
-                        <img src="${esc(expertAvatar(expert))}" alt="${esc(
-                          expert.name
-                        )}" loading="lazy" decoding="async">
-                        <strong>${esc(expert.name)}</strong>
-                        <small>${esc(expert.dept)} · ${esc(expert.deptTitle)}</small>
-                      </div>
-                    `
-                  )
-                  .join("")}
+                ${
+                  experts.length
+                    ? experts
+                        .slice(0, 4)
+                        .map(
+                          (expert) => `
+                            <div class="theme-expert">
+                              <img src="${esc(expertAvatar(expert))}" alt="${esc(
+                                expert.name
+                              )}" loading="lazy" decoding="async">
+                              <strong>${esc(expert.name)}</strong>
+                              <small>${esc(expert.dept)} · ${esc(expert.deptTitle)}</small>
+                            </div>
+                          `
+                        )
+                        .join("")
+                    : `<div class="theme-expert-empty">当前城市暂无可履约的本月绑定专家</div>`
+                }
               </div>
             </section>
             <section class="theme-section">
@@ -3562,9 +3608,11 @@
         <span>${
           state.expertScope === "nearby"
             ? esc(hospital?.name || "就近医院")
-            : `${state.expertAvailability === "local" ? "当地医院" : "全部医院"} · ${esc(
-                regionText(region.province, region.city)
-              )}可履约`
+            : `${
+                state.expertAvailability === "local" ? "当地医院" : "全部医院"
+              } · ${esc(regionText(region.province, region.city))}${
+                state.expertMonth > 0 ? "时令课题可履约" : "可履约"
+              }`
         }</span>
       </div>
       ${
@@ -3595,8 +3643,10 @@
         <div class="filter-scroll filter-scroll--services" id="expert-service-filter">
           <span class="filter-label">服务类型</span>
           <button class="chip is-active" type="button" data-action="expert-service"
-            data-value="讲座">${esc(serviceLabel("讲座"))}<span class="chip__count">本月</span></button>
-          <span class="filter-month-note">${icon("leaf", 10)} 月令主题仅对应讲座</span>
+            data-value="讲座">${esc(serviceLabel("讲座"))}<span class="chip__count">${
+              bookableScopeExperts().length
+            }</span></button>
+          <span class="filter-month-note">${icon("leaf", 10)} 月令主题仅对应讲座，按课题履约地筛选</span>
           <button class="filter-reset-link" type="button" data-action="expert-month-clear">
             清除月令筛选
           </button>
@@ -3758,6 +3808,34 @@
       button.classList.toggle("is-active", button.dataset.value === state.expertAvailability);
     });
     refreshExpertAvailabilityCounts();
+    refreshExpertScopeCount();
+    refreshExpertServiceCounts();
+  }
+
+  function refreshExpertScopeCount() {
+    const count = document.querySelector(
+      '[data-action="expert-scope"][data-value="nearby"] span'
+    );
+    if (count) count.textContent = String(bookableScopeExperts("nearby").length);
+  }
+
+  function refreshExpertServiceCounts() {
+    const filter = document.getElementById("expert-service-filter");
+    if (!filter) return;
+    if (state.expertMonth > 0) {
+      const monthCount = filter.querySelector(
+        '[data-action="expert-service"][data-value="讲座"] .chip__count'
+      );
+      if (monthCount) monthCount.textContent = String(bookableScopeExperts().length);
+      return;
+    }
+    filter
+      .querySelectorAll('[data-action="expert-service"][data-value]')
+      .forEach((button) => {
+        if (button.dataset.value === "all") return;
+        const count = button.querySelector(".chip__count");
+        if (count) count.textContent = String(scopedServiceCount(button.dataset.value));
+      });
   }
 
   function refreshExpertAvailabilityCounts() {
@@ -4233,7 +4311,25 @@
     if (themeCtx.active && !themeCtx.expertIds.includes(String(expert.id))) return null;
 
     const availability = doctorAvailability(expert);
-    const covers = expertCoversRegion(expert, booking.province, booking.city);
+    const covers = themeCtx.active
+      ? themeCtx.topic
+        ? themeTopicCoversRegion(
+            themeTopicCoverage(
+              themeCtx.topic,
+              themeCtx.theme,
+              themeCtx.hospitalId
+            ),
+            booking.province,
+            booking.city
+          )
+        : expertThemeCoversRegion(
+            expert,
+            themeCtx.month,
+            booking.province,
+            booking.city,
+            themeCtx.hospitalId
+          )
+      : expertCoversRegion(expert, booking.province, booking.city);
     if (!covers) {
       return {
         expert,
@@ -9247,6 +9343,12 @@
     if (!hint) return;
     const hospital = nearestHospital();
     const region = currentClientRegion();
+    if (state.expertMonth > 0) {
+      hint.innerHTML = `${icon("leaf", 11)} 时令主题按「课题履约地」判断，区别于专家日常服务的履约城市；当前查看 ${esc(
+        state.expertScope === "nearby" ? hospital?.name || "就近医院" : "全部医院"
+      )} · ${esc(regionText(region.province, region.city))}`;
+      return;
+    }
     hint.innerHTML =
       state.expertScope === "nearby"
         ? `${icon("mapPin", 11)} 优先展示 ${esc(hospital?.name || "就近医院")}${
