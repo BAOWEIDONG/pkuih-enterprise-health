@@ -26,7 +26,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261124-11";
+  const DATA_VERSION = "20261124-13";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -7081,7 +7081,7 @@
       patch.status === "revision"
         ? "活动地点已更新，院方会重新发送方案后再次确认。"
         : appointment.plan
-        ? "活动地点已更新，院方方案与短信内容已同步。"
+        ? "活动地点已更新，院方方案与推送内容已同步。"
         : "活动地点已更新，院方接单后会自动带入。"
     );
   }
@@ -7515,7 +7515,7 @@
         <button class="btn btn--ghost btn--block me-logout" type="button" data-action="logout">
           ${icon("logout", 15)} 退出登录
         </button>
-        <p class="source-note">登录状态会保存在当前浏览器，下次打开自动进入。演示环境不发送真实短信。</p>
+        <p class="source-note">登录状态会保存在当前浏览器，下次打开自动进入。演示环境仅生成可复制的推送内容，不会真实发送。</p>
       </div>
     `;
   }
@@ -7742,8 +7742,7 @@
       { id: "doctors", label: "专家", icon: "experts" },
       { id: "themes", label: "时令", icon: "leaf" },
       { id: "templates", label: "方案模版", icon: "clipboard" },
-      { id: "marketing", label: "展业", icon: "send" },
-      { id: "sms", label: "短信", icon: "message" }
+      { id: "marketing", label: "展业", icon: "send" }
     ];
     if (isSuperadmin()) {
       tabs.splice(4, 0, { id: "hospitals", label: "医院账号", icon: "building" });
@@ -7815,8 +7814,6 @@
               ? renderAdminLogsPage()
               : state.adminTab === "marketing"
               ? renderMarketingPage()
-              : state.adminTab === "sms"
-              ? renderAdminSmsPage()
               : renderAdminAppointmentsPage()
           }
         </main>
@@ -8202,10 +8199,10 @@
     });
     showToast(
       wasConfirmed
-        ? "方案已更新并发送，客户短信已生成；机构需重新确认。"
+        ? "方案已更新并发送，推送通知已生成；机构需重新确认。"
         : themeTopic && !keepsTheme
-        ? "方案已发送；原时令课题关联已解除，客户短信已生成。"
-        : "方案已发送，客户短信已生成，可直接复制发送。"
+        ? "方案已发送；原时令课题关联已解除，推送通知已生成。"
+        : "方案已发送，推送通知已生成，可直接复制发送。"
     );
   }
 
@@ -8274,6 +8271,7 @@
     const formLocked = canView && (!canEdit || saved);
     const smsLog = getSmsLogs()[appointment.id];
     const smsCurrent = smsLogIsCurrent(appointment, smsLog);
+    const mail = buildEmailText(appointment);
     const planTemplates = getPlanTemplates(appointment.hospitalId);
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
@@ -8355,8 +8353,8 @@
                 ? `<div class="review-state-banner is-success">
                     ${icon("send", 18)}
                     <div>
-                      <strong>方案已发送，客户短信已生成</strong>
-                      <p>机构端已进入“方案待确认”。请复制下方号码和短信内容提醒客户；复制后系统视为已发送。</p>
+                      <strong>方案已发送，推送通知已生成</strong>
+                      <p>机构端已进入“方案待确认”。请复制下方号码和推送内容提醒客户；复制后系统视为已推送。</p>
                       <button class="text-link" type="button" data-action="review-edit-again">
                         继续修改方案 ${icon("chevronRight", 12)}
                       </button>
@@ -8544,7 +8542,7 @@
               ["review", "revision", "confirmed", "completed"].includes(appointment.status)
                 ? `<section class="sms-card ${saved ? "is-primary" : ""}">
                     <div class="sms-card__head">
-                      <h3>${icon("message", 14)} 客户短信提醒</h3>
+                      <h3>${icon("message", 14)} 推送通知</h3>
                       <span>${
                         smsCurrent
                           ? "已复制，视为已发送"
@@ -8555,32 +8553,29 @@
                           : "尚未发送"
                       }</span>
                     </div>
-                    <p>${esc(buildSmsText(appointment))}</p>
-                    <button class="btn btn--ghost btn--sm" type="button" data-action="review-sms-copy">
-                      ${icon("phone", 13)} 复制号码和短信内容
-                    </button>
-                  </section>`
-                : ""
-            }
-            ${
-              appointment.plan &&
-              ["review", "revision", "confirmed", "completed"].includes(
-                appointment.status
-              )
-                ? `<section class="email-card">
-                    <div class="sms-card__head">
-                      <h3>${icon("send", 14)} 邮件提醒</h3>
-                      <span>${esc(
-                        buildEmailText(appointment).recipient || "机构未配置邮箱"
-                      )}</span>
+                    <div class="push-channel">
+                      <div class="push-channel__head">
+                        <strong>${icon("phone", 12)} 短信推送</strong>
+                        <span>${esc(appointment.phone)}</span>
+                      </div>
+                      <p>${esc(buildSmsText(appointment))}</p>
+                      <button class="btn btn--ghost btn--sm" type="button" data-action="review-sms-copy">
+                        ${icon("phone", 13)} 复制号码和推送内容
+                      </button>
                     </div>
-                    <p>${esc(buildEmailText(appointment).body)}</p>
-                    <button class="btn btn--ghost btn--sm" type="button"
-                      data-action="review-email-copy" data-appointment-id="${esc(
-                        appointment.id
-                      )}">
-                      ${icon("send", 13)} 复制邮件内容
-                    </button>
+                    <div class="push-channel push-channel--email">
+                      <div class="push-channel__head">
+                        <strong>${icon("send", 12)} 邮件推送</strong>
+                        <span>${esc(mail.recipient || "机构未配置通知邮箱")}</span>
+                      </div>
+                      <p>${esc(`主题：${mail.subject}\n\n${mail.body}`)}</p>
+                      <button class="btn btn--ghost btn--sm" type="button"
+                        data-action="review-email-copy" data-appointment-id="${esc(
+                          appointment.id
+                        )}">
+                        ${icon("send", 13)} 复制邮件内容
+                      </button>
+                    </div>
                   </section>`
                 : ""
             }
@@ -8608,12 +8603,40 @@
     `;
   }
 
+  function appointmentRecipient(appointment) {
+    const account = institutionAccountByPhone(appointment.ownerPhone);
+    const user = getUser(appointment.ownerPhone);
+    const name =
+      account?.name ||
+      user?.name ||
+      appointment.contactName ||
+      "您好";
+    const title =
+      appointment.contactTitle ||
+      account?.title ||
+      user?.title ||
+      "";
+    const orgName =
+      appointment.orgName ||
+      account?.orgName ||
+      user?.orgName ||
+      "";
+    return {
+      name: String(name).trim() || "您好",
+      title: String(title).trim(),
+      orgName: String(orgName).trim()
+    };
+  }
+
   function buildSmsText(appointment) {
     const plan = appointment.plan || {};
     const staff = appointment.assignedStaff;
     const hospital = hospitalById(appointment.hospitalId);
     const confirmed = ["confirmed", "completed"].includes(appointment.status);
-    return `【${hospital?.name || "北大医疗"}】${appointment.contactName}您好，您预约的${formatDateCN(
+    const recipient = appointmentRecipient(appointment);
+    return `【${hospital?.name || "北大医疗"}】${
+      recipient.orgName ? recipient.orgName + " " : ""
+    }${recipient.name}${recipient.title ? "（" + recipient.title + "）" : ""}您好，您预约的${formatDateCN(
       plan.date || appointment.date
     )} ${plan.time || ""}「${plan.topic || topicOf(appointment)}」${
       confirmed ? "活动已确认" : "院方已提交活动方案，请登录平台查看并确认"
@@ -8630,12 +8653,12 @@
   function buildEmailText(appointment) {
     const account = institutionAccountByPhone(appointment.ownerPhone);
     const user = getUser(appointment.ownerPhone);
-    const recipient =
-      account?.email || user?.email || "";
+    const contact = appointmentRecipient(appointment);
+    const email = account?.email || user?.email || "";
     const subject = `【${hospitalById(appointment.hospitalId)?.name || "北大医疗"}】活动方案待确认 · ${topicOf(
       appointment
     )}`;
-    const body = `${appointment.contactName || account?.name || "您好"}：\n\n您预约的「${topicOf(
+    const body = `${contact.name}：\n\n您预约的「${topicOf(
       appointment
     )}」活动方案已更新，请登录企业健康服务平台查看并确认。\n\n活动日期：${formatDateCN(
       appointment.plan?.date || appointment.date,
@@ -8646,10 +8669,10 @@
         : "院方项目组"
     }\n\n如信息有调整，请在平台提交修改申请或联系项目对接人。\n\n北京大学国际医院 · 名医入企`;
     return {
-      recipient,
+      recipient: email,
       subject,
       body,
-      copyText: `收件人：${recipient || "机构未配置邮箱"}\n主题：${subject}\n\n${body}`
+      copyText: `收件人：${email || "机构未配置邮箱"}\n主题：${subject}\n\n${body}`
     };
   }
 
@@ -8657,7 +8680,7 @@
     const appointment = appointmentById(button?.dataset.appointmentId || state.adminReviewId);
     if (!appointment) return;
     if (!adminCanManageHospital(appointment.hospitalId)) {
-      return showToast("只能发送本院预约的短信。");
+      return showToast("只能推送本院预约的通知。");
     }
     const text = buildSmsText(appointment);
     const payload = `${appointment.phone}\n${text}`;
@@ -8667,12 +8690,12 @@
       copiedAt: new Date().toISOString(),
       copiedBy: state.adminUser ? { name: state.adminUser.name, username: state.adminUser.username } : null
     });
-    logOperation("复制客户短信", `${appointment.id} · ${appointment.orgName}`, {
+    logOperation("复制推送通知", `${appointment.id} · ${appointment.orgName}`, {
       entityType: "appointment",
       entityId: appointment.id,
       hospitalId: appointment.hospitalId
     });
-    showToast("号码和短信内容已复制，可打开短信应用发送。");
+    showToast("号码和推送内容已复制，可打开短信应用发送。");
     if (state.overlay?.type === "admin-review") renderOverlay();
     else renderApp();
   }
@@ -11415,92 +11438,6 @@
     anchor.remove();
     showToast("高清海报已打开。若微信未自动保存，请长按预览图保存到相册。");
   }
-
-  /* =========================================================
-     Admin SMS follow-ups
-     ========================================================= */
-  function smsAppointments() {
-    const logs = getSmsLogs();
-    return adminAppointments()
-      .filter(
-        (item) =>
-          item.plan &&
-          ["review", "revision", "confirmed"].includes(item.status)
-      )
-      .sort((a, b) => {
-        const aCopied = smsLogIsCurrent(a, logs[a.id]);
-        const bCopied = smsLogIsCurrent(b, logs[b.id]);
-        if (aCopied !== bCopied) return aCopied ? 1 : -1;
-        return String(a.date).localeCompare(String(b.date));
-      });
-  }
-
-  function renderAdminSmsPage() {
-    const list = smsAppointments();
-    const logs = getSmsLogs();
-    const pending = list.filter((item) => !smsLogIsCurrent(item, logs[item.id])).length;
-    return `
-      <div class="admin-page-head">
-        <div><h1>短信跟进</h1><p>复制号码与模板，院方自行发送</p></div>
-        <span class="admin-page-head__date">${pending} 条待发送</span>
-      </div>
-      ${renderAdminTabs()}
-      ${renderAdminHospitalFilter()}
-      <p class="admin-hint">${icon(
-        "message",
-        12
-      )} 点击“复制号码和内容”后视为已发送；未复制的预约会持续显示为待发送。</p>
-      ${
-        list.length
-          ? `<div class="sms-list">${list
-              .map((appointment) => {
-                const log = logs[appointment.id];
-                const current = smsLogIsCurrent(appointment, log);
-                return `
-                  <article class="sms-item ${current ? "is-done" : ""}">
-                    <div class="sms-item__top">
-                      <strong>${esc(appointment.orgName)}</strong>
-                      ${
-                        current
-                          ? '<span class="is-on">已复制</span>'
-                          : log
-                          ? '<span class="is-off">方案更新 · 待重新发送</span>'
-                          : '<span class="is-off">待发送</span>'
-                      }
-                    </div>
-                    <p>${esc(topicOf(appointment))} · ${esc(
-                      formatDateCN(appointment.plan?.date || appointment.date)
-                    )}</p>
-                    <div class="sms-item__contact">${icon("phone", 12)} ${phoneLink(
-                      appointment.phone,
-                      appointment.phone
-                    )} · ${esc(appointment.contactName)}</div>
-                    <pre>${esc(buildSmsText(appointment))}</pre>
-                    <div class="sms-item__actions">
-                      <button class="btn btn--ghost btn--sm" type="button" data-action="admin-sms-copy"
-                        data-appointment-id="${esc(appointment.id)}">复制号码和内容</button>
-                      ${
-                        log
-                          ? `<small>${
-                              current ? "" : "方案已更新；"
-                            }${esc(log.copiedBy?.name || "院方")} · ${esc(
-                              formatDateTime(log.copiedAt)
-                            )} 曾复制</small>`
-                          : ""
-                      }
-                    </div>
-                  </article>
-                `;
-              })
-              .join("")}</div>`
-          : `<div class="empty-state"><span class="empty-state__icon">${icon(
-              "message",
-              26
-            )}</span><h3>暂无待发送短信</h3><p>院方发送方案后，预约会进入短信跟进。</p></div>`
-      }
-    `;
-  }
-
   /* =========================================================
      App render
      ========================================================= */
@@ -12146,9 +12083,6 @@
           renderOverlay();
           showToast("已移除方案附件，保存后生效。");
         }
-        break;
-      case "admin-sms-copy":
-        copySmsForAppointment(el);
         break;
       case "admin-demand-contact":
         markDemandContacted("");

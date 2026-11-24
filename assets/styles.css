@@ -6443,6 +6443,55 @@ textarea {
   box-shadow: 0 14px 34px rgba(10, 76, 178, 0.12);
 }
 
+.push-channel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(10, 76, 178, 0.14);
+}
+
+.push-channel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.push-channel__head strong {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-2);
+  font-size: 9px;
+  font-weight: 730;
+}
+
+.push-channel__head span {
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: 7.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.push-channel > p {
+  margin: 7px 0 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--brand-deep);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 8.5px;
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
+.push-channel--email > p {
+  background: #0d4d3a;
+}
+
+.push-channel .btn {
+  margin-top: 8px;
+}
+
 /* =========================================================
    Slot config
    ========================================================= */
