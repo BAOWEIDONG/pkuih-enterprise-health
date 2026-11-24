@@ -1,1 +1,1298 @@
-[{"dept":"呼吸科","topic":"肺炎的常见类型及治疗要点","hospital":"北大医疗淄博医院","doctor":"崔晓杰","title":"副主任医师","month":1,"coverage":"山东省内"},{"dept":"呼吸科","topic":"咳嗽变异性哮喘的早期识别及规范治疗","hospital":"北大医疗淄博医院","doctor":"崔晓杰","title":"副主任医师","month":4,"coverage":"山东省内"},{"dept":"呼吸科","topic":"慢性阻塞性肺病，大家了解么？","hospital":"北大医疗淄博医院","doctor":"崔晓杰","title":"副主任医师","month":8,"coverage":"山东省内"},{"dept":"呼吸科","topic":"反复咳嗽、久咳不愈-千万别忽视","hospital":"北大医疗淄博医院","doctor":"崔晓杰","title":"副主任医师","month":9,"coverage":"山东省内"},{"dept":"呼吸科","topic":"冬春季节致命性呼吸道传染病的科学防御","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"陈婷婷","title":"科室副主任","month":1,"coverage":"山东省"},{"dept":"呼吸科","topic":"理性看待肺部结节","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"陈婷婷","title":"科室副主任","month":9,"coverage":"山东省"},{"dept":"呼吸科","topic":"肺结节距离肺癌究竟还有多远","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"陈婷婷","title":"科室副主任","month":12,"coverage":"山东省"},{"dept":"呼吸科","topic":"春暖花开话过敏","hospital":"北大医疗潞安医院","doctor":"贾晓琴","title":"科主任","month":4,"coverage":"山西"},{"dept":"呼吸科","topic":"肺部疾病的防治与肺部养生","hospital":"北大医疗潞安医院","doctor":"贾晓琴","title":"科主任","month":8,"coverage":"山西"},{"dept":"呼吸科","topic":"肺肿瘤与胸腔积液的诊断与治疗","hospital":"北大医疗潞安医院","doctor":"贾晓琴","title":"科主任","month":10,"coverage":"山西"},{"dept":"呼吸科","topic":"出现喘憋才是哮喘吗？","hospital":"深圳北医康复医院","doctor":"孙立东","title":"主任医师","month":3,"coverage":"深圳"},{"dept":"呼吸科","topic":"远离烟草-它伤害的可不仅仅是肺","hospital":"深圳北医康复医院","doctor":"孙立东","title":"主任医师","month":5,"coverage":"深圳"},{"dept":"心血管","topic":"心脑血管疾病的家庭管理","hospital":"北京大学国际医院","doctor":"邹丽春","title":"主任医师","month":2,"coverage":"北京"},{"dept":"心血管","topic":"全科讲座：《“心”事知多少》——心血管疾病精准防治讲座","hospital":"北京大学国际医院","doctor":"雷励","title":"副主任医师","month":1,"coverage":"北京"},{"dept":"心血管","topic":"高血压、高血脂防治","hospital":"北大医疗健康管理中心","doctor":"郭莉娟","title":"副主任医师","month":11,"coverage":"北京"},{"dept":"心血管","topic":"查体发现动脉硬化斑块怎么办？","hospital":"北京北大医疗康复医院","doctor":"花焱","title":"中心主任","month":11,"coverage":"北京"},{"dept":"心血管","topic":"心源性猝死防治","hospital":"株洲恺德心血管病医院","doctor":"任承潜","title":"科主任","month":1,"coverage":"湖南"},{"dept":"心血管","topic":"心血管内科常见疾病的规范化诊疗（高血压、心力衰竭篇）","hospital":"株洲恺德心血管病医院","doctor":"任承潜","title":"科主任","month":5,"coverage":"湖南"},{"dept":"心血管","topic":"房颤知识系列","hospital":"株洲恺德心血管病医院","doctor":"任承潜","title":"科主任","month":11,"coverage":"湖南"},{"dept":"心血管","topic":"心衰知识系列","hospital":"株洲恺德心血管病医院","doctor":"任承潜","title":"科主任","month":12,"coverage":"湖南"},{"dept":"心血管","topic":"高脂血症患者教育","hospital":"株洲恺德心血管病医院","doctor":"刘平平","title":"科主任","month":4,"coverage":"湖南"},{"dept":"心血管","topic":"高血压知识系列","hospital":"株洲恺德心血管病医院","doctor":"刘平平","title":"科主任","month":5,"coverage":"湖南"},{"dept":"心血管","topic":"冠心病知识系列","hospital":"深圳北医康复医院","doctor":"朱冰坡","title":"主任医师","month":1,"coverage":"深圳"},{"dept":"心血管","topic":"高血压的防治","hospital":"深圳北医康复医院","doctor":"朱冰坡","title":"主任医师","month":5,"coverage":"深圳"},{"dept":"心血管","topic":"警惕冠心病、管理胆固醇","hospital":"深圳北医康复医院","doctor":"朱冰坡","title":"主任医师","month":12,"coverage":"深圳"},{"dept":"内科·全科与健康管理","topic":"健康体检报告的解读","hospital":"北京大学国际医院","doctor":"邹丽春","title":"主任医师","month":9,"coverage":"北京"},{"dept":"内科·全科与健康管理","topic":"全科讲座：《年终盘点：看懂你的体检报告“潜台词”》","hospital":"北京大学国际医院","doctor":"邹丽春","title":"主任医师","month":12,"coverage":"北京"},{"dept":"内科·全科与健康管理","topic":"发热原因待查","hospital":"北京大学国际医院","doctor":"雷励","title":"副主任医师","month":2,"coverage":"北京"},{"dept":"内科·全科与健康管理","topic":"全科医学和健康管理","hospital":"北京大学国际医院","doctor":"雷励","title":"副主任医师","month":3,"coverage":"北京"},{"dept":"内科·全科与健康管理","topic":"《防范重大疾病风险、逆转职业健康损害！》","hospital":"北京大学国际医院","doctor":"李宏方","title":"主治医师","month":5,"coverage":"北京"},{"dept":"内科·全科与健康管理","topic":"功能医学讲座：《万病源于肠道：破解“第二大脑”的求救信号》","hospital":"北大医疗健康管理中心","doctor":"邸素洁","title":"副主任医师","month":6,"coverage":"北京"},{"dept":"内科·全科与健康管理","topic":"《慢病与衰老：从功能医学角度重建身体平衡》","hospital":"北大医疗健康管理中心","doctor":"邸素洁","title":"副主任医师","month":12,"coverage":"北京"},{"dept":"内科·全科与健康管理","topic":"消化不良，怎么办？","hospital":"北大医疗健康管理中心","doctor":"郭莉娟","title":"副主任医师","month":2,"coverage":"北京"},{"dept":"内科·全科与健康管理","topic":"《助力中老年健康：慢性病与老年病的康复之路与运动处方》","hospital":"北大医疗健康管理中心","doctor":"郭莉娟","title":"副主任医师","month":10,"coverage":"北京"},{"dept":"内科·全科与健康管理","topic":"《血糖、体重、骨密度：代谢失衡的三张“体检警报单”》","hospital":"北京北大医疗康复医院","doctor":"花焱","title":"中心主任","month":9,"coverage":"北京"},{"dept":"内科·全科与健康管理","topic":"体检怀疑癌症的全身PET-CT影像诊断","hospital":"北京北大医疗康复医院","doctor":"花焱","title":"中心主任","month":10,"coverage":"北京"},{"dept":"内科·内分泌代谢","topic":"《你以为是胖，其实是代谢出了问题》","hospital":"北京大学国际医院","doctor":"李宏方","title":"主治医师","month":4,"coverage":"北京"},{"dept":"内科·内分泌代谢","topic":"《为什么越忙越容易胖？高压人群的代谢医学真相》","hospital":"北京大学国际医院","doctor":"李宏方","title":"主治医师","month":6,"coverage":"北京"},{"dept":"内科·内分泌代谢","topic":"甲状腺疾病的规范化诊断与治疗（含甲亢、甲减）","hospital":"北大医疗健康管理中心","doctor":"刘晓禹","title":"副主任医师","month":3,"coverage":"北京"},{"dept":"内科·内分泌代谢","topic":"《糖尿病不是一天形成的：代谢失衡的早期信号》","hospital":"北大医疗健康管理中心","doctor":"刘晓禹","title":"副主任医师","month":4,"coverage":"北京"},{"dept":"内科·内分泌代谢","topic":"肥胖与代谢综合征知识系列","hospital":"北大医疗健康管理中心","doctor":"刘晓禹","title":"副主任医师","month":5,"coverage":"北京"},{"dept":"内科·内分泌代谢","topic":"肠道菌群科普","hospital":"北大医疗健康管理中心","doctor":"刘晓禹","title":"副主任医师","month":7,"coverage":"北京"},{"dept":"内科·内分泌代谢","topic":"《甲状腺、骨质疏松、肥胖，背后其实是一个系统问题》","hospital":"北大医疗健康管理中心","doctor":"邸素洁","title":"副主任医师","month":9,"coverage":"北京"},{"dept":"内科·内分泌代谢","topic":"打破糖尿病谣言，解锁控糖密码","hospital":"北大医疗海洋石油医院","doctor":"张婷","title":"科室副主任","month":7,"coverage":"天津"},{"dept":"内科·内分泌代谢","topic":"糖尿病知识系列","hospital":"北大医疗海洋石油医院","doctor":"张婷","title":"科室副主任","month":11,"coverage":"天津"},{"dept":"内科·内分泌代谢","topic":"糖尿病的防治及运动治疗","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"刘群","title":"科主任","month":5,"coverage":"山东省"},{"dept":"内科·内分泌代谢","topic":"呵护您颈部的蝴蝶——甲状腺结节科普","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"刘群","title":"科主任","month":9,"coverage":"山东省"},{"dept":"内科·内分泌代谢","topic":"骨质疏松的防治","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"刘群","title":"科主任","month":10,"coverage":"山东省"},{"dept":"内科·内分泌代谢","topic":"高尿酸血症与痛风知识系列","hospital":"株洲恺德心血管病医院","doctor":"刘平平","title":"科主任","month":2,"coverage":"湖南"},{"dept":"内科·内分泌代谢","topic":"《平稳度过“人生第二春”：女性更年期深度管理与调养》","hospital":"深圳北医康复医院","doctor":"崔琈瑛","title":"副主任医师","month":3,"coverage":"深圳"},{"dept":"内科·内分泌代谢","topic":"《乳腺与甲状腺结节：如何科学看待与主动预防？》","hospital":"深圳北医康复医院","doctor":"崔琈瑛","title":"副主任医师","month":10,"coverage":"深圳"},{"dept":"内科·内分泌代谢","topic":"《内分泌靶向周期治疗：女性健康管理新思路》","hospital":"深圳北医康复医院","doctor":"崔琈瑛","title":"副主任医师","month":12,"coverage":"深圳"},{"dept":"内科·临床营养","topic":"关爱女性健康—备孕中的热点话题","hospital":"北京大学国际医院","doctor":"张月红","title":"副主任医师","month":3,"coverage":"北京"},{"dept":"内科·临床营养","topic":"科学饮食控制体重","hospital":"北京大学国际医院","doctor":"张月红","title":"副主任医师","month":4,"coverage":"北京"},{"dept":"内科·临床营养","topic":"婴幼儿辅食添加与食物过敏","hospital":"北京大学国际医院","doctor":"张月红","title":"副主任医师","month":6,"coverage":"北京"},{"dept":"内科·临床营养","topic":"病从口入，如何注意饮食？","hospital":"北京大学国际医院","doctor":"张月红","title":"副主任医师","month":7,"coverage":"北京"},{"dept":"内科·临床营养","topic":"合理膳食，免疫基石","hospital":"北大医疗海洋石油医院","doctor":"刘燕","title":"副主任医师","month":1,"coverage":"天津"},{"dept":"内科·临床营养","topic":"1.减肥不等于减重，2.体重管理重塑健康生活方式","hospital":"北大医疗海洋石油医院","doctor":"刘燕","title":"副主任医师","month":4,"coverage":"天津"},{"dept":"内科·临床营养","topic":"远离肥胖 远离糖尿病","hospital":"北大医疗海洋石油医院","doctor":"刘燕","title":"副主任医师","month":7,"coverage":"天津"},{"dept":"内科·临床营养","topic":"医学营养减重","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"赵雪","title":"副主任医师","month":5,"coverage":"山东省"},{"dept":"内科·临床营养","topic":"科学减重，享“瘦”生活","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"赵雪","title":"副主任医师","month":6,"coverage":"山东省"},{"dept":"内科·临床营养","topic":"小学知食就是力量","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"赵雪","title":"副主任医师","month":9,"coverage":"山东省"},{"dept":"内科·临床营养","topic":"《你的肠道健康吗？吃对食物，养好“第二大脑”》","hospital":"深圳北医康复医院","doctor":"江洁","title":"营养师","month":7,"coverage":"深圳"},{"dept":"内科·临床营养","topic":"《身体老发炎？可能是你吃错了：抗炎饮食的必修课》","hospital":"深圳北医康复医院","doctor":"江洁","title":"营养师","month":8,"coverage":"深圳"},{"dept":"内科·临床营养","topic":"《吃出来的年轻：延缓衰老的饮食核心》","hospital":"深圳北医康复医院","doctor":"江洁","title":"营养师","month":12,"coverage":"深圳"},{"dept":"内科·肾病","topic":"尿里有泡沫是肾病吗？教你自判","hospital":"北大医疗海洋石油医院","doctor":"张婷","title":"科室副主任","month":8,"coverage":"天津"},{"dept":"内科·肾病","topic":"怎么知道自己是不是得了肾脏病","hospital":"株洲恺德心血管病医院","doctor":"易黎黎","title":"科主任","month":3,"coverage":"湖南"},{"dept":"内科·肾病","topic":"尿道结石、输尿管结石、肾结石等知识系列","hospital":"株洲恺德心血管病医院","doctor":"易黎黎","title":"科主任","month":7,"coverage":"湖南"},{"dept":"内科·肾病","topic":"肾脏病常见症状","hospital":"株洲恺德心血管病医院","doctor":"易黎黎","title":"科主任","month":8,"coverage":"湖南"},{"dept":"内科·感染与肝病","topic":"哪些疾病需要去感染肝病科","hospital":"北京大学国际医院","doctor":"孙丹辉","title":"主治医师","month":2,"coverage":"北京"},{"dept":"内科·感染与肝病","topic":"脂肪肝的危害","hospital":"北京大学国际医院","doctor":"孙丹辉","title":"主治医师","month":4,"coverage":"北京"},{"dept":"内科·感染与肝病","topic":"乙肝、脂肪肝，护肝其实很简单","hospital":"北京大学国际医院","doctor":"孙丹辉","title":"主治医师","month":7,"coverage":"北京"},{"dept":"内科·肿瘤","topic":"科学抗癌，预防先行","hospital":"北大医疗淄博医院","doctor":"董霖","title":"副主任医师","month":2,"coverage":"山东省内、省外"},{"dept":"内科·肿瘤","topic":"乳腺癌健康教育及预防","hospital":"北大医疗淄博医院","doctor":"董霖","title":"副主任医师","month":3,"coverage":"山东省内、省外"},{"dept":"内科·肿瘤","topic":"肠胃无忧，早诊早治，消化道早期癌的内镜筛查","hospital":"北大医疗淄博医院","doctor":"董霖","title":"副主任医师","month":6,"coverage":"山东省内、省外"},{"dept":"骨科","topic":"老年人摔倒的预防与治疗","hospital":"北大医疗健康管理中心","doctor":"司建国","title":"副主任医师","month":1,"coverage":"北京"},{"dept":"骨科","topic":"办公室人员颈腰痛如何预防","hospital":"北大医疗健康管理中心","doctor":"司建国","title":"副主任医师","month":3,"coverage":"北京"},{"dept":"骨科","topic":"面对中老年人的关节健康","hospital":"北大医疗健康管理中心","doctor":"司建国","title":"副主任医师","month":10,"coverage":"北京"},{"dept":"骨科","topic":"关节痛怎么早诊断？运动康复怎么做？","hospital":"北大医疗潞安医院","doctor":"杨江明","title":"科主任","month":4,"coverage":"山西"},{"dept":"骨科","topic":"面对中青年人的运动损伤防护","hospital":"北大医疗潞安医院","doctor":"杨江明","title":"科主任","month":5,"coverage":"山西"},{"dept":"骨科","topic":"膝关节半月板损伤及处理","hospital":"北大医疗潞安医院","doctor":"杨江明","title":"科主任","month":8,"coverage":"山西"},{"dept":"骨科","topic":"肩周炎与肩袖损伤","hospital":"北大医疗潞安医院","doctor":"杨江明","title":"科主任","month":12,"coverage":"山西"},{"dept":"骨科","topic":"断指再植和手指再造，能接上还能再造","hospital":"北大医疗潞安医院","doctor":"赵辉","title":"专科医师","month":5,"coverage":"山西"},{"dept":"骨科","topic":"足弓健康小课堂","hospital":"北大医疗潞安医院","doctor":"赵辉","title":"专科医师","month":6,"coverage":"山西"},{"dept":"骨科","topic":"急性踝关节扭伤的治疗","hospital":"北大医疗潞安医院","doctor":"赵辉","title":"专科医师","month":8,"coverage":"山西"},{"dept":"骨科","topic":"肩周炎知识系列","hospital":"株洲恺德心血管病医院","doctor":"胡伟","title":"主任助理","month":1,"coverage":"湖南"},{"dept":"骨科","topic":"运动损伤知识系列","hospital":"株洲恺德心血管病医院","doctor":"胡伟","title":"主任助理","month":4,"coverage":"湖南"},{"dept":"骨科","topic":"骨质疏松知识系列","hospital":"株洲恺德心血管病医院","doctor":"胡伟","title":"主任助理","month":11,"coverage":"湖南"},{"dept":"康复科","topic":"居家康复","hospital":"北京北大医疗康复医院","doctor":"唐克","title":"科室主任","month":2,"coverage":"北京"},{"dept":"康复科","topic":"《告别腰痛困扰：康复方案与核心肌群训练全攻略》","hospital":"北京北大医疗康复医院","doctor":"唐克","title":"科室主任","month":6,"coverage":"北京"},{"dept":"康复科","topic":"《守护膝盖健康：远离膝骨关节炎困扰，且行且珍“膝》","hospital":"北京北大医疗康复医院","doctor":"唐克","title":"科室主任","month":10,"coverage":"北京"},{"dept":"康复科","topic":"《肌少症+骨质疏松：1+1>2的康复策略——中老年\"力量守护计划：从防跌倒到强骨增肌》","hospital":"北京北大医疗康复医院","doctor":"唐克","title":"科室主任","month":11,"coverage":"北京"},{"dept":"康复科","topic":"酷姿势革命：给久坐族的肩颈矫正训练能量站","hospital":"北大医疗海洋石油医院","doctor":"赵锐","title":"医师","month":6,"coverage":"天津"},{"dept":"康复科","topic":"重塑生活：卒中后康复全攻略","hospital":"北大医疗海洋石油医院","doctor":"赵锐","title":"医师","month":11,"coverage":"天津"},{"dept":"康复科","topic":"《战胜慢性肌肉骨骼疼痛，开启康复新征程》","hospital":"北大医疗海洋石油医院","doctor":"赵锐","title":"医师","month":12,"coverage":"天津"},{"dept":"康复科","topic":"骨科康复","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"郑兴旺","title":"副主任治疗师","month":4,"coverage":"山东省"},{"dept":"康复科","topic":"脊柱健康","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"郑兴旺","title":"副主任治疗师","month":9,"coverage":"山东省"},{"dept":"康复科","topic":"老年人健康运动科普","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"郑兴旺","title":"副主任治疗师","month":11,"coverage":"山东省"},{"dept":"康复科","topic":"《不是老了，是功能在退化：老年脑与身体的科学康复路径》","hospital":"深圳北医康复医院","doctor":"徐武华","title":"主任医师","month":10,"coverage":"深圳"},{"dept":"康复科","topic":"《从中风到重启：脑卒中后的功能恢复与长期管理》","hospital":"深圳北医康复医院","doctor":"徐武华","title":"主任医师","month":11,"coverage":"深圳"},{"dept":"康复科","topic":"《帕金森、认知障碍与功能衰退：我们能提前做什么》","hospital":"深圳北医康复医院","doctor":"徐武华","title":"主任医师","month":12,"coverage":"深圳"},{"dept":"中医科","topic":"中医讲座：主题《开工不“上火”：中医教你疏肝解郁，满血复活》","hospital":"北大医疗健康管理中心","doctor":"王乐","title":"中医师","month":2,"coverage":"北京"},{"dept":"中医科","topic":"好“胃”一生—中医养生文化带你有个好胃口","hospital":"北大医疗健康管理中心","doctor":"王乐","title":"中医师","month":6,"coverage":"北京"},{"dept":"中医科","topic":"因人因时喝对茶","hospital":"北大医疗健康管理中心","doctor":"王乐","title":"中医师","month":10,"coverage":"北京"},{"dept":"中医科","topic":"解密中医药膳的养生智慧","hospital":"北大医疗健康管理中心","doctor":"王乐","title":"中医师","month":1,"coverage":"北京/京外"},{"dept":"中医科","topic":"女性中医养生","hospital":"北大医疗健康管理中心","doctor":"王乐","title":"中医师","month":3,"coverage":"北京/京外"},{"dept":"中医科","topic":"冬病夏治-三伏贴","hospital":"北大医疗健康管理中心","doctor":"王乐","title":"中医师","month":7,"coverage":"北京/京外"},{"dept":"中医科","topic":"中医亚健康-秋","hospital":"北大医疗健康管理中心","doctor":"王乐","title":"中医师","month":9,"coverage":"北京/京外"},{"dept":"中医科","topic":"脖子疼、肩膀硬，几个动作轻松缓解","hospital":"北大医疗潞安医院","doctor":"杨慧丰","title":"科室副主任","month":5,"coverage":"山西"},{"dept":"中医科","topic":"中医-咳嗽","hospital":"北大医疗潞安医院","doctor":"杨慧丰","title":"科室副主任","month":11,"coverage":"山西"},{"dept":"中医科","topic":"春起生机 代谢焕新","hospital":"北大医疗潞安医院","doctor":"闫支花","title":"主任医师","month":4,"coverage":"山西"},{"dept":"中医科","topic":"中医夏季养生讲座","hospital":"北大医疗潞安医院","doctor":"闫支花","title":"主任医师","month":8,"coverage":"山西"},{"dept":"中医科","topic":"闻香养心——从中医香文化谈情绪调理","hospital":"北大医疗潞安医院","doctor":"闫支花","title":"主任医师","month":12,"coverage":"山西"},{"dept":"心理","topic":"心理讲座：职场高压下的亲密关系经营与沟通艺术","hospital":"北大医疗健康管理中心","doctor":"周志强","title":"副主任医师","month":2,"coverage":"北京"},{"dept":"心理","topic":"迎风飞扬——压力与情绪管理","hospital":"北大医疗健康管理中心","doctor":"周志强","title":"副主任医师","month":3,"coverage":"北京"},{"dept":"心理","topic":"心理讲座：破局育儿焦虑：家有学童的心理支持与科学行为引导","hospital":"北大医疗健康管理中心","doctor":"周志强","title":"副主任医师","month":9,"coverage":"北京"},{"dept":"心理","topic":"心理讲座：关注“注意力与学习困难”：职场父母的特殊家庭支持策略","hospital":"北大医疗海洋石油医院","doctor":"田国华","title":"副主任医师","month":6,"coverage":"天津"},{"dept":"心理","topic":"做好孩子大棉被 儿童青少年常见心理问题及应对","hospital":"北大医疗海洋石油医院","doctor":"田国华","title":"副主任医师","month":9,"coverage":"天津"},{"dept":"心理","topic":"绽放光芒  正念赋能","hospital":"北大医疗海洋石油医院","doctor":"田国华","title":"副主任医师","month":12,"coverage":"天津"},{"dept":"睡眠","topic":"失眠","hospital":"北京大学国际医院","doctor":"朱莎","title":"副主任医师","month":3,"coverage":"北京"},{"dept":"睡眠","topic":"打鼾是病吗？","hospital":"北京大学国际医院","doctor":"朱莎","title":"副主任医师","month":8,"coverage":"北京"},{"dept":"睡眠","topic":"睡不着、总便秘，中医有妙招","hospital":"北大医疗潞安医院","doctor":"闫支花","title":"主任医师","month":6,"coverage":"山西"},{"dept":"神经内科","topic":"如何早期识别帕金森病与痴呆？","hospital":"北京大学国际医院","doctor":"朱莎","title":"副主任医师","month":10,"coverage":"北京"},{"dept":"神经内科","topic":"得了急性脑卒中怎么办","hospital":"北大医疗淄博医院","doctor":"张楷","title":"副主任医师","month":1,"coverage":"山东省内、省外"},{"dept":"神经内科","topic":"头晕与头痛的鉴别诊断及治疗","hospital":"北大医疗淄博医院","doctor":"张楷","title":"副主任医师","month":8,"coverage":"山东省内、省外"},{"dept":"神经内科","topic":"缺血性卒中的早期识别和防治","hospital":"北大医疗淄博医院","doctor":"张楷","title":"副主任医师","month":10,"coverage":"山东省内、省外"},{"dept":"神经内科","topic":"面神经炎知识系列","hospital":"北大医疗潞安医院","doctor":"杨慧丰","title":"科室副主任","month":2,"coverage":"山西"},{"dept":"神经内科","topic":"脑梗知识系列","hospital":"株洲恺德心血管病医院","doctor":"齐义","title":"科主任","month":1,"coverage":"湖南"},{"dept":"神经内科","topic":"眩晕知识系列","hospital":"株洲恺德心血管病医院","doctor":"齐义","title":"科主任","month":8,"coverage":"湖南"},{"dept":"神经内科","topic":"卒中知识系列","hospital":"株洲恺德心血管病医院","doctor":"齐义","title":"科主任","month":11,"coverage":"湖南"},{"dept":"急诊急救与应急救援","topic":"急救心脏CPR培训+体外除颤","hospital":"北大医疗海洋石油医院","doctor":"谢岩浩","title":"中心主任","month":5,"coverage":"天津"},{"dept":"急诊急救与应急救援","topic":"常见创伤的初步处理","hospital":"北大医疗海洋石油医院","doctor":"谢岩浩","title":"中心主任","month":7,"coverage":"天津"},{"dept":"急诊急救与应急救援","topic":"“救”在身边","hospital":"北大医疗海洋石油医院","doctor":"谢岩浩","title":"中心主任","month":9,"coverage":"天津"},{"dept":"急诊急救与应急救援","topic":"摔到头了，什么时候必须去医院？","hospital":"北大医疗海洋石油医院","doctor":"谢岩浩","title":"中心主任","month":11,"coverage":"天津"},{"dept":"急诊急救与应急救援","topic":"急性心肌梗死——预防识别救治","hospital":"北大医疗淄博医院","doctor":"姚文明","title":"主任医师","month":1,"coverage":"山东省内、省外"},{"dept":"急诊急救与应急救援","topic":"关键时刻能救命：心肺复苏和海姆立克","hospital":"北大医疗淄博医院","doctor":"姚文明","title":"主任医师","month":2,"coverage":"山东省内、省外"},{"dept":"急诊急救与应急救援","topic":"心脏骤停与复苏技术","hospital":"北大医疗淄博医院","doctor":"姚文明","title":"主任医师","month":6,"coverage":"山东省内、省外"},{"dept":"急诊急救与应急救援","topic":"命悬“胰”线-节假日谨防胰腺炎","hospital":"北大医疗潞安医院","doctor":"申翼飞","title":"副主任医师","month":2,"coverage":"山西"},{"dept":"急诊急救与应急救援","topic":"血液净化","hospital":"北大医疗潞安医院","doctor":"申翼飞","title":"副主任医师","month":7,"coverage":"山西"},{"dept":"急诊急救与应急救援","topic":"ECMO能做什么","hospital":"北大医疗潞安医院","doctor":"申翼飞","title":"副主任医师","month":8,"coverage":"山西"},{"dept":"急诊急救与应急救援","topic":"ICU为病人提供了什么治疗","hospital":"深圳北医康复医院","doctor":"孙立东","title":"主任医师","month":7,"coverage":"深圳"},{"dept":"皮肤·创面与医美","topic":"定制你的美眼","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"王春雷","title":"科主任","month":3,"coverage":"山东省"},{"dept":"皮肤·创面与医美","topic":"浅谈烧伤","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"王春雷","title":"科主任","month":7,"coverage":"山东省"},{"dept":"皮肤·创面与医美","topic":"瘢痕的综合管理","hospital":"北大医疗鲁中医学中心总院（鲁中院区）","doctor":"王春雷","title":"科主任","month":10,"coverage":"山东省"}]
+[
+  {
+    "dept": "呼吸科",
+    "topic": "肺炎的常见类型及治疗要点",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "崔晓杰",
+    "title": "副主任医师",
+    "month": 1,
+    "coverage": "山东省内"
+  },
+  {
+    "dept": "呼吸科",
+    "topic": "咳嗽变异性哮喘的早期识别及规范治疗",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "崔晓杰",
+    "title": "副主任医师",
+    "month": 4,
+    "coverage": "山东省内"
+  },
+  {
+    "dept": "呼吸科",
+    "topic": "慢性阻塞性肺病，大家了解么？",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "崔晓杰",
+    "title": "副主任医师",
+    "month": 8,
+    "coverage": "山东省内"
+  },
+  {
+    "dept": "呼吸科",
+    "topic": "反复咳嗽、久咳不愈-千万别忽视",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "崔晓杰",
+    "title": "副主任医师",
+    "month": 9,
+    "coverage": "山东省内"
+  },
+  {
+    "dept": "呼吸科",
+    "topic": "冬春季节致命性呼吸道传染病的科学防御",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "陈婷婷",
+    "title": "科室副主任",
+    "month": 1,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "呼吸科",
+    "topic": "理性看待肺部结节",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "陈婷婷",
+    "title": "科室副主任",
+    "month": 9,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "呼吸科",
+    "topic": "肺结节距离肺癌究竟还有多远",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "陈婷婷",
+    "title": "科室副主任",
+    "month": 12,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "呼吸科",
+    "topic": "春暖花开话过敏",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "贾晓琴",
+    "title": "科主任",
+    "month": 4,
+    "coverage": "山西"
+  },
+  {
+    "dept": "呼吸科",
+    "topic": "肺部疾病的防治与肺部养生",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "贾晓琴",
+    "title": "科主任",
+    "month": 8,
+    "coverage": "山西"
+  },
+  {
+    "dept": "呼吸科",
+    "topic": "肺肿瘤与胸腔积液的诊断与治疗",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "贾晓琴",
+    "title": "科主任",
+    "month": 10,
+    "coverage": "山西"
+  },
+  {
+    "dept": "呼吸科",
+    "topic": "出现喘憋才是哮喘吗？",
+    "hospital": "深圳北医康复医院",
+    "doctor": "孙立东",
+    "title": "主任医师",
+    "month": 3,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "呼吸科",
+    "topic": "远离烟草-它伤害的可不仅仅是肺",
+    "hospital": "深圳北医康复医院",
+    "doctor": "孙立东",
+    "title": "主任医师",
+    "month": 5,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "心血管",
+    "topic": "心脑血管疾病的家庭管理",
+    "hospital": "北京大学国际医院",
+    "doctor": "邹丽春",
+    "title": "主任医师",
+    "month": 2,
+    "coverage": "北京"
+  },
+  {
+    "dept": "心血管",
+    "topic": "全科讲座：《“心”事知多少》——心血管疾病精准防治讲座",
+    "hospital": "北京大学国际医院",
+    "doctor": "雷励",
+    "title": "副主任医师",
+    "month": 1,
+    "coverage": "北京"
+  },
+  {
+    "dept": "心血管",
+    "topic": "高血压、高血脂防治",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "郭莉娟",
+    "title": "副主任医师",
+    "month": 11,
+    "coverage": "北京"
+  },
+  {
+    "dept": "心血管",
+    "topic": "查体发现动脉硬化斑块怎么办？",
+    "hospital": "北京北大医疗康复医院",
+    "doctor": "花焱",
+    "title": "中心主任",
+    "month": 11,
+    "coverage": "北京"
+  },
+  {
+    "dept": "心血管",
+    "topic": "心源性猝死防治",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "任承潜",
+    "title": "科主任",
+    "month": 1,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "心血管",
+    "topic": "心血管内科常见疾病的规范化诊疗（高血压、心力衰竭篇）",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "任承潜",
+    "title": "科主任",
+    "month": 5,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "心血管",
+    "topic": "房颤知识系列",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "任承潜",
+    "title": "科主任",
+    "month": 11,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "心血管",
+    "topic": "心衰知识系列",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "任承潜",
+    "title": "科主任",
+    "month": 12,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "心血管",
+    "topic": "高脂血症患者教育",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "刘平平",
+    "title": "科主任",
+    "month": 4,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "心血管",
+    "topic": "高血压知识系列",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "刘平平",
+    "title": "科主任",
+    "month": 5,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "心血管",
+    "topic": "冠心病知识系列",
+    "hospital": "深圳北医康复医院",
+    "doctor": "朱冰坡",
+    "title": "主任医师",
+    "month": 1,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "心血管",
+    "topic": "高血压的防治",
+    "hospital": "深圳北医康复医院",
+    "doctor": "朱冰坡",
+    "title": "主任医师",
+    "month": 5,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "心血管",
+    "topic": "警惕冠心病、管理胆固醇",
+    "hospital": "深圳北医康复医院",
+    "doctor": "朱冰坡",
+    "title": "主任医师",
+    "month": 12,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "内科·全科与健康管理",
+    "topic": "健康体检报告的解读",
+    "hospital": "北京大学国际医院",
+    "doctor": "邹丽春",
+    "title": "主任医师",
+    "month": 9,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·全科与健康管理",
+    "topic": "全科讲座：《年终盘点：看懂你的体检报告“潜台词”》",
+    "hospital": "北京大学国际医院",
+    "doctor": "邹丽春",
+    "title": "主任医师",
+    "month": 12,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·全科与健康管理",
+    "topic": "发热原因待查",
+    "hospital": "北京大学国际医院",
+    "doctor": "雷励",
+    "title": "副主任医师",
+    "month": 2,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·全科与健康管理",
+    "topic": "全科医学和健康管理",
+    "hospital": "北京大学国际医院",
+    "doctor": "雷励",
+    "title": "副主任医师",
+    "month": 3,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·全科与健康管理",
+    "topic": "《防范重大疾病风险、逆转职业健康损害！》",
+    "hospital": "北京大学国际医院",
+    "doctor": "李宏方",
+    "title": "主治医师",
+    "month": 5,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·全科与健康管理",
+    "topic": "功能医学讲座：《万病源于肠道：破解“第二大脑”的求救信号》",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "邸素洁",
+    "title": "副主任医师",
+    "month": 6,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·全科与健康管理",
+    "topic": "《慢病与衰老：从功能医学角度重建身体平衡》",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "邸素洁",
+    "title": "副主任医师",
+    "month": 12,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·全科与健康管理",
+    "topic": "消化不良，怎么办？",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "郭莉娟",
+    "title": "副主任医师",
+    "month": 2,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·全科与健康管理",
+    "topic": "《助力中老年健康：慢性病与老年病的康复之路与运动处方》",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "郭莉娟",
+    "title": "副主任医师",
+    "month": 10,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·全科与健康管理",
+    "topic": "《血糖、体重、骨密度：代谢失衡的三张“体检警报单”》",
+    "hospital": "北京北大医疗康复医院",
+    "doctor": "花焱",
+    "title": "中心主任",
+    "month": 9,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·全科与健康管理",
+    "topic": "体检怀疑癌症的全身PET-CT影像诊断",
+    "hospital": "北京北大医疗康复医院",
+    "doctor": "花焱",
+    "title": "中心主任",
+    "month": 10,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "《你以为是胖，其实是代谢出了问题》",
+    "hospital": "北京大学国际医院",
+    "doctor": "李宏方",
+    "title": "主治医师",
+    "month": 4,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "《为什么越忙越容易胖？高压人群的代谢医学真相》",
+    "hospital": "北京大学国际医院",
+    "doctor": "李宏方",
+    "title": "主治医师",
+    "month": 6,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "甲状腺疾病的规范化诊断与治疗（含甲亢、甲减）",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "刘晓禹",
+    "title": "副主任医师",
+    "month": 3,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "《糖尿病不是一天形成的：代谢失衡的早期信号》",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "刘晓禹",
+    "title": "副主任医师",
+    "month": 4,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "肥胖与代谢综合征知识系列",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "刘晓禹",
+    "title": "副主任医师",
+    "month": 5,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "肠道菌群科普",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "刘晓禹",
+    "title": "副主任医师",
+    "month": 7,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "《甲状腺、骨质疏松、肥胖，背后其实是一个系统问题》",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "邸素洁",
+    "title": "副主任医师",
+    "month": 9,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "打破糖尿病谣言，解锁控糖密码",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "张婷",
+    "title": "科室副主任",
+    "month": 7,
+    "coverage": "天津"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "糖尿病知识系列",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "张婷",
+    "title": "科室副主任",
+    "month": 11,
+    "coverage": "天津"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "糖尿病的防治及运动治疗",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "刘群",
+    "title": "科主任",
+    "month": 5,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "呵护您颈部的蝴蝶——甲状腺结节科普",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "刘群",
+    "title": "科主任",
+    "month": 9,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "骨质疏松的防治",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "刘群",
+    "title": "科主任",
+    "month": 10,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "高尿酸血症与痛风知识系列",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "刘平平",
+    "title": "科主任",
+    "month": 2,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "《平稳度过“人生第二春”：女性更年期深度管理与调养》",
+    "hospital": "深圳北医康复医院",
+    "doctor": "崔琈瑛",
+    "title": "副主任医师",
+    "month": 3,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "《乳腺与甲状腺结节：如何科学看待与主动预防？》",
+    "hospital": "深圳北医康复医院",
+    "doctor": "崔琈瑛",
+    "title": "副主任医师",
+    "month": 10,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "内科·内分泌代谢",
+    "topic": "《内分泌靶向周期治疗：女性健康管理新思路》",
+    "hospital": "深圳北医康复医院",
+    "doctor": "崔琈瑛",
+    "title": "副主任医师",
+    "month": 12,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "关爱女性健康—备孕中的热点话题",
+    "hospital": "北京大学国际医院",
+    "doctor": "张月红",
+    "title": "副主任医师",
+    "month": 3,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "科学饮食控制体重",
+    "hospital": "北京大学国际医院",
+    "doctor": "张月红",
+    "title": "副主任医师",
+    "month": 4,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "婴幼儿辅食添加与食物过敏",
+    "hospital": "北京大学国际医院",
+    "doctor": "张月红",
+    "title": "副主任医师",
+    "month": 6,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "病从口入，如何注意饮食？",
+    "hospital": "北京大学国际医院",
+    "doctor": "张月红",
+    "title": "副主任医师",
+    "month": 7,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "合理膳食，免疫基石",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "刘燕",
+    "title": "副主任医师",
+    "month": 1,
+    "coverage": "天津"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "1.减肥不等于减重，2.体重管理重塑健康生活方式",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "刘燕",
+    "title": "副主任医师",
+    "month": 4,
+    "coverage": "天津"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "远离肥胖 远离糖尿病",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "刘燕",
+    "title": "副主任医师",
+    "month": 7,
+    "coverage": "天津"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "医学营养减重",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "赵雪",
+    "title": "副主任医师",
+    "month": 5,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "科学减重，享“瘦”生活",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "赵雪",
+    "title": "副主任医师",
+    "month": 6,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "小学知食就是力量",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "赵雪",
+    "title": "副主任医师",
+    "month": 9,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "《你的肠道健康吗？吃对食物，养好“第二大脑”》",
+    "hospital": "深圳北医康复医院",
+    "doctor": "江洁",
+    "title": "营养师",
+    "month": 7,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "《身体老发炎？可能是你吃错了：抗炎饮食的必修课》",
+    "hospital": "深圳北医康复医院",
+    "doctor": "江洁",
+    "title": "营养师",
+    "month": 8,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "内科·临床营养",
+    "topic": "《吃出来的年轻：延缓衰老的饮食核心》",
+    "hospital": "深圳北医康复医院",
+    "doctor": "江洁",
+    "title": "营养师",
+    "month": 12,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "内科·肾病",
+    "topic": "尿里有泡沫是肾病吗？教你自判",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "张婷",
+    "title": "科室副主任",
+    "month": 8,
+    "coverage": "天津"
+  },
+  {
+    "dept": "内科·肾病",
+    "topic": "怎么知道自己是不是得了肾脏病",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "易黎黎",
+    "title": "科主任",
+    "month": 3,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "内科·肾病",
+    "topic": "尿道结石、输尿管结石、肾结石等知识系列",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "易黎黎",
+    "title": "科主任",
+    "month": 7,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "内科·肾病",
+    "topic": "肾脏病常见症状",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "易黎黎",
+    "title": "科主任",
+    "month": 8,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "内科·感染与肝病",
+    "topic": "哪些疾病需要去感染肝病科",
+    "hospital": "北京大学国际医院",
+    "doctor": "孙丹辉",
+    "title": "主治医师",
+    "month": 2,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·感染与肝病",
+    "topic": "脂肪肝的危害",
+    "hospital": "北京大学国际医院",
+    "doctor": "孙丹辉",
+    "title": "主治医师",
+    "month": 4,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·感染与肝病",
+    "topic": "乙肝、脂肪肝，护肝其实很简单",
+    "hospital": "北京大学国际医院",
+    "doctor": "孙丹辉",
+    "title": "主治医师",
+    "month": 7,
+    "coverage": "北京"
+  },
+  {
+    "dept": "内科·肿瘤",
+    "topic": "科学抗癌，预防先行",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "董霖",
+    "title": "副主任医师",
+    "month": 2,
+    "coverage": "山东省内、省外"
+  },
+  {
+    "dept": "内科·肿瘤",
+    "topic": "乳腺癌健康教育及预防",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "董霖",
+    "title": "副主任医师",
+    "month": 3,
+    "coverage": "山东省内、省外"
+  },
+  {
+    "dept": "内科·肿瘤",
+    "topic": "肠胃无忧，早诊早治，消化道早期癌的内镜筛查",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "董霖",
+    "title": "副主任医师",
+    "month": 6,
+    "coverage": "山东省内、省外"
+  },
+  {
+    "dept": "骨科",
+    "topic": "老年人摔倒的预防与治疗",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "司建国",
+    "title": "副主任医师",
+    "month": 1,
+    "coverage": "北京"
+  },
+  {
+    "dept": "骨科",
+    "topic": "办公室人员颈腰痛如何预防",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "司建国",
+    "title": "副主任医师",
+    "month": 3,
+    "coverage": "北京"
+  },
+  {
+    "dept": "骨科",
+    "topic": "面对中老年人的关节健康",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "司建国",
+    "title": "副主任医师",
+    "month": 10,
+    "coverage": "北京"
+  },
+  {
+    "dept": "骨科",
+    "topic": "关节痛怎么早诊断？运动康复怎么做？",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "杨江明",
+    "title": "科主任",
+    "month": 4,
+    "coverage": "山西"
+  },
+  {
+    "dept": "骨科",
+    "topic": "面对中青年人的运动损伤防护",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "杨江明",
+    "title": "科主任",
+    "month": 5,
+    "coverage": "山西"
+  },
+  {
+    "dept": "骨科",
+    "topic": "膝关节半月板损伤及处理",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "杨江明",
+    "title": "科主任",
+    "month": 8,
+    "coverage": "山西"
+  },
+  {
+    "dept": "骨科",
+    "topic": "肩周炎与肩袖损伤",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "杨江明",
+    "title": "科主任",
+    "month": 12,
+    "coverage": "山西"
+  },
+  {
+    "dept": "骨科",
+    "topic": "断指再植和手指再造，能接上还能再造",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "赵辉",
+    "title": "专科医师",
+    "month": 5,
+    "coverage": "山西"
+  },
+  {
+    "dept": "骨科",
+    "topic": "足弓健康小课堂",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "赵辉",
+    "title": "专科医师",
+    "month": 6,
+    "coverage": "山西"
+  },
+  {
+    "dept": "骨科",
+    "topic": "急性踝关节扭伤的治疗",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "赵辉",
+    "title": "专科医师",
+    "month": 8,
+    "coverage": "山西"
+  },
+  {
+    "dept": "骨科",
+    "topic": "肩周炎知识系列",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "胡伟",
+    "title": "主任助理",
+    "month": 1,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "骨科",
+    "topic": "运动损伤知识系列",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "胡伟",
+    "title": "主任助理",
+    "month": 4,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "骨科",
+    "topic": "骨质疏松知识系列",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "胡伟",
+    "title": "主任助理",
+    "month": 11,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "康复科",
+    "topic": "居家康复",
+    "hospital": "北京北大医疗康复医院",
+    "doctor": "唐克",
+    "title": "科室主任",
+    "month": 2,
+    "coverage": "北京"
+  },
+  {
+    "dept": "康复科",
+    "topic": "《告别腰痛困扰：康复方案与核心肌群训练全攻略》",
+    "hospital": "北京北大医疗康复医院",
+    "doctor": "唐克",
+    "title": "科室主任",
+    "month": 6,
+    "coverage": "北京"
+  },
+  {
+    "dept": "康复科",
+    "topic": "《守护膝盖健康：远离膝骨关节炎困扰，且行且珍“膝》",
+    "hospital": "北京北大医疗康复医院",
+    "doctor": "唐克",
+    "title": "科室主任",
+    "month": 10,
+    "coverage": "北京"
+  },
+  {
+    "dept": "康复科",
+    "topic": "《肌少症+骨质疏松：1+1>2的康复策略——中老年\"力量守护计划：从防跌倒到强骨增肌》",
+    "hospital": "北京北大医疗康复医院",
+    "doctor": "唐克",
+    "title": "科室主任",
+    "month": 11,
+    "coverage": "北京"
+  },
+  {
+    "dept": "康复科",
+    "topic": "酷姿势革命：给久坐族的肩颈矫正训练能量站",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "赵锐",
+    "title": "医师",
+    "month": 6,
+    "coverage": "天津"
+  },
+  {
+    "dept": "康复科",
+    "topic": "重塑生活：卒中后康复全攻略",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "赵锐",
+    "title": "医师",
+    "month": 11,
+    "coverage": "天津"
+  },
+  {
+    "dept": "康复科",
+    "topic": "《战胜慢性肌肉骨骼疼痛，开启康复新征程》",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "赵锐",
+    "title": "医师",
+    "month": 12,
+    "coverage": "天津"
+  },
+  {
+    "dept": "康复科",
+    "topic": "骨科康复",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "郑兴旺",
+    "title": "副主任治疗师",
+    "month": 4,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "康复科",
+    "topic": "脊柱健康",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "郑兴旺",
+    "title": "副主任治疗师",
+    "month": 9,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "康复科",
+    "topic": "老年人健康运动科普",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "郑兴旺",
+    "title": "副主任治疗师",
+    "month": 11,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "康复科",
+    "topic": "《不是老了，是功能在退化：老年脑与身体的科学康复路径》",
+    "hospital": "深圳北医康复医院",
+    "doctor": "徐武华",
+    "title": "主任医师",
+    "month": 10,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "康复科",
+    "topic": "《从中风到重启：脑卒中后的功能恢复与长期管理》",
+    "hospital": "深圳北医康复医院",
+    "doctor": "徐武华",
+    "title": "主任医师",
+    "month": 11,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "康复科",
+    "topic": "《帕金森、认知障碍与功能衰退：我们能提前做什么》",
+    "hospital": "深圳北医康复医院",
+    "doctor": "徐武华",
+    "title": "主任医师",
+    "month": 12,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "中医科",
+    "topic": "中医讲座：主题《开工不“上火”：中医教你疏肝解郁，满血复活》",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "王乐",
+    "title": "中医师",
+    "month": 2,
+    "coverage": "北京"
+  },
+  {
+    "dept": "中医科",
+    "topic": "好“胃”一生—中医养生文化带你有个好胃口",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "王乐",
+    "title": "中医师",
+    "month": 6,
+    "coverage": "北京"
+  },
+  {
+    "dept": "中医科",
+    "topic": "因人因时喝对茶",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "王乐",
+    "title": "中医师",
+    "month": 10,
+    "coverage": "北京"
+  },
+  {
+    "dept": "中医科",
+    "topic": "解密中医药膳的养生智慧",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "王乐",
+    "title": "中医师",
+    "month": 1,
+    "coverage": "北京/京外"
+  },
+  {
+    "dept": "中医科",
+    "topic": "女性中医养生",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "王乐",
+    "title": "中医师",
+    "month": 3,
+    "coverage": "北京/京外"
+  },
+  {
+    "dept": "中医科",
+    "topic": "冬病夏治-三伏贴",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "王乐",
+    "title": "中医师",
+    "month": 7,
+    "coverage": "北京/京外"
+  },
+  {
+    "dept": "中医科",
+    "topic": "中医亚健康-秋",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "王乐",
+    "title": "中医师",
+    "month": 9,
+    "coverage": "北京/京外"
+  },
+  {
+    "dept": "中医科",
+    "topic": "脖子疼、肩膀硬，几个动作轻松缓解",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "杨慧丰",
+    "title": "科室副主任",
+    "month": 5,
+    "coverage": "山西"
+  },
+  {
+    "dept": "中医科",
+    "topic": "中医-咳嗽",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "杨慧丰",
+    "title": "科室副主任",
+    "month": 11,
+    "coverage": "山西"
+  },
+  {
+    "dept": "中医科",
+    "topic": "春起生机 代谢焕新",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "闫支花",
+    "title": "主任医师",
+    "month": 4,
+    "coverage": "山西"
+  },
+  {
+    "dept": "中医科",
+    "topic": "中医夏季养生讲座",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "闫支花",
+    "title": "主任医师",
+    "month": 8,
+    "coverage": "山西"
+  },
+  {
+    "dept": "中医科",
+    "topic": "闻香养心——从中医香文化谈情绪调理",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "闫支花",
+    "title": "主任医师",
+    "month": 12,
+    "coverage": "山西"
+  },
+  {
+    "dept": "心理",
+    "topic": "心理讲座：职场高压下的亲密关系经营与沟通艺术",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "周志强",
+    "title": "副主任医师",
+    "month": 2,
+    "coverage": "北京"
+  },
+  {
+    "dept": "心理",
+    "topic": "迎风飞扬——压力与情绪管理",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "周志强",
+    "title": "副主任医师",
+    "month": 3,
+    "coverage": "北京"
+  },
+  {
+    "dept": "心理",
+    "topic": "心理讲座：破局育儿焦虑：家有学童的心理支持与科学行为引导",
+    "hospital": "北大医疗健康管理中心",
+    "doctor": "周志强",
+    "title": "副主任医师",
+    "month": 9,
+    "coverage": "北京"
+  },
+  {
+    "dept": "心理",
+    "topic": "心理讲座：关注“注意力与学习困难”：职场父母的特殊家庭支持策略",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "田国华",
+    "title": "副主任医师",
+    "month": 6,
+    "coverage": "天津"
+  },
+  {
+    "dept": "心理",
+    "topic": "做好孩子大棉被 儿童青少年常见心理问题及应对",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "田国华",
+    "title": "副主任医师",
+    "month": 9,
+    "coverage": "天津"
+  },
+  {
+    "dept": "心理",
+    "topic": "绽放光芒  正念赋能",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "田国华",
+    "title": "副主任医师",
+    "month": 12,
+    "coverage": "天津"
+  },
+  {
+    "dept": "睡眠",
+    "topic": "失眠",
+    "hospital": "北京大学国际医院",
+    "doctor": "朱莎",
+    "title": "副主任医师",
+    "month": 3,
+    "coverage": "北京"
+  },
+  {
+    "dept": "睡眠",
+    "topic": "打鼾是病吗？",
+    "hospital": "北京大学国际医院",
+    "doctor": "朱莎",
+    "title": "副主任医师",
+    "month": 8,
+    "coverage": "北京"
+  },
+  {
+    "dept": "睡眠",
+    "topic": "睡不着、总便秘，中医有妙招",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "闫支花",
+    "title": "主任医师",
+    "month": 6,
+    "coverage": "山西"
+  },
+  {
+    "dept": "神经内科",
+    "topic": "如何早期识别帕金森病与痴呆？",
+    "hospital": "北京大学国际医院",
+    "doctor": "朱莎",
+    "title": "副主任医师",
+    "month": 10,
+    "coverage": "北京"
+  },
+  {
+    "dept": "神经内科",
+    "topic": "得了急性脑卒中怎么办",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "张楷",
+    "title": "副主任医师",
+    "month": 1,
+    "coverage": "山东省内、省外"
+  },
+  {
+    "dept": "神经内科",
+    "topic": "头晕与头痛的鉴别诊断及治疗",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "张楷",
+    "title": "副主任医师",
+    "month": 8,
+    "coverage": "山东省内、省外"
+  },
+  {
+    "dept": "神经内科",
+    "topic": "缺血性卒中的早期识别和防治",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "张楷",
+    "title": "副主任医师",
+    "month": 10,
+    "coverage": "山东省内、省外"
+  },
+  {
+    "dept": "神经内科",
+    "topic": "面神经炎知识系列",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "杨慧丰",
+    "title": "科室副主任",
+    "month": 2,
+    "coverage": "山西"
+  },
+  {
+    "dept": "神经内科",
+    "topic": "脑梗知识系列",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "齐义",
+    "title": "科主任",
+    "month": 1,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "神经内科",
+    "topic": "眩晕知识系列",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "齐义",
+    "title": "科主任",
+    "month": 8,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "神经内科",
+    "topic": "卒中知识系列",
+    "hospital": "株洲恺德心血管病医院",
+    "doctor": "齐义",
+    "title": "科主任",
+    "month": 11,
+    "coverage": "湖南"
+  },
+  {
+    "dept": "急诊急救与应急救援",
+    "topic": "急救心脏CPR培训+体外除颤",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "谢岩浩",
+    "title": "中心主任",
+    "month": 5,
+    "coverage": "天津"
+  },
+  {
+    "dept": "急诊急救与应急救援",
+    "topic": "常见创伤的初步处理",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "谢岩浩",
+    "title": "中心主任",
+    "month": 7,
+    "coverage": "天津"
+  },
+  {
+    "dept": "急诊急救与应急救援",
+    "topic": "“救”在身边",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "谢岩浩",
+    "title": "中心主任",
+    "month": 9,
+    "coverage": "天津"
+  },
+  {
+    "dept": "急诊急救与应急救援",
+    "topic": "摔到头了，什么时候必须去医院？",
+    "hospital": "北大医疗海洋石油医院",
+    "doctor": "谢岩浩",
+    "title": "中心主任",
+    "month": 11,
+    "coverage": "天津"
+  },
+  {
+    "dept": "急诊急救与应急救援",
+    "topic": "急性心肌梗死——预防识别救治",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "姚文明",
+    "title": "主任医师",
+    "month": 1,
+    "coverage": "山东省内、省外"
+  },
+  {
+    "dept": "急诊急救与应急救援",
+    "topic": "关键时刻能救命：心肺复苏和海姆立克",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "姚文明",
+    "title": "主任医师",
+    "month": 2,
+    "coverage": "山东省内、省外"
+  },
+  {
+    "dept": "急诊急救与应急救援",
+    "topic": "心脏骤停与复苏技术",
+    "hospital": "北大医疗淄博医院",
+    "doctor": "姚文明",
+    "title": "主任医师",
+    "month": 6,
+    "coverage": "山东省内、省外"
+  },
+  {
+    "dept": "急诊急救与应急救援",
+    "topic": "命悬“胰”线-节假日谨防胰腺炎",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "申翼飞",
+    "title": "副主任医师",
+    "month": 2,
+    "coverage": "山西"
+  },
+  {
+    "dept": "急诊急救与应急救援",
+    "topic": "血液净化",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "申翼飞",
+    "title": "副主任医师",
+    "month": 7,
+    "coverage": "山西"
+  },
+  {
+    "dept": "急诊急救与应急救援",
+    "topic": "ECMO能做什么",
+    "hospital": "北大医疗潞安医院",
+    "doctor": "申翼飞",
+    "title": "副主任医师",
+    "month": 8,
+    "coverage": "山西"
+  },
+  {
+    "dept": "急诊急救与应急救援",
+    "topic": "ICU为病人提供了什么治疗",
+    "hospital": "深圳北医康复医院",
+    "doctor": "孙立东",
+    "title": "主任医师",
+    "month": 7,
+    "coverage": "深圳"
+  },
+  {
+    "dept": "皮肤·创面与医美",
+    "topic": "定制你的美眼",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "王春雷",
+    "title": "科主任",
+    "month": 3,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "皮肤·创面与医美",
+    "topic": "浅谈烧伤",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "王春雷",
+    "title": "科主任",
+    "month": 7,
+    "coverage": "山东省"
+  },
+  {
+    "dept": "皮肤·创面与医美",
+    "topic": "瘢痕的综合管理",
+    "hospital": "北大医疗鲁中医学中心总院（鲁中院区）",
+    "doctor": "王春雷",
+    "title": "科主任",
+    "month": 10,
+    "coverage": "山东省"
+  }
+]

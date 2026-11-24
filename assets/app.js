@@ -18,12 +18,13 @@
     slots: "pkuih_h6_slots",
     smsLogs: "pkuih_h6_sms_logs",
     homeRegion: "pkuih_h6_home_region",
+    homeHospital: "pkuih_h6_home_hospital",
     lastPortal: "pkuih_h6_portal",
     seed: "pkuih_h6_seed"
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261124-06";
+  const DATA_VERSION = "20261124-09";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -43,46 +44,7 @@
     female: "assets/avatars/doctor-female.svg",
     femaleSenior: "assets/avatars/doctor-female-senior.svg"
   };
-  const EXPERT_DATA_FIXES = {
-    "elite-01": { services: ["讲座", "1V1报告解读"] },
-    "elite-02": { services: ["讲座", "1V1报告解读"] },
-    "elite-03": { services: ["讲座", "1V1报告解读"] },
-    "elite-04": { services: ["讲座", "1V1报告解读"] },
-    "elite-05": { services: ["讲座", "1V1报告解读"] },
-    "elite-06": { services: ["讲座", "1V1报告解读"] },
-    "elite-07": { services: ["讲座", "1V1报告解读"] },
-    "director-01": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "director-02": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "director-03": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "director-04": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-01": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-03": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-04": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-05": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-07": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-09": {
-      services: ["讲座", "健康咨询"],
-      coverage: "全国",
-      coverageCities: ["全国"],
-      coverageRegions: ["全国"]
-    },
-    "specialist-11": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-12": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-13": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-15": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-18": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-22": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-26": { services: ["讲座"] },
-    "specialist-27": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-30": { services: ["讲座"] },
-    "specialist-35": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-36": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-40": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-41": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-42": { services: ["讲座", "健康咨询", "1V1报告解读"] },
-    "specialist-44": { services: ["讲座"] }
-  };
-
+  let hospitalThemesCache = new Map();
   const TIERS = {
     elite: {
       id: "elite",
@@ -150,7 +112,8 @@
     pending: { label: "待联系", cls: "is-pending" },
     contacted: { label: "已联系", cls: "is-planning" },
     matched: { label: "已匹配", cls: "is-confirmed" },
-    closed: { label: "已关闭", cls: "is-cancelled" }
+    closed: { label: "已关闭", cls: "is-cancelled" },
+    cancelled: { label: "已取消", cls: "is-cancelled" }
   };
 
   const ROLE = {
@@ -185,6 +148,69 @@
       role: "operator",
       hospitalId: "shenzhen",
       active: true
+    },
+    {
+      username: "health",
+      password: "pkuih2026",
+      name: "赵老师",
+      phone: "13800003333",
+      role: "operator",
+      hospitalId: "health",
+      active: true
+    },
+    {
+      username: "rehab",
+      password: "pkuih2026",
+      name: "孙老师",
+      phone: "13800004444",
+      role: "operator",
+      hospitalId: "rehab",
+      active: true
+    },
+    {
+      username: "ocean",
+      password: "pkuih2026",
+      name: "刘老师",
+      phone: "13800005555",
+      role: "operator",
+      hospitalId: "ocean",
+      active: true
+    },
+    {
+      username: "zibo",
+      password: "pkuih2026",
+      name: "王老师",
+      phone: "13800006666",
+      role: "operator",
+      hospitalId: "zibo",
+      active: true
+    },
+    {
+      username: "luzhong",
+      password: "pkuih2026",
+      name: "张老师",
+      phone: "13800007777",
+      role: "operator",
+      hospitalId: "luzhong",
+      active: true
+    },
+    {
+      username: "luan",
+      password: "pkuih2026",
+      name: "杨老师",
+      phone: "13800008888",
+      role: "operator",
+      hospitalId: "luan",
+      active: true
+    },
+    {
+      username: "kaide",
+      password: "pkuih2026",
+      name: "胡老师",
+      phone: "13800001234",
+      role: "operator",
+      hospitalId: "kaide",
+      active: true
     }
   ];
 
@@ -214,6 +240,7 @@
     geoDistanceKm: null,
     geoError: "",
     expertScope: "nearby",
+    expertHospitalId: "",
     expertTier: "all",
     expertService: "all",
     expertMonth: 0,
@@ -221,6 +248,7 @@
     expertAvailability: "bookable",
     expertSearch: "",
     expertSearchOpen: false,
+    expertVisited: false,
     appointmentFilter: "all",
     clientRecordTab: "bookings",
     demandFilter: "all",
@@ -261,11 +289,13 @@
     adminReviewId: "",
     adminDraft: null,
     adminNoteEditing: false,
+    adminReviewSaved: false,
     adminDemandId: "",
     adminDemandDraft: null,
     appointmentLocationDraft: null,
     slotDoctorId: "",
     slotMonth: "",
+    slotMonthDoctor: "",
     slotDraft: null,
     slotScope: "one",
     slotBatch: {
@@ -541,6 +571,23 @@
         updatedAt: new Date().toISOString()
       }));
       writeJSON(STORAGE.adminAccounts, accounts);
+      return accounts;
+    }
+    const seeded = readJSON(STORAGE.seed, {});
+    if (!seeded.adminOperatorsV2) {
+      const usernames = new Set(accounts.map((item) => item.username));
+      const missing = DEFAULT_ADMIN_ACCOUNTS.filter(
+        (item) => !usernames.has(item.username)
+      ).map((account) => ({
+        ...account,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+      if (missing.length) {
+        accounts = accounts.concat(missing);
+        writeJSON(STORAGE.adminAccounts, accounts);
+      }
+      writeJSON(STORAGE.seed, { ...seeded, adminOperatorsV2: true });
     }
     return accounts;
   }
@@ -565,14 +612,16 @@
     return state.adminUser?.role === "superadmin";
   }
 
+  function adminCanManageHospital(hospitalId) {
+    if (!state.adminUser) return false;
+    if (isSuperadmin()) return true;
+    return Boolean(hospitalId) && state.adminUser.hospitalId === hospitalId;
+  }
+
   function operatorHospital() {
     if (!state.adminUser) return null;
     if (isSuperadmin()) {
-      return (
-        state.hospitals.find((item) => item.id === state.adminHospitalId) ||
-        state.hospitals[0] ||
-        null
-      );
+      return state.adminHospitalId ? hospitalById(state.adminHospitalId) : null;
     }
     return state.hospitals.find((item) => item.id === state.adminUser.hospitalId) || null;
   }
@@ -596,7 +645,6 @@
       .filter((expert) => !removed.has(expert.id))
       .map((expert) => ({
         ...expert,
-        ...(EXPERT_DATA_FIXES[expert.id] || {}),
         ...(config.overrides?.[expert.id] || {})
       }));
     const added = (config.added || []).map((expert) => ({ ...expert, custom: true }));
@@ -604,6 +652,7 @@
       ...expert,
       services: normalizeServiceList(expert.services)
     }));
+    hospitalThemesCache.clear();
   }
 
   function allExperts() {
@@ -639,39 +688,30 @@
     ) {
       return ["全国"];
     }
-    const cities = [];
-    [
-      ["北京", "北京市"],
-      ["天津", "天津市"],
-      ["深圳", "深圳市"],
-      ["淄博", "淄博市"],
-      ["长治", "长治市"],
-      ["株洲", "株洲市"],
-      ["太原", "太原市"]
-    ].forEach(([keyword, city]) => {
-      if (value.includes(keyword) && !cities.includes(city)) cities.push(city);
-    });
-    if (value.includes("山东")) {
-      ["济南市", "青岛市", "淄博市"].forEach((city) => {
-        if (!cities.includes(city)) cities.push(city);
-      });
-    }
-    if (value.includes("山西")) {
-      ["太原市", "长治市"].forEach((city) => {
-        if (!cities.includes(city)) cities.push(city);
-      });
-    }
-    if (value.includes("湖南")) {
-      ["长沙市", "株洲市"].forEach((city) => {
-        if (!cities.includes(city)) cities.push(city);
-      });
-    }
-    return cities.length ? cities : [value];
+    if (value.includes("北京")) return ["北京市"];
+    if (value.includes("天津")) return ["天津市"];
+    if (value.includes("深圳")) return ["深圳市"];
+    if (value.includes("山东")) return ["山东省"];
+    if (value.includes("山西")) return ["山西省"];
+    if (value.includes("湖南")) return ["湖南省"];
+    return [value];
   }
 
   function coverageCitiesFor(expert) {
     const stored = Array.isArray(expert?.coverageCities) ? expert.coverageCities.filter(Boolean) : [];
-    return stored.length ? stored : derivedCoverageCities(expert?.coverage);
+    if (stored.length) return stored;
+    const label = String(expert?.coverage || "").trim();
+    const provinceCoverage = {
+      北京: "北京市",
+      天津: "天津市",
+      深圳: "深圳市",
+      山东省: "山东省",
+      山东省内: "山东省",
+      山西: "山西省",
+      湖南: "湖南省"
+    };
+    if (provinceCoverage[label]) return [provinceCoverage[label]];
+    return derivedCoverageCities(expert?.coverage);
   }
 
   function coverageText(expertOrCities) {
@@ -924,9 +964,22 @@
     return fallbackHospital(user);
   }
 
+  function libraryHospital() {
+    return state.expertHospitalId
+      ? hospitalById(state.expertHospitalId) || nearestHospital()
+      : nearestHospital();
+  }
+
   function currentClientRegion() {
     if (state.homeRegion?.province) {
       return normalizeRegion(state.homeRegion.province, state.homeRegion.city);
+    }
+    if (state.geoStatus === "ready") {
+      const located = state.geoHospitalId ? hospitalById(state.geoHospitalId) : null;
+      if (located) return normalizeRegion(located.province, located.city);
+    }
+    if (state.session?.province) {
+      return normalizeRegion(state.session.province, state.session.city);
     }
     const hospital = nearestHospital();
     if (hospital) return normalizeRegion(hospital.province, hospital.city);
@@ -959,16 +1012,42 @@
   function persistHomeRegion(region) {
     const normalized = normalizeRegion(region?.province, region?.city);
     state.homeRegion = normalized;
+    state.expertHospitalId = "";
     writeJSON(STORAGE.homeRegion, normalized);
     const hospital = hospitalForRegion(normalized);
     state.homeHospitalId = hospital?.id || "";
+    persistHomeHospital(state.homeHospitalId);
     state.expertScope = "nearby";
     return hospital;
+  }
+
+  function persistHomeHospital(hospitalId) {
+    if (hospitalId) writeJSON(STORAGE.homeHospital, hospitalId);
+    else localStorage.removeItem(STORAGE.homeHospital);
+  }
+
+  function selectHomeHospital(hospitalId, { announce = true } = {}) {
+    const hospital = hospitalById(hospitalId);
+    state.homeHospitalId = hospital ? hospital.id : "";
+    persistHomeHospital(state.homeHospitalId);
+    if (hospital) {
+      state.homeRegion = normalizeRegion(hospital.province, hospital.city);
+      writeJSON(STORAGE.homeRegion, state.homeRegion);
+    }
+    state.expertHospitalId = "";
+    state.expertScope = "nearby";
+    refreshHomeLocationViews();
+    if (announce && hospital) {
+      showToast(
+        `已切换到${hospital.name} · ${regionText(hospital.province, hospital.city)}。`
+      );
+    }
   }
 
   function clearHomeRegion() {
     state.homeRegion = null;
     localStorage.removeItem(STORAGE.homeRegion);
+    localStorage.removeItem(STORAGE.homeHospital);
   }
 
   function locationDistanceText() {
@@ -1038,7 +1117,10 @@
         state.geoAccuracy = Math.round(position.coords.accuracy || 0);
         state.geoHospitalId = nearest?.hospital?.id || "";
         state.geoDistanceKm = nearest?.distance ?? null;
-        if (manual) state.homeHospitalId = "";
+        if (manual) {
+          state.homeHospitalId = "";
+          persistHomeHospital("");
+        }
         applyLocationToLogin(nearest?.hospital);
         refreshHomeLocationViews();
         if (state.screen === "main" && state.tab === "experts" && state.expertScope === "nearby") {
@@ -1072,7 +1154,25 @@
   function matchesService(expert, service) {
     if (!service || service === "all") return true;
     const target = normalizeService(service);
-    return (expert.services || []).some((item) => normalizeService(item) === target);
+    return (expert?.services || []).some((item) => normalizeService(item) === target);
+  }
+
+  function concreteService(value) {
+    const service = normalizeService(value);
+    return SERVICE_IDS.includes(service) ? service : "";
+  }
+
+  function defaultServiceFor(expert) {
+    if (matchesService(expert, "讲座")) return "讲座";
+    const first = (expert?.services || [])
+      .map((item) => concreteService(item))
+      .find(Boolean);
+    return first || "讲座";
+  }
+
+  function bookingServiceFor(expert, preferred = "") {
+    const service = concreteService(preferred);
+    return service && matchesService(expert, service) ? service : defaultServiceFor(expert);
   }
 
   function serviceCount(service, hospitalId = "") {
@@ -1084,13 +1184,22 @@
     ).length;
   }
 
+  function lectureTopicSearchText(expert) {
+    if (!expert?.hospitalId || !matchesService(expert, "讲座")) return "";
+    return hospitalThemes(expert.hospitalId)
+      .flatMap((theme) => theme.topics || [])
+      .filter((topic) => String(topic.expertId || "") === String(expert.id))
+      .map((topic) => `${topic.title || ""} ${topic.dept || ""}`)
+      .join(" ");
+  }
+
   function expertMatchesLibrary(expert, overrides = {}) {
-    if (!expert?.active) return false;
+    if (expert?.active === false) return false;
     const scope = overrides.scope ?? state.expertScope;
     const availability = overrides.availability ?? state.expertAvailability;
     const service = overrides.service ?? state.expertService;
     const month = overrides.month ?? state.expertMonth;
-    const hospital = overrides.hospital || nearestHospital();
+    const hospital = overrides.hospital || libraryHospital();
     const region = overrides.region || currentClientRegion();
     if (scope === "nearby" && expert.hospitalId !== hospital?.id) return false;
     if (
@@ -1128,6 +1237,7 @@
         expert.deptTitle,
         expert.specialty,
         expert.coverage,
+        lectureTopicSearchText(expert),
         ...(expert.coverageCities || []),
         ...(expert.services || [])
       ]
@@ -1139,7 +1249,7 @@
   }
 
   function filteredLibraryExperts(overrides = {}) {
-    const hospital = overrides.hospital || nearestHospital();
+    const hospital = overrides.hospital || libraryHospital();
     const region = overrides.region || currentClientRegion();
     return state.experts
       .filter((expert) =>
@@ -1160,17 +1270,25 @@
     return normalizeServiceList(expert?.services).map((service) => ({ service }));
   }
 
+  let slotsCache = null;
+  let appointmentsCache = null;
+
+  function allSlotsSnapshot() {
+    if (!slotsCache) slotsCache = readJSON(STORAGE.slots, {});
+    return slotsCache;
+  }
+
   function getSlots(doctorId) {
-    const all = readJSON(STORAGE.slots, {});
+    const all = allSlotsSnapshot();
     return all[doctorId] && typeof all[doctorId] === "object" ? all[doctorId] : {};
   }
 
   function getAllSlots() {
-    const all = readJSON(STORAGE.slots, {});
-    return all && typeof all === "object" ? all : {};
+    return clone(allSlotsSnapshot());
   }
 
   function saveAllSlots(all) {
+    slotsCache = all;
     writeJSON(STORAGE.slots, all);
   }
 
@@ -1213,7 +1331,7 @@
           state.experts.find(
             (item) =>
               item.hospitalId === pendingDemo.hospitalId &&
-              item.active &&
+              item.active !== false &&
               matchesService(item, pendingDemo.serviceType)
           ) || state.experts[0];
         if (fallbackExpert) {
@@ -1223,6 +1341,36 @@
             tier: fallbackExpert.tier
           });
         }
+      }
+      if (pendingDemo && pendingDemo.doctorId) {
+        const doctor = expertById(pendingDemo.doctorId);
+        const availability = doctor ? doctorAvailability(doctor) : { dates: [] };
+        if (
+          pendingDemo.status === "pending" &&
+          !availability.dates.includes(pendingDemo.date)
+        ) {
+          const earliest = availability.dates.find(
+            (date) => date >= isoDate(addDays(startOfDay(), 7))
+          );
+          if (earliest) updateAppointment(pendingDemo.id, { date: earliest });
+        }
+      }
+      const legacyConfirmed = getAppointments().find(
+        (item) => item.id === "BD-DEMO-03"
+      );
+      if (legacyConfirmed?.plan?.time === "10:00-12:00") {
+        updateAppointment(legacyConfirmed.id, {
+          plan: {
+            ...legacyConfirmed.plan,
+            time: "全天",
+            agenda:
+              legacyConfirmed.plan.agenda ===
+              "10:00-10:20 场地准备\n10:20-11:40 分组咨询\n11:40-12:00 汇总答疑"
+                ? "09:00-09:20 场地准备\n09:20-11:30 分组健康咨询\n13:30-16:30 分组健康咨询\n16:30-17:00 汇总答疑"
+                : legacyConfirmed.plan.agenda,
+            updatedAt: new Date().toISOString()
+          }
+        });
       }
       return;
     }
@@ -1243,11 +1391,17 @@
     };
     const specialist =
       state.experts.find(
-        (item) => item.hospitalId === hospital.id && item.tier === "specialist" && item.active
+        (item) =>
+          item.hospitalId === hospital.id &&
+          item.tier === "specialist" &&
+          item.active !== false
       ) || state.experts[0];
     const director =
       state.experts.find(
-        (item) => item.hospitalId === hospital.id && item.tier === "director" && item.active
+        (item) =>
+          item.hospitalId === hospital.id &&
+          item.tier === "director" &&
+          item.active !== false
       ) || specialist;
     const specialistDates = specialist ? doctorAvailability(specialist).dates : [];
     const directorDates = director ? doctorAvailability(director).dates : [];
@@ -1255,7 +1409,10 @@
       specialistDates[0] || isoDate(addDays(today, Math.max(8, specialist?.leadDays || 7)));
     const confirmedDate =
       directorDates[0] || isoDate(addDays(today, Math.max(16, director?.leadDays || 14)));
-    const pendingDate = isoDate(addDays(today, 12));
+    const pendingDate =
+      specialistDates.find((date) => date >= isoDate(addDays(today, 8))) ||
+      specialistDates[0] ||
+      isoDate(addDays(today, 12));
     const now = new Date().toISOString();
     let appointmentChanged = false;
     let demandChanged = false;
@@ -1375,13 +1532,14 @@
             speakerId: director?.id || "",
             speaker: director ? `${director.name} · ${director.deptTitle}` : "院方安排",
             date: confirmedDate,
-            time: "10:00-12:00",
+            time: "全天",
             province: "北京市",
             city: "北京市",
             venue: "B1 员工活动中心",
             address: "北京市朝阳区望京 SOHO T1",
             outline: "血压、体脂与腰围测量；代谢风险分层；个体化饮食与运动建议。",
-            agenda: "10:00-10:20 场地准备\n10:20-11:40 分组咨询\n11:40-12:00 汇总答疑",
+            agenda:
+              "09:00-09:20 场地准备\n09:20-11:30 分组健康咨询\n13:30-16:30 分组健康咨询\n16:30-17:00 汇总答疑",
             team: "周老师（项目负责人）、张老师（现场执行）",
             message: "方案已确认，院方将按流程到场执行。",
             contact: "周老师 · 13800001111",
@@ -1467,10 +1625,12 @@
   }
 
   function getAppointments() {
-    return readJSON(STORAGE.appointments, []);
+    if (!appointmentsCache) appointmentsCache = readJSON(STORAGE.appointments, []);
+    return Array.isArray(appointmentsCache) ? appointmentsCache : [];
   }
 
   function saveAppointments(items) {
+    appointmentsCache = items;
     writeJSON(STORAGE.appointments, items);
   }
 
@@ -1482,6 +1642,20 @@
 
   function appointmentById(id) {
     return getAppointments().find((item) => item.id === id) || null;
+  }
+
+  function clientOwnsAppointment(appointment) {
+    return Boolean(
+      appointment &&
+        state.session?.phone &&
+        appointment.ownerPhone === state.session.phone
+    );
+  }
+
+  function clientOwnsDemand(demand) {
+    return Boolean(
+      demand && state.session?.phone && demand.ownerPhone === state.session.phone
+    );
   }
 
   function updateAppointment(id, patch) {
@@ -1505,6 +1679,21 @@
     ).length;
   }
 
+  function bookedCountMap(doctorId, ignoreId = "") {
+    const counts = {};
+    getAppointments().forEach((item) => {
+      if (
+        item.doctorId !== doctorId ||
+        item.status === "cancelled" ||
+        item.id === ignoreId
+      ) {
+        return;
+      }
+      counts[item.date] = (counts[item.date] || 0) + 1;
+    });
+    return counts;
+  }
+
   function dayCapacity(doctorId, dateIso) {
     const map = getSlots(doctorId);
     return Number(map[dateIso] || 0);
@@ -1517,6 +1706,7 @@
   function doctorAvailability(expert, ignoreId = "") {
     if (!expert) return { bookable: false, next: "", remaining: 0, dates: [] };
     const map = getSlots(expert.id);
+    const booked = bookedCountMap(expert.id, ignoreId);
     const lead = Math.max(0, Number(expert.leadDays) || tierOf(expert).leadDays);
     const minDate = isoDate(addDays(startOfDay(), lead));
     const today = todayIso();
@@ -1527,7 +1717,7 @@
       .sort()
       .forEach((date) => {
         if (date < minDate || date < today) return;
-        const left = Math.max(0, Number(map[date] || 0) - bookedCount(expert.id, date, ignoreId));
+        const left = Math.max(0, Number(map[date] || 0) - (booked[date] || 0));
         if (left > 0) {
           if (!next) next = date;
           remaining += left;
@@ -1594,6 +1784,20 @@
 
   function getSmsLogs() {
     return readJSON(STORAGE.smsLogs, {});
+  }
+
+  function smsLogIsCurrent(appointment, log) {
+    if (!log?.copiedAt) return false;
+    const copiedAt = new Date(log.copiedAt).getTime();
+    if (!Number.isFinite(copiedAt)) return false;
+    const changeTimes = [
+      appointment?.plan?.updatedAt,
+      appointment?.planSentAt
+    ]
+      .map((value) => (value ? new Date(value).getTime() : NaN))
+      .filter(Number.isFinite);
+    if (!changeTimes.length) return true;
+    return copiedAt >= Math.max(...changeTimes);
   }
 
   function saveSmsLog(id, payload) {
@@ -1718,7 +1922,15 @@
     );
     const byName = new Map(hospitalExperts.map((expert) => [expert.name, expert]));
     const exact = state.themeMatches
-      .filter((row) => row.month === Number(month) && byName.has(row.doctor))
+      .filter(
+        (row) =>
+          row.month === Number(month) &&
+          byName.has(row.doctor) &&
+          (!row.hospital ||
+            row.hospital === hospital.name ||
+            row.hospital.includes(hospital.name) ||
+            hospital.name.includes(row.hospital))
+      )
       .map((row) => {
         const expert = byName.get(row.doctor);
         return {
@@ -1738,19 +1950,22 @@
       })
       .slice(0, 8);
     if (!topics.length) {
-      season.topics.slice(0, 6).forEach((topic) => {
+      season.topics.forEach((topic) => {
+        if (topics.length >= 6) return;
         const expert = hospitalExperts.find((item) => {
           const deptAliases = DEPT_ALIASES[item.dept] || [item.dept];
           return [...new Set([item.dept, ...deptAliases].filter(Boolean))].some(
             (keyword) => topic.dept.includes(keyword) || keyword.includes(topic.dept)
           );
         });
-        topics.push({
-          id: `${month}-fallback-${topics.length}`,
-          dept: topic.dept,
-          title: topic.title,
-          expertId: expert?.id || ""
-        });
+        if (expert) {
+          topics.push({
+            id: `${month}-fallback-${topics.length}`,
+            dept: topic.dept,
+            title: topic.title,
+            expertId: expert.id
+          });
+        }
       });
     }
     const expertIds = [...new Set(topics.map((topic) => topic.expertId).filter(Boolean))];
@@ -1773,6 +1988,19 @@
     };
   }
 
+  function clientThemeTopics(theme, hospitalId = "") {
+    if (!theme) return [];
+    return (theme.topics || []).filter((topic) => {
+      const expert = topic?.expertId ? expertById(topic.expertId) : null;
+      return Boolean(
+        expert &&
+          expert.active !== false &&
+          matchesService(expert, "讲座") &&
+          (!hospitalId || expert.hospitalId === hospitalId)
+      );
+    });
+  }
+
   function getThemeConfigStore() {
     return readJSON(STORAGE.themeConfig, {});
   }
@@ -1784,9 +2012,10 @@
   function hospitalThemes(hospitalId) {
     const hospital = hospitalById(hospitalId);
     if (!hospital) return [];
+    if (hospitalThemesCache.has(hospital.id)) return hospitalThemesCache.get(hospital.id);
     const store = getThemeConfigStore();
     const saved = store?.[hospital.id] || {};
-    return Array.from({ length: 12 }, (_, index) => {
+    const themes = Array.from({ length: 12 }, (_, index) => {
       const month = index + 1;
       const base = defaultThemeConfig(hospital.id, month);
       return {
@@ -1809,6 +2038,8 @@
         image: saved[month]?.image || base?.image || themeImageFor(month)
       };
     });
+    hospitalThemesCache.set(hospital.id, themes);
+    return themes;
   }
 
   function hospitalTheme(hospitalId, month) {
@@ -1832,6 +2063,7 @@
       }))
     };
     saveThemeConfigStore(store);
+    hospitalThemesCache.clear();
   }
 
   /* =========================================================
@@ -1911,7 +2143,9 @@
   }
 
   function currentWindowScroll() {
-    return state.overlayScrollY ?? window.scrollY ?? 0;
+    return state.overlay
+      ? state.overlayScrollY ?? window.scrollY ?? 0
+      : window.scrollY ?? 0;
   }
 
   function storedScrollForView(key) {
@@ -2066,6 +2300,7 @@
     state.adminReviewId = "";
     state.adminDraft = null;
     state.adminNoteEditing = false;
+    state.adminReviewSaved = false;
     state.adminDemandId = "";
     state.adminDemandDraft = null;
     state.adminAccountDraft = null;
@@ -2115,6 +2350,24 @@
     });
   }
 
+  function scrollActiveAdminTabIntoView() {
+    const tabs = document.querySelector(".admin-tabs");
+    const active = tabs?.querySelector("button.is-active");
+    if (!tabs || !active) return;
+    const tabsRect = tabs.getBoundingClientRect();
+    const activeRect = active.getBoundingClientRect();
+    const maxScroll = Math.max(0, tabs.scrollWidth - tabs.clientWidth);
+    const target =
+      tabs.scrollLeft +
+      activeRect.left -
+      tabsRect.left -
+      (tabs.clientWidth - activeRect.width) / 2;
+    tabs.scrollTo({
+      left: Math.max(0, Math.min(maxScroll, target)),
+      behavior: "auto"
+    });
+  }
+
   function renderOverlay() {
     if (!overlayRoot) return;
     const hadOverlay = Boolean(overlayRoot.querySelector(".sheet, .flow"));
@@ -2124,7 +2377,7 @@
     }
     const nextScrollKey = overlayScrollKey(state.overlay);
     if (state.overlay && !hadOverlay) {
-      if (state.overlayScrollY == null) state.overlayScrollY = Math.max(0, window.scrollY || 0);
+      state.overlayScrollY = Math.max(0, window.scrollY || 0);
       pushOverlayHistory();
     }
     const paint = (content) => {
@@ -2331,6 +2584,14 @@
 
   function startLogin(pending = null) {
     if (state.session) return;
+    const returnTab = pending?.returnTab || state.tab || "home";
+    const returnScroll =
+      pending?.returnScroll !== undefined
+        ? Number(pending.returnScroll) || 0
+        : currentWindowScroll();
+    const nextPending = pending
+      ? { ...pending, returnTab, returnScroll }
+      : { type: "restore", returnTab, returnScroll };
     const hadOverlay = Boolean(
       state.overlay || overlayRoot?.querySelector(".sheet, .sheet-backdrop, .flow")
     );
@@ -2357,9 +2618,15 @@
       }
     }
     applyLocationToLogin(nearestHospital());
-    state.pendingAuth = pending;
+    state.pendingAuth = nextPending;
     state.screen = "auth";
     state.login.step = 1;
+    state.login.phone = "";
+    state.login.name = "";
+    state.login.orgName = "";
+    state.login.orgType = "保险公司";
+    state.login.title = "";
+    state.login.contactPhone = "";
     state.login.code = "";
     state.login.agree = false;
     state.adminAuthed = false;
@@ -2422,8 +2689,12 @@
       finishLogin(existing);
       return;
     }
+    state.login.name = "";
+    state.login.orgName = "";
+    state.login.orgType = "保险公司";
+    state.login.title = "";
     state.login.step = 2;
-    state.login.contactPhone = state.login.contactPhone || phone;
+    state.login.contactPhone = phone;
     renderApp();
     window.scrollTo(0, 0);
   }
@@ -2431,6 +2702,8 @@
   function finishLogin(user) {
     setSession(user);
     state.adminAuthed = false;
+    state.expertVisited = false;
+    state.expertHospitalId = "";
     clearAdminSession();
     setLastPortal("client");
     if (state.authHistory) {
@@ -2458,7 +2731,7 @@
     state.login.code = "";
     if (pending?.type === "booking") {
       state.tab = pending.returnTab || "experts";
-      renderApp({ scrollTo: 0 });
+      renderApp({ scrollTo: pending.returnScroll || 0 });
       openBooking(
         pending.doctorId || "",
         pending.tier || "",
@@ -2468,15 +2741,21 @@
       );
     } else if (pending?.type === "tab") {
       state.tab = pending.tab || "me";
-      renderApp({ scrollTo: 0 });
+      renderApp({
+        scrollTo:
+          pending.returnScroll ??
+          storedScrollForView(`main:${pending.tab || "me"}`)
+      });
     } else if (pending?.type === "demand") {
-      state.tab = "appointments";
-      state.clientRecordTab = "demands";
-      renderApp({ scrollTo: 0 });
+      state.tab = pending.returnTab || "home";
+      renderApp({ scrollTo: pending.returnScroll || 0 });
       openDemandCreate();
+    } else if (pending?.type === "restore") {
+      state.tab = pending.returnTab || state.tab || "home";
+      renderApp({ scrollTo: pending.returnScroll || 0 });
     } else {
-      state.tab = "home";
-      renderApp({ scrollTo: 0 });
+      state.tab = pending?.returnTab || state.tab || "home";
+      renderApp({ scrollTo: pending?.returnScroll || 0 });
     }
     showToast(`欢迎回来，${user.name}。`);
   }
@@ -2703,7 +2982,7 @@
     const region = currentClientRegion();
     return state.experts
       .filter((expert) => {
-        if (!expert.active) return false;
+        if (expert.active === false) return false;
         if (expert.hospitalId !== hospital?.id) return false;
         if (!expertCoversRegion(expert, region.province, region.city)) return false;
         if (bookableOnly && !doctorAvailability(expert).bookable) return false;
@@ -2797,7 +3076,7 @@
         : locationFailed
         ? "未获取定位 · 选择城市"
         : state.homeHospitalId
-        ? "已手动切换"
+        ? `已手动切换 · ${regionText(current?.province, current?.city)}`
         : state.geoStatus === "ready"
         ? "按当前位置推荐"
         : state.session
@@ -2809,14 +3088,13 @@
       Number.isFinite(Number(state.geoLat))
         ? " · 按距离排序"
         : "";
+    const currentName = current?.name || "请选择医院";
     return `
       <div class="hero-hospital">
         <span class="hero-hospital__pin">${icon("mapPin", 15)}</span>
         <span class="hero-hospital__body">
           <span class="hero-hospital__meta">
-            <small>${
-              state.homeRegion || locationFailed ? "" : "当前附近医院 · "
-            }${esc(meta)}${sortHint}</small>
+            <small>${esc(meta)}${sortHint}</small>
             <button type="button" data-action="home-city-open" ${
               locationFailed ? 'class="is-needed"' : ""
             }>${
@@ -2824,14 +3102,17 @@
             }</button>
           </span>
           <span class="hero-hospital__select-wrap">
+            <span class="hero-hospital__selected-name" title="${esc(
+              currentName
+            )}">${esc(currentName)}</span>
             <select data-home-hospital-picker aria-label="切换履约医院">
               ${hospitals
-                .map((hospital) => {
-                  const distance = hospitalDistanceText(hospital);
-                  return `<option value="${esc(hospital.id)}" ${
-                    hospital.id === current?.id ? "selected" : ""
-                  }>${esc(hospital.name)}${distance ? ` · ${distance}` : ""}</option>`;
-                })
+                .map(
+                  (hospital) =>
+                    `<option value="${esc(hospital.id)}" ${
+                      hospital.id === current?.id ? "selected" : ""
+                    }>${esc(hospital.name)}</option>`
+                )
                 .join("")}
             </select>
             <span class="hero-hospital__chevron">${icon("chevronDown", 13)}</span>
@@ -2881,7 +3162,7 @@
       hospitalExperts.map((expert) => String(expert.dept || "").trim()).filter(Boolean)
     );
     const theme = hospital ? hospitalTheme(hospital.id, currentMonth()) : null;
-    const topicCount = (theme?.topics || []).length;
+    const topicCount = hospital ? clientThemeTopics(theme, hospital.id).length : 0;
     return `
       <div><strong>${hospitalExperts.length}<span>位</span></strong><small>本院专家</small></div>
       <div><strong>${departments.size}<span>个</span></strong><small>覆盖科室</small></div>
@@ -2988,10 +3269,9 @@
     const hospital = nearestHospital() || state.hospitals[0];
     const currentTheme = hospital ? hospitalTheme(hospital.id, month) : null;
     const season = seasonalOf(month);
-    const topics = (currentTheme ? currentTheme.topics || [] : season?.topics || []).slice(
-      0,
-      2
-    );
+    const topics = (
+      currentTheme ? clientThemeTopics(currentTheme, hospital?.id) : []
+    ).slice(0, 2);
     return `
         <section class="season-banner season-banner--media season-banner--art season-tone--${seasonKeyOf(
           month
@@ -3022,17 +3302,21 @@
             </div>
             <p>${esc(currentTheme?.focus || season?.focus || "")}</p>
             <div class="season-banner__topics">
-              ${topics
-                .map(
-                  (topic, index) => `
+              ${
+                topics.length
+                  ? topics
+                      .map(
+                        (topic, index) => `
                     <button type="button" data-action="theme-topic" data-month="${month}"
                       data-hospital-id="${esc(hospital?.id || "")}"
                       data-topic-index="${index}">
                       <i>${esc(topic.dept)}</i><span>${esc(topic.title)}</span>
                     </button>
                   `
-                )
-                .join("")}
+                      )
+                      .join("")
+                  : `<span class="season-banner__empty">本月暂无已绑定专家的时令课题</span>`
+              }
             </div>
           </div>
         </section>
@@ -3229,7 +3513,8 @@
     const hospital =
       hospitalById(state.overlay?.hospitalId) || nearestHospital() || state.hospitals[0];
     const theme = hospitalTheme(hospital?.id, month);
-    const topic = topicIndex >= 0 ? theme?.topics?.[topicIndex] : null;
+    const topics = clientThemeTopics(theme, hospital?.id);
+    const topic = topicIndex >= 0 ? topics[topicIndex] : null;
     const coverage = topic
       ? themeTopicCoverage(topic, theme, hospital?.id)
       : null;
@@ -3264,7 +3549,7 @@
     const boundExperts = themeExpertList(theme, hospital?.id);
     const topicIndex = Number(state.overlay?.topicIndex);
     const selectedTopic = Number.isInteger(topicIndex) && topicIndex >= 0 ? topicIndex : -1;
-    const topics = theme.topics || [];
+    const topics = clientThemeTopics(theme, hospital?.id);
     const rawLocation =
       fromBooking && state.booking
         ? {
@@ -3407,8 +3692,10 @@
                 }</span>
               </div>
               <div class="theme-topic-list">
-                ${topics
-                  .map((topic, index) => {
+                ${
+                  topics.length
+                    ? topics
+                        .map((topic, index) => {
                     const row = topicRows[index];
                     const expert = row.expert;
                     const statusText = isCurrent
@@ -3443,15 +3730,23 @@
                           data-action="theme-topic-focus" data-month="${month}"
                           data-topic-index="${index}">${content}</button>`
                       : `<div class="theme-topic-card is-readonly">${content}</div>`;
-                  })
-                  .join("")}
+                        })
+                        .join("")
+                    : `<div class="theme-topic-empty">${icon(
+                        "leaf",
+                        18
+                      )}<strong>本月暂无已绑定专家的时令课题</strong><p>医院运营配置课题并绑定本院讲座专家后，会在这里展示。</p></div>`
+                }
               </div>
             </section>
             <section class="theme-section">
               <div class="theme-section__head">
                 <div><small>Expert team</small><h3>本月绑定专家</h3></div>
                 <button class="theme-text-btn" type="button" data-action="theme-experts"
-                  data-month="${month}">查看全部 ${icon("chevronRight", 12)}</button>
+                  data-month="${month}" data-hospital-id="${esc(hospital?.id || "")}">查看全部 ${icon(
+                    "chevronRight",
+                    12
+                  )}</button>
               </div>
               <div class="theme-expert-row">
                 ${
@@ -3460,13 +3755,15 @@
                         .slice(0, 4)
                         .map(
                           (expert) => `
-                            <div class="theme-expert">
+                            <button class="theme-expert" type="button" data-action="open-doctor"
+                              data-doctor-id="${esc(expert.id)}" data-month="${month}"
+                              data-theme-month="${month === currentMonth() ? month : 0}">
                               <img src="${esc(expertAvatar(expert))}" alt="${esc(
                                 expert.name
                               )}" loading="lazy" decoding="async">
                               <strong>${esc(expert.name)}</strong>
                               <small>${esc(expert.dept)} · ${esc(expert.deptTitle)}</small>
-                            </div>
+                            </button>
                           `
                         )
                         .join("")
@@ -3496,7 +3793,7 @@
         </div>
         <div class="theme-sheet__footer ${isCurrent ? "" : "is-readonly"}">
           <button class="theme-filter-btn" type="button" data-action="theme-experts"
-            data-month="${month}">按月筛专家</button>
+            data-month="${month}" data-hospital-id="${esc(hospital?.id || "")}">按月筛专家</button>
           ${
             !isCurrent
               ? `<span class="theme-sheet__readonly-note">${icon("history", 15)}
@@ -3594,7 +3891,7 @@
 
   function renderExpertResults() {
     const list = bookableScopeExperts();
-    const hospital = nearestHospital();
+    const hospital = libraryHospital();
     const region = currentClientRegion();
     const availabilityText =
       state.expertAvailability === "bookable"
@@ -3640,7 +3937,8 @@
   function expertServiceFilterMarkup(scopeHospitalId = "") {
     if (state.expertMonth > 0) {
       return `
-        <div class="filter-scroll filter-scroll--services" id="expert-service-filter">
+        <div class="filter-scroll filter-scroll--services" id="expert-service-filter"
+          data-filter-mode="month">
           <span class="filter-label">服务类型</span>
           <button class="chip is-active" type="button" data-action="expert-service"
             data-value="讲座">${esc(serviceLabel("讲座"))}<span class="chip__count">${
@@ -3654,7 +3952,8 @@
       `;
     }
     return `
-      <div class="filter-scroll filter-scroll--services" id="expert-service-filter">
+      <div class="filter-scroll filter-scroll--services" id="expert-service-filter"
+        data-filter-mode="all">
         <span class="filter-label">服务类型</span>
         <button class="chip ${state.expertService === "all" ? "is-active" : ""}" type="button"
           data-action="expert-service" data-value="all">全部服务</button>
@@ -3672,8 +3971,10 @@
   }
 
   function renderExpertsPage() {
-    const hospital = nearestHospital();
+    const hospital = libraryHospital();
+    const scopeLabel = state.expertHospitalId ? "当前医院" : "就近医院";
     const nearCount = bookableScopeExperts("nearby").length;
+    const allScopeCount = bookableScopeExperts("all").length;
     const bookableCount = bookableScopeExperts(state.expertScope, "bookable").length;
     const localCount = bookableScopeExperts(state.expertScope, "local").length;
     const allCount = bookableScopeExperts(state.expertScope, "all").length;
@@ -3693,26 +3994,14 @@
           <div class="expert-toolbar__row">
             <div class="segmented segmented--scope">
               <button class="${state.expertScope === "nearby" ? "is-active" : ""}" type="button"
-                data-action="expert-scope" data-value="nearby">就近医院 <span>${nearCount}</span></button>
+                data-action="expert-scope" data-value="nearby">${scopeLabel} <span>${nearCount}</span></button>
               <button class="${state.expertScope === "all" ? "is-active" : ""}" type="button"
-                data-action="expert-scope" data-value="all">全部医院</button>
+                data-action="expert-scope" data-value="all">全部医院 <span>${allScopeCount}</span></button>
             </div>
             <button class="icon-button ${state.expertSearchOpen ? "is-active" : ""}" type="button"
               data-action="expert-search-toggle" aria-label="搜索专家">${icon("search", 17)}</button>
           </div>
-          ${
-            state.expertSearchOpen
-              ? `<div class="expert-search">
-                  ${icon("search", 16)}
-                  <input id="expert-search" type="search" placeholder="搜索姓名、医院、科室或主题"
-                    value="${esc(state.expertSearch)}" data-expert-search autocomplete="off">
-                  <button type="button" data-action="expert-search-clear" aria-label="清空">${icon(
-                    "close",
-                    12
-                  )}</button>
-                </div>`
-              : ""
-          }
+          ${expertSearchMarkup()}
           <div class="filter-scroll filter-scroll--tier">
             ${[
               ["all", "全部梯队"],
@@ -3792,6 +4081,34 @@
     `;
   }
 
+  function expertSearchMarkup() {
+    return state.expertSearchOpen
+      ? `<div class="expert-search">
+          ${icon("search", 16)}
+          <input id="expert-search" type="search" placeholder="搜索姓名、医院、科室或主题"
+            value="${esc(state.expertSearch)}" data-expert-search autocomplete="off">
+          <button type="button" data-action="expert-search-clear" aria-label="清空">${icon(
+            "close",
+            12
+          )}</button>
+        </div>`
+      : "";
+  }
+
+  function syncExpertSearchBox() {
+    const toolbar = document.getElementById("expert-toolbar");
+    if (!toolbar) return;
+    const existing = toolbar.querySelector(".expert-search");
+    const toggle = toolbar.querySelector('[data-action="expert-search-toggle"]');
+    if (toggle) toggle.classList.toggle("is-active", state.expertSearchOpen);
+    if (state.expertSearchOpen && !existing) {
+      const row = toolbar.querySelector(".expert-toolbar__row");
+      if (row) row.insertAdjacentHTML("afterend", expertSearchMarkup());
+    } else if (!state.expertSearchOpen && existing) {
+      existing.remove();
+    }
+  }
+
   function refreshExpertResults() {
     const wrap = document.getElementById("expert-results");
     if (wrap) wrap.innerHTML = renderExpertResults();
@@ -3813,10 +4130,14 @@
   }
 
   function refreshExpertScopeCount() {
-    const count = document.querySelector(
+    const near = document.querySelector(
       '[data-action="expert-scope"][data-value="nearby"] span'
     );
-    if (count) count.textContent = String(bookableScopeExperts("nearby").length);
+    if (near) near.textContent = String(bookableScopeExperts("nearby").length);
+    const all = document.querySelector(
+      '[data-action="expert-scope"][data-value="all"] span'
+    );
+    if (all) all.textContent = String(bookableScopeExperts("all").length);
   }
 
   function refreshExpertServiceCounts() {
@@ -3832,6 +4153,10 @@
     filter
       .querySelectorAll('[data-action="expert-service"][data-value]')
       .forEach((button) => {
+        button.classList.toggle(
+          "is-active",
+          button.dataset.value === state.expertService
+        );
         if (button.dataset.value === "all") return;
         const count = button.querySelector(".chip__count");
         if (count) count.textContent = String(scopedServiceCount(button.dataset.value));
@@ -3858,6 +4183,7 @@
 
   function resetExpertFilters(overrides = {}) {
     state.expertScope = overrides.scope || "nearby";
+    state.expertHospitalId = overrides.hospitalId || "";
     state.expertTier = overrides.tier || "all";
     state.expertService = overrides.service || "all";
     state.expertMonth = Number(overrides.month) || 0;
@@ -3868,10 +4194,13 @@
   }
 
   function refreshExpertFilterChrome() {
-    const hospital = nearestHospital();
+    const hospital = libraryHospital();
     const scopeHospitalId = state.expertScope === "nearby" ? hospital?.id || "" : "";
     const serviceFilter = document.getElementById("expert-service-filter");
-    if (serviceFilter) serviceFilter.outerHTML = expertServiceFilterMarkup(scopeHospitalId);
+    const mode = state.expertMonth > 0 ? "month" : "all";
+    if (serviceFilter && serviceFilter.dataset.filterMode !== mode) {
+      serviceFilter.outerHTML = expertServiceFilterMarkup(scopeHospitalId);
+    }
     document.querySelectorAll('[data-action="expert-scope"]').forEach((button) => {
       button.classList.toggle("is-active", button.dataset.value === state.expertScope);
     });
@@ -3882,6 +4211,7 @@
       button.classList.toggle("is-active", button.dataset.value === state.expertAvailability);
     });
     refreshExpertAvailabilityCounts();
+    refreshExpertServiceCounts();
     refreshExpertHint();
   }
 
@@ -3897,6 +4227,7 @@
     const matchedMonths = monthsForExpert(expert);
     const fromBooking = state.overlayStack.some((item) => item.type === "booking");
     const selected = fromBooking && state.booking?.doctorId === expert.id;
+    const nextService = bookingServiceFor(expert, state.expertService);
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet doctor-sheet" role="dialog" aria-modal="true" aria-label="${esc(
@@ -4025,11 +4356,9 @@
                 </button>`
               : `<button class="btn btn--primary" type="button" data-action="book-doctor" data-doctor-id="${esc(
                   expert.id
-                )}" data-service="${
-                  state.expertService && matchesService(expert, state.expertService)
-                    ? esc(state.expertService)
-                    : ""
-                }" data-month="${state.overlay?.themeMonth || 0}" ${
+                )}" data-service="${esc(nextService)}" data-month="${
+                  state.overlay?.themeMonth || 0
+                }" ${
                   availability.bookable ? "" : "disabled"
                 }>
                   ${availability.bookable ? "预约该专家" : "暂无可约档期"} ${icon("arrowRight", 15)}
@@ -4077,10 +4406,7 @@
       state.hospitals[0] ||
       null;
     const region = currentClientRegion();
-    const serviceType =
-      preferredService && (!expert || matchesService(expert, preferredService))
-        ? preferredService
-        : expert?.services?.[0] || "讲座";
+    const serviceType = bookingServiceFor(expert, preferredService);
     let themeMonth = Number(preferredTheme?.month) || 0;
     let themeTopicId = preferredTheme?.topicId || "";
     let themeCoverage = preferredTheme?.coverageLabel || "";
@@ -4254,8 +4580,8 @@
 
   function bookingTopicChoices(booking) {
     if (booking?.serviceType !== "讲座") return [];
-    const { expert, theme } = bookingTopicContext(booking);
-    const hospitalTopics = theme?.topics || [];
+    const { expert, theme, hospitalId } = bookingTopicContext(booking);
+    const hospitalTopics = clientThemeTopics(theme, hospitalId);
     const expertTopics = expert
       ? hospitalTopics.filter((topic) => String(topic.expertId || "") === String(expert.id))
       : [];
@@ -4405,7 +4731,7 @@
       ? expertById(themeCtx.topic.expertId)
       : null;
     const filterText = pinned
-      ? `已带入 ${doctor.name}，可直接继续填写；需要调整时可点击“更换专家”。`
+      ? `已带入 ${doctor.name}，可直接继续填写；同条件共 ${options.length} 位相关专家、${bookableCount} 位可约，点击“更换专家”查看。`
       : themeCtx.topic
       ? `已按课题「${themeCtx.topic.title}」筛选${
           topicExpert ? `，仅展示主讲专家 ${topicExpert.name}` : ""
@@ -4610,7 +4936,7 @@
                       <button class="topic-chip__select ${active ? "is-active" : ""}" type="button"
                         data-action="booking-topic" data-value="${esc(topic.title)}"
                         ${selectable ? "" : "disabled"}>
-                        ${active ? "已选 · 取消" : available ? (monthBookable ? "选择" : "仅浏览") : "不可约"}
+                        ${active ? "已选" : available ? (monthBookable ? "选择" : "仅浏览") : "不可约"}
                       </button>
                     </div>
                   `;
@@ -4629,6 +4955,26 @@
       </div>
       </div>
     `;
+  }
+
+  function bookingDemandHint(serviceType) {
+    if (normalizeService(serviceType) === "健康咨询") {
+      return "填写咨询方向与人群需求";
+    }
+    if (normalizeService(serviceType) === "1V1报告解读") {
+      return "填写报告解读关注方向";
+    }
+    return "时令主题可选，点击已选主题可取消";
+  }
+
+  function bookingTopicFieldHint(serviceType) {
+    if (normalizeService(serviceType) === "健康咨询") {
+      return "填写咨询方向";
+    }
+    if (normalizeService(serviceType) === "1V1报告解读") {
+      return "填写报告解读方向";
+    }
+    return "可选本月主题，也可自定义";
   }
 
   function renderBookingStepOne() {
@@ -4671,16 +5017,14 @@
         </div>
       </div>
       <div class="flow-section">
-        <div class="flow-section__head"><h2>活动需求</h2><span>${
-          booking.serviceType === "讲座"
-            ? "时令主题可选，点击已选主题可取消"
-            : normalizeService(booking.serviceType) === "健康咨询"
-            ? "填写咨询方向与人群需求"
-            : "填写报告解读关注方向"
-        }</span></div>
+        <div class="flow-section__head"><h2>活动需求</h2><span id="booking-demand-hint">${esc(
+          bookingDemandHint(booking.serviceType)
+        )}</span></div>
         ${renderBookingTopics(booking)}
         <div class="field">
-          <label>活动主题 <span>可选本月主题，也可自定义</span></label>
+          <label>活动主题 <span id="booking-topic-field-hint">${esc(
+            bookingTopicFieldHint(booking.serviceType)
+          )}</span></label>
           <input type="text" data-booking-field="customTopic" value="${esc(
             booking.customTopic
           )}" placeholder="如：职场人群心血管风险识别">
@@ -4823,17 +5167,19 @@
 
   function setBookingService(value) {
     if (!state.booking) return;
-    state.booking.serviceType = value;
-    if (value !== "讲座") {
+    const service = concreteService(value);
+    if (!service) return;
+    state.booking.serviceType = service;
+    if (service !== "讲座") {
       state.booking.themeMonth = 0;
       state.booking.themeTopicId = "";
       state.booking.themeCoverage = "";
     }
     document.querySelectorAll('[data-action="booking-service"]').forEach((button) => {
-      button.classList.toggle("is-active", button.dataset.value === value);
+      button.classList.toggle("is-active", button.dataset.value === service);
     });
     const doctor = bookingSelectedDoctor(state.booking);
-    if (doctor && !matchesService(doctor, value)) {
+    if (doctor && !matchesService(doctor, service)) {
       state.booking.doctorId = "";
       state.booking.date = "";
       state.booking.doctorPinned = false;
@@ -4844,6 +5190,10 @@
     if (wrap) wrap.innerHTML = renderBookingDoctorSection(state.booking);
     refreshBookingDates();
     refreshBookingTopics();
+    const demandHint = document.getElementById("booking-demand-hint");
+    if (demandHint) demandHint.textContent = bookingDemandHint(service);
+    const topicFieldHint = document.getElementById("booking-topic-field-hint");
+    if (topicFieldHint) topicFieldHint.textContent = bookingTopicFieldHint(service);
     const topicCoverage = bookingSelectedTopicCoverage(state.booking);
     if (topicCoverage && !topicCoverage.available) {
       showToast(
@@ -4933,7 +5283,9 @@
     const booking = state.booking;
     if (!booking) return;
     const { month, hospitalId, theme } = bookingTopicContext(booking);
-    const index = (theme?.topics || []).findIndex((topic) => topic.title === title);
+    const index = clientThemeTopics(theme, hospitalId).findIndex(
+      (topic) => String(topic.title || "").trim() === String(title || "").trim()
+    );
     if (index < 0) return showToast("该主题详情暂不可用。");
     openTheme(month, index, hospitalId);
   }
@@ -4957,7 +5309,7 @@
       bookingSelectedDoctor(booking)?.hospitalId ||
       "";
     const theme = hospitalTheme(hospitalId, Number(month));
-    const topic = theme?.topics?.[Number(topicIndex)];
+    const topic = clientThemeTopics(theme, hospitalId)[Number(topicIndex)];
     if (!booking || !topic) return showToast("该主题暂不可用。");
     if (Number(month) !== currentMonth()) {
       return showToast("非本月时令主题仅可浏览，不能预约。");
@@ -5097,8 +5449,15 @@
     }
     if (!booking.province || !booking.city) return "请选择活动省市。";
     if (!booking.address.trim()) return "请填写活动详细地址。";
-    if (booking.contactPhone && !/^1\d{10}$/.test(booking.contactPhone)) {
+    if (!booking.contactName.trim()) return "请填写联系人。";
+    if (!/^1\d{10}$/.test(booking.contactPhone || "")) {
       return "联系电话格式不正确。";
+    }
+    if (
+      String(booking.headcount || "").trim() &&
+      (!Number.isInteger(Number(booking.headcount)) || Number(booking.headcount) <= 0)
+    ) {
+      return "预计人数需填写大于 0 的整数。";
     }
     const selectedTopic = bookingSelectedTopicCoverage(booking);
     if (selectedTopic && !selectedTopic.available) {
@@ -5127,6 +5486,11 @@
   function submitBooking() {
     const booking = state.booking;
     if (!booking) return;
+    if (!state.session) {
+      showToast("请先登录后再提交预约。");
+      startLogin({ type: "booking" });
+      return;
+    }
     const error = validateBookingStepOne();
     if (error) {
       state.booking.step = 1;
@@ -5176,6 +5540,7 @@
     items.push(appointment);
     saveAppointments(items);
     state.booking = null;
+    state.overlayStack = [];
     state.overlay = { type: "appointment", appointmentId: id, action: "success" };
     renderOverlay();
     renderApp();
@@ -5210,6 +5575,95 @@
       appointment.address,
       appointment.venue
     );
+  }
+
+  function appointmentThemeTopicFor(appointment, serviceType = "") {
+    const service = normalizeService(
+      serviceType || appointment?.plan?.serviceType || appointment?.serviceType
+    );
+    const month = Number(appointment?.themeMonth || appointment?.plan?.themeMonth || 0);
+    if (service !== "讲座" || !month || !appointment?.hospitalId) return null;
+    const theme = hospitalTheme(appointment.hospitalId, month);
+    if (!theme) return null;
+    const topicId = appointment.themeTopicId || appointment.plan?.themeTopicId || "";
+    return (
+      (theme.topics || []).find((topic) =>
+        topicId
+          ? String(topic.id || "") === String(topicId)
+          : String(topic.title || "").trim() ===
+            String(appointment.plan?.topic || appointment.topic || "").trim()
+      ) || null
+    );
+  }
+
+  function appointmentAssignmentError({
+    appointment,
+    expert,
+    serviceType,
+    date,
+    province,
+    city,
+    ignoreId = ""
+  }) {
+    if (!appointment) return "预约信息已失效。";
+    if (!expert) return "专家为必选项，请选择出讲专家。";
+    if (expert.active === false) return "所选专家已停止展示，请重新选择。";
+    if (expert.hospitalId !== appointment.hospitalId) {
+      return "出讲专家必须属于本次履约医院。";
+    }
+    if (!matchesService(expert, serviceType)) {
+      return `所选专家不提供「${serviceLabel(serviceType)}」服务，请重新选择。`;
+    }
+    const topic = appointmentThemeTopicFor(appointment, serviceType);
+    if (topic) {
+      if (topic.expertId && String(topic.expertId) !== String(expert.id)) {
+        return "出讲专家与机构已选的时令课题主讲人不一致，请重新选择。";
+      }
+      const theme = hospitalTheme(appointment.hospitalId, Number(topic.month || appointment.themeMonth));
+      const coverage = themeTopicCoverage(topic, theme, appointment.hospitalId);
+      if (!themeTopicCoversRegion(coverage, province, city)) {
+        return `该时令课题履约地不含${regionText(province, city)}，请先与机构确认调整。`;
+      }
+    } else if (!expertCoversRegion(expert, province, city)) {
+      return `${expert.name} 的日常履约范围不含${regionText(province, city)}。`;
+    }
+    if (!date) return "请选择活动日期。";
+    if (date < todayIso()) return "活动日期不能早于今天。";
+    const availability = doctorAvailability(expert, ignoreId);
+    if (!availability.dates.includes(date)) {
+      return `${expert.name} 在 ${formatDateCN(date, true)} 不在可预约周期或没有可用号源。`;
+    }
+    if (dayRemaining(expert.id, date, ignoreId) <= 0) {
+      return `${expert.name} 在 ${formatDateCN(date, true)} 已无可约号源，请调整日期或专家。`;
+    }
+    return "";
+  }
+
+  function finalPlanError(appointment) {
+    if (!appointment) return "预约信息已失效。";
+    const plan = appointment.plan;
+    if (!plan) return "院方尚未提交活动方案。";
+    const expertId = plan.speakerId || appointment.doctorId;
+    const expert = expertId ? expertById(expertId) : null;
+    const serviceType = plan.serviceType || appointment.serviceType;
+    const date = plan.date || appointment.date;
+    if (!plan.topic?.trim()) return "方案缺少活动主题，请联系项目对接人。";
+    if (!(appointment.address || "").trim()) return "预约缺少活动详细地址，请先补充活动地点。";
+    if (normalizeService(serviceType) !== normalizeService(appointment.serviceType)) {
+      return "方案服务类型与预约记录不一致，请联系项目对接人更新。";
+    }
+    if (date !== appointment.date) {
+      return "方案日期与预约记录不一致，请联系项目对接人更新。";
+    }
+    return appointmentAssignmentError({
+      appointment,
+      expert,
+      serviceType,
+      date,
+      province: appointment.province,
+      city: appointment.city,
+      ignoreId: appointment.id
+    });
   }
 
   function topicOf(appointment) {
@@ -5399,23 +5853,42 @@
           <button class="${state.clientRecordTab === "demands" ? "is-active" : ""}" type="button"
             data-action="record-tab" data-value="demands">专家提需 <span>${demands.length}</span></button>
         </div>
-        ${
-          state.clientRecordTab === "bookings"
-            ? `<div class="filter-scroll filter-scroll--page">
-                ${appointmentFilterList()
-                  .map(
-                    (filter) =>
-                      `<button class="chip ${
-                        state.appointmentFilter === filter.id ? "is-active" : ""
-                      }" type="button" data-action="appointment-filter" data-value="${filter.id}">${filter.label}</button>`
-                  )
-                  .join("")}
-              </div>
-              <div id="appointment-list">${renderAppointmentList()}</div>`
-            : `<div id="demand-list">${renderDemandList()}</div>`
-        }
+        <div id="record-panel">${renderRecordPanel()}</div>
       </div>
     `;
+  }
+
+  function renderRecordPanel() {
+    if (state.clientRecordTab === "bookings") {
+      return `<div class="filter-scroll filter-scroll--page">
+          ${appointmentFilterList()
+            .map(
+              (filter) =>
+                `<button class="chip ${
+                  state.appointmentFilter === filter.id ? "is-active" : ""
+                }" type="button" data-action="appointment-filter" data-value="${filter.id}">${filter.label}</button>`
+            )
+            .join("")}
+        </div>
+        <div id="appointment-list">${renderAppointmentList()}</div>`;
+    }
+    return `<div id="demand-list">${renderDemandList()}</div>`;
+  }
+
+  function refreshRecordPanel() {
+    const panel = document.getElementById("record-panel");
+    if (panel) panel.innerHTML = renderRecordPanel();
+    const appointments = appointmentsForUser(state.session?.phone || "");
+    const demands = demandsForUser(state.session?.phone || "");
+    document.querySelectorAll('[data-action="record-tab"]').forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.value === state.clientRecordTab);
+      const count = button.querySelector("span");
+      if (count) {
+        count.textContent = String(
+          button.dataset.value === "bookings" ? appointments.length : demands.length
+        );
+      }
+    });
   }
 
   function refreshAppointmentList() {
@@ -5435,11 +5908,11 @@
     const status = appointment.status;
     const rank = {
       pending: 1,
-      planning: 2,
-      review: 3,
-      revision: 3,
-      confirmed: 4,
-      completed: 5,
+      planning: 3,
+      review: 4,
+      revision: 4,
+      confirmed: 5,
+      completed: 6,
       cancelled: 0
     }[status] || 1;
     const steps = [
@@ -5578,7 +6051,9 @@
                 appointmentLocationText(appointment)
               )}</strong></div>
               ${
-                ["pending", "planning", "review", "revision"].includes(appointment.status)
+                ["pending", "planning", "review", "revision", "confirmed"].includes(
+                  appointment.status
+                )
                   ? `<button class="location-edit-link" type="button"
                       data-action="appointment-location-edit" data-appointment-id="${esc(
                         appointment.id
@@ -5676,6 +6151,12 @@
   function openAppointmentLocationEdit(appointmentId) {
     const appointment = appointmentById(appointmentId);
     if (!appointment) return;
+    if (!clientOwnsAppointment(appointment)) {
+      return showToast(state.session ? "无权修改该预约。" : "请先登录。");
+    }
+    if (["completed", "cancelled"].includes(appointment.status)) {
+      return showToast("该预约已结束，活动地点仅供查看。");
+    }
     state.appointmentLocationDraft = {
       appointmentId: appointment.id,
       province: appointment.province || "北京市",
@@ -5747,28 +6228,62 @@
     const draft = state.appointmentLocationDraft;
     const appointment = appointmentById(draft?.appointmentId);
     if (!draft || !appointment) return;
+    if (!clientOwnsAppointment(appointment)) {
+      return showToast(state.session ? "无权修改该预约。" : "请先登录。");
+    }
+    if (["completed", "cancelled"].includes(appointment.status)) {
+      return showToast("该预约已结束，活动地点仅供查看。");
+    }
     if (!draft.address.trim()) return showToast("请填写活动详细地址。");
+    const expert = appointment.doctorId ? expertById(appointment.doctorId) : null;
+    const assignmentError = appointmentAssignmentError({
+      appointment,
+      expert,
+      serviceType: appointment.serviceType,
+      date: appointment.plan?.date || appointment.date,
+      province: draft.province,
+      city: draft.city,
+      ignoreId: appointment.id
+    });
+    if (assignmentError) return showToast(assignmentError);
     const patch = {
       province: draft.province,
       city: draft.city,
       address: draft.address.trim(),
       venue: draft.venue.trim()
     };
+    if (appointment.status === "confirmed") {
+      patch.status = "review";
+      patch.confirmedAt = "";
+      patch.feedback = "";
+      patch.feedbackAt = "";
+    }
     if (appointment.plan) {
       patch.plan = {
         ...appointment.plan,
         ...patch,
         updatedAt: new Date().toISOString()
       };
+      patch.planSentAt = patch.plan.updatedAt;
     }
     updateAppointment(appointment.id, patch);
     state.appointmentLocationDraft = null;
     if (!popOverlayLayer()) {
       clearOverlayState();
       releaseOverlayHistory();
+      renderApp({ scrollTo: currentWindowScroll() });
+    } else if (state.screen === "admin") {
+      refreshAdminRecordList();
+    } else {
+      refreshRecordPanel();
     }
-    renderApp({ scrollTo: currentWindowScroll() });
-    showToast("活动地点已更新，院方方案与短信内容已同步。");
+    showToast(
+      patch.status === "review"
+        ? "活动地点已更新，院方需重新发送方案后再次确认。"
+        : appointment.plan
+        ? "活动地点已更新，院方方案与短信内容已同步。"
+        : "活动地点已更新，院方接单后会自动带入。"
+    );
   }
 
   function openDemandCreate() {
@@ -5804,6 +6319,7 @@
       return;
     }
     const hospital = bookingHospital(booking);
+    const expert = bookingSelectedDoctor(booking);
     openOverlayLayer({
       type: "demand-create",
       draft: {
@@ -5942,10 +6458,25 @@
   function submitDemand() {
     const draft = state.overlay?.draft;
     if (!draft) return;
+    if (!state.session) {
+      showToast("请先登录后再提交提需。");
+      startLogin({ type: "demand" });
+      return;
+    }
     if (!draft.topic.trim()) return showToast("请填写需求主题。");
     if (!draft.contactName.trim()) return showToast("请填写联系人。");
     if (draft.contactPhone && !/^1\d{10}$/.test(draft.contactPhone)) {
       return showToast("联系电话格式不正确。");
+    }
+    if (!draft.province || !draft.city) return showToast("请选择活动省市。");
+    if (draft.preferredDate && draft.preferredDate < todayIso()) {
+      return showToast("期望日期不能早于今天。");
+    }
+    if (
+      String(draft.headcount || "").trim() &&
+      (!Number.isInteger(Number(draft.headcount)) || Number(draft.headcount) <= 0)
+    ) {
+      return showToast("预计人数需填写大于 0 的整数。");
     }
     const now = new Date().toISOString();
     const demand = {
@@ -6125,7 +6656,7 @@
           <button type="button" data-action="me-demands">
             <strong>${demands.length}</strong><span>专家提需</span>
           </button>
-          <button type="button" data-action="open-booking">
+          <button type="button" data-action="me-confirmed">
             <strong>${appointments.filter((item) => item.status === "confirmed").length}</strong>
             <span>已确认</span>
           </button>
@@ -6146,9 +6677,9 @@
             <span><strong>企业资料</strong><small>姓名、单位与联系方式</small></span>
             ${icon("chevronRight", 15)}
           </button>
-          <a href="${esc(phoneHref("400-000-0000"))}">
+          <a href="${esc(phoneHref("010-69006900"))}">
             <span class="me-menu__icon">${icon("phone", 17)}</span>
-            <span><strong>服务咨询</strong><small>工作日 9:00–18:00</small></span>
+            <span><strong>医院服务咨询</strong><small>010-69006900 · 工作日 9:00–18:00</small></span>
             ${icon("chevronRight", 15)}
           </a>
         </section>
@@ -6304,6 +6835,7 @@
             <strong>演示账号</strong>
             <span>超级管理员 admin / pkuih2026</span>
             <span>医院运营 pkuih / pkuih2026</span>
+            <span>其他医院：医院 ID / pkuih2026（如 zibo、luan、kaide）</span>
           </div>
         </div>
       </div>
@@ -6592,17 +7124,16 @@
   function acceptAppointment() {
     const appointment = appointmentById(state.adminReviewId);
     if (!appointment) return;
+    if (["completed", "cancelled"].includes(appointment.status)) {
+      return showToast("该预约已结束，不能重新接单。");
+    }
     if (appointment.assignedStaff) {
       showToast("该预约已有项目对接人。");
       return;
     }
     const account = state.adminUser;
     if (!account) return showToast("登录状态已失效，请重新登录。");
-    if (
-      account.role === "operator" &&
-      account.hospitalId !== appointment.hospitalId &&
-      !isSuperadmin()
-    ) {
+    if (!adminCanManageHospital(appointment.hospitalId)) {
       return showToast("只能接本院预约。");
     }
     const now = new Date().toISOString();
@@ -6612,6 +7143,7 @@
       acceptedAt: appointment.acceptedAt || now
     });
     state.adminDraft = buildReviewDraft(updated);
+    state.adminReviewSaved = false;
     renderOverlay();
     showToast(`已接单，项目对接人为 ${account.name}。`);
   }
@@ -6649,6 +7181,24 @@
     };
   }
 
+  function reviewSpeakerOptions(draft, hospitalId) {
+    const service = normalizeService(draft?.serviceType || "讲座");
+    return state.experts
+      .filter(
+        (item) =>
+          item.hospitalId === hospitalId &&
+          item.active !== false &&
+          matchesService(item, service)
+      )
+      .map(
+        (item) =>
+          `<option value="${esc(item.id)}" ${
+            draft?.speakerId === item.id ? "selected" : ""
+          }>${esc(item.name)} · ${esc(item.deptTitle)} · ${esc(coverageText(item))}</option>`
+      )
+      .join("");
+  }
+
   function collectReviewFields() {
     const fields = {};
     document.querySelectorAll("[data-review-field]").forEach((input) => {
@@ -6657,26 +7207,77 @@
     return fields;
   }
 
+  function collectInternalNotePatch() {
+    const input = document.querySelector("[data-internal-note]");
+    if (!input) return null;
+    return {
+      internalNote: input.value.trim(),
+      internalNoteAt: new Date().toISOString(),
+      internalNoteBy: state.adminUser?.name || ""
+    };
+  }
+
   function saveReview() {
     const appointment = appointmentById(state.adminReviewId);
     if (!appointment) return;
+    if (["completed", "cancelled"].includes(appointment.status)) {
+      return showToast("该预约已结束，方案仅供查看。");
+    }
+    if (!adminCanManageHospital(appointment.hospitalId)) {
+      return showToast("只能处理本院预约。");
+    }
     if (!appointment.assignedStaff) return showToast("请先接单并确定项目对接人。");
     const fields = collectReviewFields();
     if (!fields.topic) return showToast("请填写活动主题。");
     if (!fields.date) return showToast("请选择活动日期。");
+    if (fields.date < todayIso()) return showToast("活动日期不能早于今天。");
     const staff = appointmentAssignee(appointment);
-    const speakerExpert = fields.speakerId ? expertById(fields.speakerId) : null;
+    if (!(appointment.address || "").trim()) {
+      return showToast("机构尚未填写活动详细地址，请先联系机构补充。");
+    }
+    const planService = fields.serviceType || appointment.serviceType || "讲座";
+    const finalSpeaker = fields.speakerId ? expertById(fields.speakerId) : null;
+    const themeTopic = appointmentThemeTopicFor(appointment, planService);
+    const planMonth = Number(String(fields.date || "").slice(5, 7)) || 0;
+    const themeMonthValue = Number(appointment.themeMonth) || 0;
+    const keepsTheme = Boolean(
+      normalizeService(planService) === "讲座" &&
+        themeTopic &&
+        themeMonthValue &&
+        planMonth === themeMonthValue &&
+        finalSpeaker &&
+        String(themeTopic.expertId || "") === String(finalSpeaker.id) &&
+        String(fields.topic || "").trim() === String(themeTopic.title || "").trim()
+    );
+    const validationAppointment = keepsTheme
+      ? appointment
+      : {
+          ...appointment,
+          themeMonth: "",
+          themeTopicId: "",
+          themeCoverage: ""
+        };
+    const assignmentError = appointmentAssignmentError({
+      appointment: validationAppointment,
+      expert: finalSpeaker,
+      serviceType: planService,
+      date: fields.date,
+      province: appointment.province,
+      city: appointment.city,
+      ignoreId: appointment.id
+    });
+    if (assignmentError) return showToast(assignmentError);
     const region = normalizeRegion(
       appointment.province || "北京市",
       appointment.city || "北京市"
     );
     const plan = {
       topic: fields.topic,
-      serviceType: fields.serviceType || appointment.serviceType,
-      speakerId: fields.speakerId || "",
-      speaker: speakerExpert
-        ? `${speakerExpert.name} · ${speakerExpert.deptTitle}`
-        : fields.speaker || "",
+      serviceType: planService,
+      speakerId: finalSpeaker?.id || "",
+      speaker: finalSpeaker
+        ? `${finalSpeaker.name} · ${finalSpeaker.deptTitle}`
+        : appointment.doctorName || fields.speaker || "",
       date: fields.date,
       time: "全天",
       province: region.province,
@@ -6688,10 +7289,13 @@
       team: fields.team || "",
       message: fields.message || "",
       contact: staff ? `${staff.name} · ${staff.phone}` : "",
+      themeMonth: keepsTheme ? appointment.themeMonth || "" : "",
+      themeTopicId: keepsTheme ? appointment.themeTopicId || "" : "",
+      themeCoverage: keepsTheme ? appointment.themeCoverage || "" : "",
       updatedAt: new Date().toISOString()
     };
     const wasConfirmed = appointment.status === "confirmed" || appointment.status === "completed";
-    updateAppointment(appointment.id, {
+    const appointmentPatch = {
       status: "review",
       plan,
       planHistory: (appointment.planHistory || []).concat(
@@ -6699,30 +7303,59 @@
       ),
       feedback: "",
       feedbackAt: "",
-      planSentAt: new Date().toISOString()
+      planSentAt: new Date().toISOString(),
+      requestedDate: appointment.requestedDate || appointment.date,
+      date: fields.date,
+      serviceType: planService,
+      themeMonth: keepsTheme ? appointment.themeMonth || "" : "",
+      themeTopicId: keepsTheme ? appointment.themeTopicId || "" : "",
+      themeCoverage: keepsTheme ? appointment.themeCoverage || "" : "",
+      confirmedAt: "",
+      completedAt: ""
+    };
+    const notePatch = collectInternalNotePatch();
+    if (notePatch) Object.assign(appointmentPatch, notePatch);
+    appointmentPatch.doctorId = finalSpeaker.id;
+    appointmentPatch.doctorName = finalSpeaker.name;
+    appointmentPatch.tier = finalSpeaker.tier;
+    const updated = updateAppointment(appointment.id, appointmentPatch);
+    state.adminReviewId = updated.id;
+    state.adminDraft = buildReviewDraft(updated);
+    state.adminNoteEditing = false;
+    state.adminReviewSaved = true;
+    renderOverlay();
+    refreshAdminRecordList();
+    window.requestAnimationFrame(() => {
+      overlayRoot.querySelector(".sms-card")?.scrollIntoView({
+        block: "center",
+        behavior: "auto"
+      });
     });
-    state.adminReviewId = "";
-    state.adminDraft = null;
-    releaseOverlayHistory();
-    clearOverlayState();
-    renderApp();
     showToast(
       wasConfirmed
-        ? "方案已更新并发送，机构需重新确认。"
-        : "方案已发送给机构，等待确认。"
+        ? "方案已更新并发送，客户短信已生成；机构需重新确认。"
+        : themeTopic && !keepsTheme
+        ? "方案已发送；原时令课题关联已解除，客户短信已生成。"
+        : "方案已发送，客户短信已生成，可直接复制发送。"
     );
   }
 
   function completeAppointment() {
     const appointment = appointmentById(state.adminReviewId);
     if (!appointment) return;
+    if (!adminCanManageHospital(appointment.hospitalId)) {
+      return showToast("只能处理本院预约。");
+    }
     if (appointment.status !== "confirmed") {
       return showToast("机构确认方案后才能标记活动完成。");
     }
-    updateAppointment(appointment.id, {
+    const patch = {
       status: "completed",
       completedAt: new Date().toISOString()
-    });
+    };
+    const notePatch = collectInternalNotePatch();
+    if (notePatch) Object.assign(patch, notePatch);
+    updateAppointment(appointment.id, patch);
     state.adminReviewId = "";
     state.adminDraft = null;
     releaseOverlayHistory();
@@ -6734,13 +7367,15 @@
   function saveInternalNote() {
     const appointment = appointmentById(state.adminReviewId);
     if (!appointment) return;
-    const input = document.querySelector("[data-internal-note]");
-    const note = input?.value.trim() || "";
-    updateAppointment(appointment.id, {
-      internalNote: note,
-      internalNoteAt: new Date().toISOString(),
-      internalNoteBy: state.adminUser ? state.adminUser.name : ""
-    });
+    if (!adminCanManageHospital(appointment.hospitalId)) {
+      return showToast("只能处理本院预约。");
+    }
+    if (["completed", "cancelled"].includes(appointment.status)) {
+      return showToast("该预约已结束，内部备注仅供查看。");
+    }
+    const notePatch = collectInternalNotePatch();
+    if (!notePatch) return;
+    updateAppointment(appointment.id, notePatch);
     state.adminNoteEditing = false;
     renderOverlay();
     showToast("内部备注已保存，机构端不可见。");
@@ -6753,8 +7388,13 @@
     const expert = appointment.doctorId ? expertById(appointment.doctorId) : null;
     const assignee = appointmentAssignee(appointment);
     const draft = state.adminDraft || buildReviewDraft(appointment);
-    const canEdit = Boolean(assignee);
+    const terminal = ["completed", "cancelled"].includes(appointment.status);
+    const canView = Boolean(assignee);
+    const canEdit = canView && !terminal;
+    const saved = canEdit && state.adminReviewSaved && Boolean(appointment.plan);
+    const formLocked = canView && (!canEdit || saved);
     const smsLog = getSmsLogs()[appointment.id];
+    const smsCurrent = smsLogIsCurrent(appointment, smsLog);
     const planTemplates = getPlanTemplates(appointment.hospitalId);
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
@@ -6791,8 +7431,8 @@
                 <div class="info-row"><span>期望主题</span><strong>${esc(
                   appointment.topic || "未填写，可结合时令推荐"
                 )}</strong></div>
-                <div class="info-row"><span>期望日期</span><strong>${esc(
-                  formatDateCN(appointment.date, true)
+                <div class="info-row"><span>机构期望日期</span><strong>${esc(
+                  formatDateCN(appointment.requestedDate || appointment.date, true)
                 )}</strong></div>
                 <div class="info-row"><span>活动地址</span><strong>${esc(
                   appointmentLocationText(appointment)
@@ -6819,7 +7459,34 @@
               }
             </div>
             ${
-              !assignee
+              terminal
+                ? `<div class="review-state-banner is-terminal">
+                    ${icon("checkCircle", 18)}
+                    <div>
+                      <strong>${
+                        appointment.status === "completed" ? "活动已完成归档" : "预约已取消"
+                      }</strong>
+                      <p>终态预约仅供查看，方案、活动地点与内部备注不可再编辑。</p>
+                    </div>
+                  </div>`
+                : ""
+            }
+            ${
+              saved
+                ? `<div class="review-state-banner is-success">
+                    ${icon("send", 18)}
+                    <div>
+                      <strong>方案已发送，客户短信已生成</strong>
+                      <p>机构端已进入“方案待确认”。请复制下方号码和短信内容提醒客户；复制后系统视为已发送。</p>
+                      <button class="text-link" type="button" data-action="review-edit-again">
+                        继续修改方案 ${icon("chevronRight", 12)}
+                      </button>
+                    </div>
+                  </div>`
+                : ""
+            }
+            ${
+              !assignee && !terminal
                 ? `<section class="assignment-card">
                     <span class="assignment-card__eyebrow">下一步 · 接单</span>
                     <h3>确认由你跟进这个项目</h3>
@@ -6843,9 +7510,13 @@
                 `
             }
             ${
-              canEdit
-                ? `<section class="review-form">
-                    <div class="plan-template-import">
+              canView
+                ? `<section class="review-form ${formLocked ? "is-locked" : ""}" ${
+                    formLocked ? "inert" : ""
+                  }>
+                    ${
+                      canEdit && !saved
+                        ? `<div class="plan-template-import">
                       <div class="plan-template-import__head">
                         <span>${icon("clipboard", 14)} 方案模版</span>
                         <small>${planTemplates.length} 个可用</small>
@@ -6871,7 +7542,9 @@
                             <p>导入会覆盖当前课题大纲、活动流程、项目组与确认说明。</p>`
                           : `<p>暂无方案模版，可请院方运营在「方案模版」中配置。</p>`
                       }
-                    </div>
+                    </div>`
+                        : ""
+                    }
                     <div class="form-card">
                       <div class="form-card__head">
                         <h3>${icon("clipboard", 15)} 活动方案</h3>
@@ -6883,7 +7556,7 @@
                       </div>
                       <div class="field-row">
                         <div class="field"><label>服务类型</label>
-                          <select data-review-field="serviceType">
+                          <select data-review-field="serviceType" data-review-service>
                             ${SERVICE_IDS.map(
                               (id) =>
                                 `<option value="${esc(id)}" ${
@@ -6893,17 +7566,11 @@
                           </select>
                         </div>
                         <div class="field"><label>出讲专家</label>
-                          <select data-review-field="speakerId" data-review-speaker>
-                            <option value="">院方安排 / 待定</option>
-                            ${state.experts
-                              .filter((item) => item.hospitalId === appointment.hospitalId && item.active)
-                              .map(
-                                (item) =>
-                                  `<option value="${esc(item.id)}" ${
-                                    draft.speakerId === item.id ? "selected" : ""
-                                  }>${esc(item.name)} · ${esc(item.deptTitle)}</option>`
-                              )
-                              .join("")}
+                          <select data-review-field="speakerId" data-review-speaker required>
+                            <option value="" disabled ${
+                              draft.speakerId ? "" : "selected"
+                            }>请选择本院出讲专家</option>
+                            ${reviewSpeakerOptions(draft, appointment.hospitalId)}
                           </select>
                         </div>
                       </div>
@@ -6949,20 +7616,24 @@
                         <span>仅院方可见</span>
                       </div>
                       ${
-                        state.adminNoteEditing
+                        state.adminNoteEditing && canEdit
                           ? `<textarea data-internal-note>${esc(appointment.internalNote || "")}</textarea>
                              <div class="internal-note__actions">
                                <button class="btn btn--ghost btn--sm" type="button" data-action="review-note-cancel">取消</button>
                                <button class="btn btn--primary btn--sm" type="button" data-action="review-note-save">保存备注</button>
                              </div>`
                           : `<p>${esc(appointment.internalNote || "暂无内部备注，可记录沟通情况、资源协调或风险点。")}</p>
-                             <button class="text-link" type="button" data-action="review-note-edit">${
-                               appointment.internalNote ? "编辑备注" : "添加备注"
-                             } ${icon("chevronRight", 12)}</button>`
+                             ${
+                               canEdit && !saved
+                                 ? `<button class="text-link" type="button" data-action="review-note-edit">${
+                                     appointment.internalNote ? "编辑备注" : "添加备注"
+                                   } ${icon("chevronRight", 12)}</button>`
+                                 : ""
+                             }`
                       }
                     </div>
                     ${
-                      appointment.status === "confirmed"
+                      canEdit && appointment.status === "confirmed"
                         ? `<div class="admin-action-card">
                             <h3>活动执行完成？</h3>
                             <p>机构已确认方案。活动结束后可标记完成，进入历史归档。</p>
@@ -6970,35 +7641,50 @@
                           </div>`
                         : ""
                     }
-                    ${
-                      appointment.status === "confirmed" || appointment.status === "completed"
-                        ? `<section class="sms-card">
-                            <div class="sms-card__head">
-                              <h3>${icon("message", 14)} 客户短信提醒</h3>
-                              <span>${smsLog ? "已复制，视为已发送" : "尚未发送"}</span>
-                            </div>
-                            <p>${esc(buildSmsText(appointment))}</p>
-                            <button class="btn btn--ghost btn--sm" type="button" data-action="review-sms-copy">
-                              ${icon("phone", 13)} 复制号码和短信内容
-                            </button>
-                          </section>`
-                        : ""
-                    }
+                  </section>`
+                : ""
+            }
+            ${
+              appointment.plan &&
+              ["review", "revision", "confirmed", "completed"].includes(appointment.status)
+                ? `<section class="sms-card ${saved ? "is-primary" : ""}">
+                    <div class="sms-card__head">
+                      <h3>${icon("message", 14)} 客户短信提醒</h3>
+                      <span>${
+                        smsCurrent
+                          ? "已复制，视为已发送"
+                          : smsLog
+                          ? "方案已更新，需重新复制"
+                          : saved
+                          ? "当前可发送 · 尚未复制"
+                          : "尚未发送"
+                      }</span>
+                    </div>
+                    <p>${esc(buildSmsText(appointment))}</p>
+                    <button class="btn btn--ghost btn--sm" type="button" data-action="review-sms-copy">
+                      ${icon("phone", 13)} 复制号码和短信内容
+                    </button>
                   </section>`
                 : ""
             }
           </div>
         </div>
         <div class="sheet__footer">
-          <button class="btn btn--ghost" type="button" data-action="close-overlay">关闭</button>
+          <button class="btn btn--ghost" type="button" data-action="close-overlay">${
+            saved ? "返回预约列表" : "关闭"
+          }</button>
           ${
-            canEdit
+            saved
+              ? `<button class="btn btn--primary" type="button" data-action="review-edit-again">
+                  继续修改方案 ${icon("edit", 14)}
+                </button>`
+              : canEdit
               ? `<button class="btn btn--primary" type="button" data-action="review-save">
-                  保存方案并发送 ${icon("send", 14)}
+                  ${appointment.plan ? "保存并重新发送" : "保存方案并发送"} ${icon("send", 14)}
                 </button>`
-              : `<button class="btn btn--primary" type="button" data-action="review-accept">
-                  确认接单
-                </button>`
+              : terminal
+              ? ""
+              : `<span class="sheet__footer-hint">先确认接单，再填写方案</span>`
           }
         </div>
       </section>
@@ -7008,9 +7694,13 @@
   function buildSmsText(appointment) {
     const plan = appointment.plan || {};
     const staff = appointment.assignedStaff;
-    return `【北京大学国际医院】${appointment.contactName}您好，您预约的${formatDateCN(
+    const hospital = hospitalById(appointment.hospitalId);
+    const confirmed = ["confirmed", "completed"].includes(appointment.status);
+    return `【${hospital?.name || "北大医疗"}】${appointment.contactName}您好，您预约的${formatDateCN(
       plan.date || appointment.date
-    )} ${plan.time || ""}「${plan.topic || topicOf(appointment)}」活动已确认。地点：${formatAddress(
+    )} ${plan.time || ""}「${plan.topic || topicOf(appointment)}」${
+      confirmed ? "活动已确认" : "院方已提交活动方案，请登录平台查看并确认"
+    }。地点：${formatAddress(
       appointment.province || plan.province,
       appointment.city || plan.city,
       appointment.address || plan.address,
@@ -7021,8 +7711,11 @@
   }
 
   async function copySmsForAppointment(button) {
-    const appointment = appointmentById(state.adminReviewId || button.dataset.appointmentId);
+    const appointment = appointmentById(button?.dataset.appointmentId || state.adminReviewId);
     if (!appointment) return;
+    if (!adminCanManageHospital(appointment.hospitalId)) {
+      return showToast("只能发送本院预约的短信。");
+    }
     const text = buildSmsText(appointment);
     const payload = `${appointment.phone}\n${text}`;
     const copied = await copyText(payload);
@@ -7100,6 +7793,7 @@
       ["pending", "待联系"],
       ["contacted", "已联系"],
       ["matched", "已匹配"],
+      ["cancelled", "已取消"],
       ["closed", "已关闭"]
     ];
     const list =
@@ -7128,15 +7822,31 @@
           )
           .join("")}
       </div>
-      ${
-        list.length
-          ? `<div class="admin-record-list">${list.map(renderAdminDemandCard).join("")}</div>`
-          : `<div class="empty-state"><span class="empty-state__icon">${icon(
-              "sparkles",
-              26
-            )}</span><h3>暂无提需</h3><p>机构提交提需后会出现在这里。</p></div>`
-      }
+      <div id="admin-demand-results">${adminDemandResultsMarkup(list)}</div>
     `;
+  }
+
+  function adminDemandResultsMarkup(list) {
+    return list.length
+      ? `<div class="admin-record-list">${list.map(renderAdminDemandCard).join("")}</div>`
+      : `<div class="empty-state"><span class="empty-state__icon">${icon(
+          "sparkles",
+          26
+        )}</span><h3>暂无提需</h3><p>机构提交提需后会出现在这里。</p></div>`;
+  }
+
+  function refreshAdminDemandList() {
+    const wrap = document.getElementById("admin-demand-results");
+    if (!wrap) return;
+    const all = adminDemands();
+    const list =
+      state.adminDemandFilter === "all"
+        ? all
+        : all.filter((item) => item.status === state.adminDemandFilter);
+    wrap.innerHTML = adminDemandResultsMarkup(list);
+    document.querySelectorAll('[data-action="admin-demand-filter"]').forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.value === state.adminDemandFilter);
+    });
   }
 
   function renderAdminDemandSheet() {
@@ -7241,6 +7951,9 @@
   function markDemandContacted(note = "") {
     const demand = demandById(state.adminDemandId);
     if (!demand || !state.adminUser) return;
+    if (!adminCanManageHospital(demand.hospitalId)) {
+      return showToast("只能跟进本院需求。");
+    }
     const followUps = (demand.followUps || []).slice();
     if (note) {
       followUps.push({
@@ -7262,6 +7975,9 @@
   function adminDemandMatch() {
     const demand = demandById(state.adminDemandId);
     if (!demand) return;
+    if (!adminCanManageHospital(demand.hospitalId)) {
+      return showToast("只能跟进本院需求。");
+    }
     updateDemand(demand.id, {
       status: "matched",
       assignedStaff: demand.assignedStaff || staffSnapshot(state.adminUser),
@@ -7274,6 +7990,9 @@
   function adminDemandClose() {
     const demand = demandById(state.adminDemandId);
     if (!demand) return;
+    if (!adminCanManageHospital(demand.hospitalId)) {
+      return showToast("只能跟进本院需求。");
+    }
     updateDemand(demand.id, { status: "closed", closedAt: new Date().toISOString() });
     renderOverlay();
     showToast("需求已关闭。");
@@ -7288,10 +8007,11 @@
 
   function slotDoctors() {
     const hospital = slotHospital();
+    if (!hospital) return [];
     return state.experts
       .filter((expert) => {
-        if (!expert.active) return false;
-        if (hospital && expert.hospitalId !== hospital.id) return false;
+        if (expert.active === false) return false;
+        if (expert.hospitalId !== hospital.id) return false;
         return true;
       })
       .sort((a, b) => {
@@ -7306,11 +8026,16 @@
     if (!doctors.some((item) => item.id === state.slotDoctorId)) {
       state.slotDoctorId = doctors[0].id;
     }
-    if (!state.slotMonth) {
-      const now = new Date();
-      state.slotMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
-    }
     const doctor = doctors.find((item) => item.id === state.slotDoctorId) || doctors[0];
+    if (state.slotMonthDoctor !== doctor.id) {
+      const lead = Math.max(1, Number(doctor.leadDays) || tierOf(doctor).leadDays);
+      const leadDate = isoDate(addDays(startOfDay(), lead));
+      const firstConfigured = Object.keys(getSlots(doctor.id))
+        .filter((date) => date >= leadDate && Number(getSlots(doctor.id)[date]) > 0)
+        .sort()[0];
+      state.slotMonth = (firstConfigured || leadDate).slice(0, 7);
+      state.slotMonthDoctor = doctor.id;
+    }
     if (!state.slotDraft) state.slotDraft = {};
     const batch = state.slotBatch || {};
     const lead = Math.max(1, Number(doctor.leadDays) || tierOf(doctor).leadDays);
@@ -7411,22 +8136,37 @@
     const days = new Date(year, month, 0, 12).getDate();
     const startBlank = first.getDay();
     const today = todayIso();
+    const leadDate = isoDate(
+      addDays(startOfDay(), Math.max(1, Number(doctor.leadDays) || tierOf(doctor).leadDays))
+    );
+    const baseMap = getSlots(doctor.id);
+    const draftMap = state.slotDraft?.[doctor.id] || {};
+    const bookedMap = bookedCountMap(doctor.id);
     const cells = [];
     for (let i = 0; i < startBlank; i += 1) cells.push(`<span class="slot-cell is-blank"></span>`);
     for (let day = 1; day <= days; day += 1) {
       const date = `${year}-${pad(month)}-${pad(day)}`;
-      const value = draftSlot(doctor.id, date);
-      const booked = bookedCount(doctor.id, date);
+      const baseValue = Number(baseMap[date] || 0);
+      const value =
+        draftMap[date] === undefined ? baseValue : Number(draftMap[date] || 0);
+      const booked = bookedMap[date] || 0;
       const isPast = date < today;
-      const changed = value !== baseSlot(doctor.id, date);
+      const beforeLead = date < leadDate;
+      const changed = value !== baseValue;
       cells.push(`
         <button class="slot-cell ${value ? "has-capacity" : "is-off"} ${
           date === today ? "is-today" : ""
-        } ${isPast ? "is-past" : ""} ${changed ? "is-changed" : ""}" type="button"
-          data-action="slot-day-open" data-value="${date}" ${isPast ? "disabled" : ""}>
+        } ${isPast ? "is-past" : ""} ${beforeLead ? "is-lead" : ""} ${
+          changed ? "is-changed" : ""
+        }" type="button"
+          data-action="slot-day-open" data-value="${date}" ${
+            isPast || beforeLead ? "disabled" : ""
+          }>
           <span class="slot-cell__day">${day}</span>
           <strong>${value ? value : "—"}</strong>
-          <small>${booked ? `已约 ${booked}` : "可约"}</small>
+          <small>${
+            beforeLead ? "未到预约期" : booked ? `已约 ${booked}` : "可约"
+          }</small>
         </button>
       `);
     }
@@ -7437,7 +8177,7 @@
           .join("")}</div>
         <div class="slot-grid">${cells.join("")}</div>
       </div>
-      <p class="slot-legend"><i class="is-open"></i> 可配置 <i class="is-full"></i> 已有预约 <i class="is-changed"></i> 本次修改</p>
+      <p class="slot-legend"><i class="is-open"></i> 可配置 <i class="is-full"></i> 已有预约 <i class="is-changed"></i> 本次修改 <i class="is-lead"></i> 未到预约周期</p>
     `;
   }
 
@@ -7518,6 +8258,30 @@
     `;
   }
 
+  function refreshSlotBatchSummary() {
+    const batch = state.slotBatch;
+    const doctor = selectedSlotDoctor();
+    if (!batch) return;
+    const fromInput = document.querySelector('[data-slot-batch="from"]');
+    const toInput = document.querySelector('[data-slot-batch="to"]');
+    if (fromInput) fromInput.value = batch.from || "";
+    if (toInput) toInput.value = batch.to || "";
+    const summary = document.querySelector(".slot-batch-summary span");
+    if (!summary) return;
+    const scopeLabel =
+      batch.scope === "hospital" ? "本院全部专家" : `当前专家 · ${doctor?.name || ""}`;
+    const weekdayText = batch.weekdays.length
+      ? batch.weekdays
+          .slice()
+          .sort((a, b) => a - b)
+          .map((day) => ["日", "一", "二", "三", "四", "五", "六"][day])
+          .join("、")
+      : "未选择";
+    summary.textContent = `${scopeLabel} · 每周 ${weekdayText} · 每日 ${
+      batch.capacity
+    } 个 · ${batch.from || "未选"} 至 ${batch.to || "未选"}`;
+  }
+
   function renderSlotConfigContent() {
     const doctor = ensureSlotState();
     const wrap = document.getElementById("slot-content");
@@ -7574,30 +8338,35 @@
   }
 
   function renderSlotConfigPage() {
-    const staff = state.adminUser;
+    const hospital = slotHospital();
     return `
       <div class="admin-page-head">
         <div><h1>号源配置</h1><p>按天配置，不划分时间段</p></div>
-        <span class="admin-page-head__date">${esc(adminHospitalName())}</span>
+        <span class="admin-page-head__date">${esc(hospital?.name || "未选择医院")}</span>
       </div>
       ${renderAdminTabs()}
       ${renderAdminHospitalFilter()}
       ${
-        isSuperadmin() && !state.adminHospitalId
-          ? `<p class="admin-hint">${icon(
-              "alert",
-              12
-            )} 当前为全部医院视图。批量设置会作用于全部医院专家，建议先选择具体医院。</p>`
-          : ""
+        !hospital
+          ? `<div class="empty-state"><span class="empty-state__icon">${icon(
+              "building",
+              26
+            )}</span><h3>请选择医院</h3><p>超级管理员需先选择医院，再维护该院专家的可预约号源。</p></div>`
+          : `<div id="slot-content" class="slot-content"></div>
+             <div id="slot-savebar" class="slot-savebar"></div>`
       }
-      <div id="slot-content" class="slot-content"></div>
-      <div id="slot-savebar" class="slot-savebar"></div>
     `;
   }
 
   function openSlotDay(dateIso) {
     const doctor = selectedSlotDoctor();
     if (!doctor) return;
+    const leadDate = isoDate(
+      addDays(startOfDay(), Math.max(1, Number(doctor.leadDays) || tierOf(doctor).leadDays))
+    );
+    if (dateIso < leadDate) {
+      return showToast(`${doctor.name} ${formatMD(dateIso)} 尚未进入可预约周期，不能配置号源。`);
+    }
     state.slotDay = dateIso;
     state.overlay = { type: "slot-day", doctorId: doctor.id, date: dateIso };
     renderOverlay();
@@ -8030,6 +8799,9 @@
   function saveAdminTemplate() {
     const draft = state.adminTemplateDraft;
     if (!draft) return;
+    if (!adminCanManageHospital(draft.hospitalId)) {
+      return showToast("只能维护本院方案模版。");
+    }
     const fields = collectPlanTemplateFields();
     if (!fields.name) return showToast("请填写模版名称。");
     if (!fields.outline && !fields.agenda && !fields.message) {
@@ -8063,6 +8835,9 @@
   function deleteAdminTemplate(id) {
     const template = getPlanTemplateStore().find((item) => item.id === id);
     if (!template) return;
+    if (!adminCanManageHospital(template.hospitalId)) {
+      return showToast("只能删除本院方案模版。");
+    }
     if (!window.confirm(`确定删除「${template.name}」吗？`)) return;
     savePlanTemplateStore(getPlanTemplateStore().filter((item) => item.id !== id));
     renderApp();
@@ -8080,10 +8855,17 @@
       ...state.adminDraft,
       ...collectReviewFields()
     };
+    const nextService = template.serviceType || current.serviceType;
+    const currentSpeaker = current.speakerId ? expertById(current.speakerId) : null;
+    const keepSpeaker = currentSpeaker && matchesService(currentSpeaker, nextService);
     state.adminDraft = {
       ...current,
       topic: template.topic || current.topic,
-      serviceType: template.serviceType || current.serviceType,
+      serviceType: nextService,
+      speakerId: keepSpeaker ? current.speakerId : "",
+      speaker: keepSpeaker
+        ? `${currentSpeaker.name} · ${currentSpeaker.deptTitle}`
+        : "",
       outline: template.outline || "",
       agenda: template.agenda || "",
       team: template.team || "",
@@ -8403,6 +9185,29 @@
       return showToast("请至少完整填写一个讲座课题。");
     }
     if (!draft.coverageCities?.length) return showToast("请至少选择一个覆盖城市。");
+    const invalidTopic = draft.topics.find((topic) => {
+      const expert = topic.expertId ? expertById(topic.expertId) : null;
+      return (
+        !topic.dept?.trim() ||
+        !expert ||
+        expert.active === false ||
+        expert.hospitalId !== hospital.id ||
+        !matchesService(expert, "讲座")
+      );
+    });
+    if (invalidTopic) {
+      return showToast(
+        `课题「${invalidTopic.title || "未填写"}」需绑定本院已显示的讲座专家。`
+      );
+    }
+    const invalidCoverage = draft.topics.find(
+      (topic) =>
+        topic.coverage &&
+        !THEME_COVERAGE_OPTIONS.includes(String(topic.coverage).trim())
+    );
+    if (invalidCoverage) {
+      return showToast(`课题「${invalidCoverage.title}」的履约地选项无效，请重新选择。`);
+    }
     draft.expertIds = [
       ...new Set([
         ...(draft.expertIds || []),
@@ -8448,6 +9253,7 @@
 
   function adminDoctorList() {
     const hospital = slotHospital();
+    if (!hospital) return [];
     const q = (state.adminDoctorSearch || "").trim().toLowerCase();
     return state.experts
       .filter((expert) => {
@@ -8493,16 +9299,26 @@
   }
 
   function renderDoctorAdminPage() {
+    const hospital = slotHospital();
     const list = adminDoctorList();
     return `
       <div class="admin-page-head">
         <div><h1>专家配置</h1><p>维护本院专家资料、服务类型与预约周期</p></div>
-        <button class="btn btn--primary btn--sm" type="button" data-action="admin-doctor-add">
+        <button class="btn btn--primary btn--sm" type="button" data-action="admin-doctor-add" ${
+          hospital ? "" : "disabled"
+        }>
           ${icon("plus", 14)} 新增专家
         </button>
       </div>
       ${renderAdminTabs()}
       ${renderAdminHospitalFilter()}
+      ${
+        !hospital
+          ? `<div class="empty-state"><span class="empty-state__icon">${icon(
+              "building",
+              26
+            )}</span><h3>请选择医院</h3><p>超级管理员需先选择医院，再查看或维护该院专家。</p></div>`
+          : `
       <div class="admin-search">
         ${icon("search", 15)}
         <input type="search" placeholder="搜索姓名、科室或擅长方向" value="${esc(
@@ -8523,11 +9339,13 @@
               )}</span><h3>暂无专家</h3><p>点击右上角新增本院专家。</p></div>`
         }
       </div>
+      `
+      }
     `;
   }
 
   function emptyDoctorDraft() {
-    const hospital = slotHospital() || state.hospitals[0];
+    const hospital = slotHospital();
     return {
       id: "",
       custom: true,
@@ -8535,7 +9353,7 @@
       gender: "neutral",
       senior: false,
       tier: "specialist",
-      hospitalId: hospital?.id || "pkuih",
+      hospitalId: hospital?.id || "",
       hospital: hospital?.name || "",
       deptTitle: "",
       dept: "内科",
@@ -8554,13 +9372,21 @@
   }
 
   function openAdminDoctorEditor(id = "") {
+    if (isSuperadmin() && !state.adminHospitalId) {
+      return showToast("请先选择医院，再维护本院专家。");
+    }
     const expert = id ? expertById(id) : null;
+    const hospital = slotHospital();
+    if (!hospital) return showToast("医院范围无效，请重新选择医院。");
+    if (expert && expert.hospitalId !== hospital.id) {
+      return showToast("只能维护当前所选医院的专家。");
+    }
     state.adminDoctorDraft = expert ? clone(expert) : emptyDoctorDraft();
     if (expert) state.adminDoctorDraft.coverageCities = coverageCitiesFor(expert);
-    const hospital = hospitalById(state.adminDoctorDraft.hospitalId);
+    const draftHospital = hospitalById(state.adminDoctorDraft.hospitalId);
     const province = coverageProvinceForCities(
       state.adminDoctorDraft.coverageCities,
-      hospital?.province || "北京市"
+      draftHospital?.province || "北京市"
     );
     const selectedCity = (state.adminDoctorDraft.coverageCities || []).find(
       (city) => city !== "全国" && (state.chinaCities?.[province] || []).includes(city)
@@ -8776,8 +9602,16 @@
 
   function saveAdminDoctor() {
     const draft = collectDoctorFields();
+    if (!state.adminUser) return showToast("登录状态已失效，请重新登录。");
     if (!draft.name) return showToast("请填写专家姓名。");
     if (!draft.hospitalId) return showToast("请选择履约机构。");
+    if (isSuperadmin()) {
+      if (!state.adminHospitalId || draft.hospitalId !== state.adminHospitalId) {
+        return showToast("超级管理员只能维护当前所选医院的专家。");
+      }
+    } else if (draft.hospitalId !== state.adminUser.hospitalId) {
+      return showToast("医院运营只能维护本院专家。");
+    }
     if (!draft.deptTitle) return showToast("请填写科室/任职。");
     if (!draft.services?.length) return showToast("请至少选择一个服务类型。");
     if (!draft.coverageCities?.length) return showToast("请至少选择一个履约城市。");
@@ -8823,9 +9657,11 @@
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext("2d");
-        const scale = Math.max(width / image.width, height / image.height);
+        const scale = Math.min(width / image.width, height / image.height);
         const drawW = image.width * scale;
         const drawH = image.height * scale;
+        ctx.fillStyle = "#dce6f7";
+        ctx.fillRect(0, 0, width, height);
         ctx.drawImage(image, (width - drawW) / 2, (height - drawH) / 2, drawW, drawH);
         const data = canvas.toDataURL("image/jpeg", 0.82);
         state.adminDoctorDraft.photo = data;
@@ -8861,7 +9697,7 @@
           .map((hospital) => {
             const operators = hospitalOperators(hospital.id);
             const expertCount = state.experts.filter(
-              (item) => item.hospitalId === hospital.id && item.active
+              (item) => item.hospitalId === hospital.id && item.active !== false
             ).length;
             const pending = getAppointments().filter(
               (item) => item.hospitalId === hospital.id && item.status === "pending"
@@ -8938,10 +9774,10 @@
   }
 
   function openAdminAccountEditor(username = "", hospitalId = "", role = "") {
-    if (!isSuperadmin()) return;
+    if (!isSuperadmin()) return showToast("仅超级管理员可分配院方账号。");
     const account = getAdminAccounts().find((item) => item.username === username);
     state.adminAccountDraft = account
-      ? { ...account, isNew: false }
+      ? { ...account, password: "", isNew: false }
       : {
           username: "",
           password: "",
@@ -9019,7 +9855,7 @@
                 )}" ${draft.isNew ? "" : "disabled"}>
               </div>
               <div class="field"><label>密码 ${draft.isNew ? "<em>*</em>" : ""}</label>
-                <input type="text" data-account-field="password" value="${esc(
+                <input type="password" data-account-field="password" value="${esc(
                   draft.password
                 )}" placeholder="${draft.isNew ? "设置登录密码" : "留空则不修改"}">
               </div>
@@ -9040,6 +9876,7 @@
   }
 
   function saveAdminAccount() {
+    if (!isSuperadmin()) return showToast("仅超级管理员可保存院方账号。");
     const draft = state.adminAccountDraft;
     if (!draft) return;
     if (!draft.name?.trim()) return showToast("请填写姓名。");
@@ -9239,10 +10076,14 @@
   function smsAppointments() {
     const logs = getSmsLogs();
     return adminAppointments()
-      .filter((item) => item.status === "confirmed" || item.status === "completed")
+      .filter(
+        (item) =>
+          item.plan &&
+          ["review", "revision", "confirmed"].includes(item.status)
+      )
       .sort((a, b) => {
-        const aCopied = Boolean(logs[a.id]);
-        const bCopied = Boolean(logs[b.id]);
+        const aCopied = smsLogIsCurrent(a, logs[a.id]);
+        const bCopied = smsLogIsCurrent(b, logs[b.id]);
         if (aCopied !== bCopied) return aCopied ? 1 : -1;
         return String(a.date).localeCompare(String(b.date));
       });
@@ -9251,7 +10092,7 @@
   function renderAdminSmsPage() {
     const list = smsAppointments();
     const logs = getSmsLogs();
-    const pending = list.filter((item) => !logs[item.id]).length;
+    const pending = list.filter((item) => !smsLogIsCurrent(item, logs[item.id])).length;
     return `
       <div class="admin-page-head">
         <div><h1>短信跟进</h1><p>复制号码与模板，院方自行发送</p></div>
@@ -9268,11 +10109,18 @@
           ? `<div class="sms-list">${list
               .map((appointment) => {
                 const log = logs[appointment.id];
+                const current = smsLogIsCurrent(appointment, log);
                 return `
-                  <article class="sms-item ${log ? "is-done" : ""}">
+                  <article class="sms-item ${current ? "is-done" : ""}">
                     <div class="sms-item__top">
                       <strong>${esc(appointment.orgName)}</strong>
-                      ${log ? '<span class="is-on">已复制</span>' : '<span class="is-off">待发送</span>'}
+                      ${
+                        current
+                          ? '<span class="is-on">已复制</span>'
+                          : log
+                          ? '<span class="is-off">方案更新 · 待重新发送</span>'
+                          : '<span class="is-off">待发送</span>'
+                      }
                     </div>
                     <p>${esc(topicOf(appointment))} · ${esc(
                       formatDateCN(appointment.plan?.date || appointment.date)
@@ -9287,9 +10135,11 @@
                         data-appointment-id="${esc(appointment.id)}">复制号码和内容</button>
                       ${
                         log
-                          ? `<small>${esc(log.copiedBy?.name || "院方")} · ${esc(
+                          ? `<small>${
+                              current ? "" : "方案已更新；"
+                            }${esc(log.copiedBy?.name || "院方")} · ${esc(
                               formatDateTime(log.copiedAt)
-                            )} 已复制</small>`
+                            )} 曾复制</small>`
                           : ""
                       }
                     </div>
@@ -9300,7 +10150,7 @@
           : `<div class="empty-state"><span class="empty-state__icon">${icon(
               "message",
               26
-            )}</span><h3>暂无待发送短信</h3><p>机构确认方案后，预约会进入短信跟进。</p></div>`
+            )}</span><h3>暂无待发送短信</h3><p>院方发送方案后，预约会进入短信跟进。</p></div>`
       }
     `;
   }
@@ -9353,6 +10203,7 @@
         if (state.adminTab === "hospitals" && !isSuperadmin()) state.adminTab = "appointments";
         app.innerHTML = renderAdminScreen();
         if (state.adminTab === "slots") renderSlotConfigContent();
+        window.requestAnimationFrame(scrollActiveAdminTabIntoView);
       }
     } else {
       let content = "";
@@ -9397,7 +10248,7 @@
   function refreshExpertHint() {
     const hint = document.getElementById("expert-scope-hint");
     if (!hint) return;
-    const hospital = nearestHospital();
+    const hospital = libraryHospital();
     const region = currentClientRegion();
     if (state.expertMonth > 0) {
       hint.innerHTML = `${icon("leaf", 11)} 时令主题按「课题履约地」判断，区别于专家日常服务的履约城市；当前查看 ${esc(
@@ -9430,6 +10281,7 @@
     const target = event.target;
     if (target.matches("[data-slot-batch]")) {
       state.slotBatch[target.dataset.slotBatch] = target.value;
+      refreshSlotBatchSummary();
       return;
     }
     if (target.matches("[data-login-field]")) {
@@ -9489,10 +10341,6 @@
       debounceRefreshDoctorList();
       return;
     }
-    if (target.matches("[data-slot-batch]")) {
-      state.slotBatch[target.dataset.slotBatch] = target.value;
-      return;
-    }
     if (target.matches("[data-account-field]") && state.adminAccountDraft) {
       state.adminAccountDraft[target.dataset.accountField] = target.value;
       return;
@@ -9512,6 +10360,16 @@
     if (target.matches("[data-theme-topic-field]") && state.adminThemeDraft) {
       const topic = state.adminThemeDraft.topics?.[Number(target.dataset.index)];
       if (topic) topic[target.dataset.themeTopicField] = target.value;
+      if (target.dataset.themeTopicField === "expertId" && target.value) {
+        state.adminThemeDraft.expertIds = [
+          ...new Set([...(state.adminThemeDraft.expertIds || []), target.value])
+        ];
+        const buttons = [
+          ...document.querySelectorAll('[data-action="theme-expert-toggle"]')
+        ];
+        const button = buttons.find((item) => item.dataset.id === target.value);
+        button?.classList.add("is-active");
+      }
       return;
     }
     if (target.matches("[data-doctor-active]") && state.adminDoctorDraft) {
@@ -9534,17 +10392,7 @@
       return;
     }
     if (target.matches("[data-home-hospital-picker]")) {
-      state.homeHospitalId = target.value || "";
-      state.expertScope = "nearby";
-      const hospital = hospitalById(state.homeHospitalId);
-      if (hospital) {
-        state.homeRegion = {
-          province: hospital.province,
-          city: hospital.city
-        };
-        writeJSON(STORAGE.homeRegion, state.homeRegion);
-      }
-      refreshHomeLocationViews();
+      selectHomeHospital(target.value || "");
       return;
     }
     if (target.matches("[data-home-region-province]") && state.homeRegionDraft) {
@@ -9670,6 +10518,15 @@
     if (target.matches("[data-theme-topic-field]") && state.adminThemeDraft) {
       const topic = state.adminThemeDraft.topics?.[Number(target.dataset.index)];
       if (topic) topic[target.dataset.themeTopicField] = target.value;
+      if (target.dataset.themeTopicField === "expertId" && target.value) {
+        state.adminThemeDraft.expertIds = [
+          ...new Set([...(state.adminThemeDraft.expertIds || []), target.value])
+        ];
+        const button = [
+          ...document.querySelectorAll('[data-action="theme-expert-toggle"]')
+        ].find((item) => item.dataset.id === target.value);
+        button?.classList.add("is-active");
+      }
       return;
     }
     if (target.matches("[data-review-speaker]") && state.adminDraft) {
@@ -9678,7 +10535,30 @@
       state.adminDraft.speaker = expert ? `${expert.name} · ${expert.deptTitle}` : "";
       return;
     }
+    if (target.matches("[data-review-service]") && state.adminDraft) {
+      state.adminDraft.serviceType = target.value;
+      const speaker = expertById(state.adminDraft.speakerId);
+      if (speaker && !matchesService(speaker, target.value)) {
+        state.adminDraft.speakerId = "";
+        state.adminDraft.speaker = "";
+      }
+      const appointment = appointmentById(state.adminReviewId);
+      const select = document.querySelector("[data-review-speaker]");
+      if (select && appointment) {
+        select.innerHTML = `<option value="" disabled ${
+          state.adminDraft.speakerId ? "" : "selected"
+        }>请选择本院出讲专家</option>${reviewSpeakerOptions(
+          state.adminDraft,
+          appointment.hospitalId
+        )}`;
+      }
+      return;
+    }
     if (target.matches("[data-admin-hospital]")) {
+      if (slotDraftChangeCount() > 0) {
+        target.value = state.adminHospitalId || "";
+        return showToast("有未保存的号源修改，请先统一保存或重置后再切换医院。");
+      }
       state.adminHospitalId = target.value;
       state.slotDoctorId = "";
       state.slotDraft = {};
@@ -9714,13 +10594,17 @@
     switch (action) {
       case "tab": {
         storeCurrentScroll();
+        const nextTab = el.dataset.tab || "home";
         if (state.overlay) {
           releaseOverlayHistory();
           clearOverlayState();
         }
         state.screen = "main";
-        state.tab = el.dataset.tab || "home";
-        if (state.tab === "experts") resetExpertFilters();
+        state.tab = nextTab;
+        if (state.tab === "experts" && !state.expertVisited) {
+          resetExpertFilters();
+          state.expertVisited = true;
+        }
         renderApp({ scrollTo: storedScrollForView(`main:${state.tab}`) });
         if (state.tab === "home" && state.geoStatus === "idle") requestLocationRecommendation();
         break;
@@ -9792,7 +10676,7 @@
         state.overlay = null;
         state.adminThemeDraft = null;
         state.adminTemplateDraft = null;
-        renderApp({ scrollTo: 0 });
+        renderApp({ scrollTo: storedScrollForView(`admin:${state.adminTab}`) });
         break;
       case "admin-filter":
         state.adminFilter = el.dataset.value;
@@ -9803,17 +10687,32 @@
         break;
       case "admin-demand-filter":
         state.adminDemandFilter = el.dataset.value;
-        renderApp({ scrollTo: currentWindowScroll() });
+        refreshAdminDemandList();
         break;
       case "open-admin-appointment":
-        state.adminReviewId = el.dataset.appointmentId;
+        {
+          const appointment = appointmentById(el.dataset.appointmentId);
+          if (!appointment) return showToast("预约记录不存在。");
+          if (!adminCanManageHospital(appointment.hospitalId)) {
+            return showToast("无权查看其他医院的预约。");
+          }
+          state.adminReviewId = appointment.id;
+        }
         state.adminDraft = null;
         state.adminNoteEditing = false;
+        state.adminReviewSaved = false;
         state.overlay = { type: "admin-review" };
         renderOverlay();
         break;
       case "open-admin-demand":
-        state.adminDemandId = el.dataset.demandId;
+        {
+          const demand = demandById(el.dataset.demandId);
+          if (!demand) return showToast("需求记录不存在。");
+          if (!adminCanManageHospital(demand.hospitalId)) {
+            return showToast("无权查看其他医院的需求。");
+          }
+          state.adminDemandId = demand.id;
+        }
         state.overlay = { type: "admin-demand" };
         renderOverlay();
         break;
@@ -9823,6 +10722,11 @@
       }
       case "review-save":
         saveReview();
+        break;
+      case "review-edit-again":
+        state.adminReviewSaved = false;
+        state.adminNoteEditing = false;
+        renderOverlay();
         break;
       case "review-complete":
         completeAppointment();
@@ -9919,7 +10823,7 @@
         const lead = Math.max(1, Number(doctor?.leadDays) || tierOf(doctor).leadDays);
         state.slotBatch.from = isoDate(addDays(startOfDay(), lead));
         state.slotBatch.to = isoDate(addDays(startOfDay(), lead + days - 1));
-        renderSlotConfigContent();
+        refreshSlotBatchSummary();
         break;
       }
       case "slot-save":
@@ -10028,8 +10932,19 @@
         if (!state.adminThemeDraft) return;
         const id = el.dataset.id;
         const ids = new Set(state.adminThemeDraft.expertIds || []);
-        if (ids.has(id)) ids.delete(id);
-        else ids.add(id);
+        if (ids.has(id)) {
+          const boundTopic = (state.adminThemeDraft.topics || []).find(
+            (topic) => String(topic.expertId || "") === String(id)
+          );
+          if (boundTopic) {
+            return showToast(
+              `「${boundTopic.title || "该课题"}」正在使用这位专家，请先更换或删除课题。`
+            );
+          }
+          ids.delete(id);
+        } else {
+          ids.add(id);
+        }
         state.adminThemeDraft.expertIds = [...ids];
         el.classList.toggle("is-active");
         break;
@@ -10106,9 +11021,7 @@
         openBooking("", "", el.dataset.value || "");
         break;
       case "home-hospital":
-        state.homeHospitalId = el.dataset.value || "";
-        state.expertScope = "nearby";
-        refreshHomeLocationViews();
+        selectHomeHospital(el.dataset.value || "");
         break;
       case "home-city-open":
         openHomeCityPicker();
@@ -10119,11 +11032,13 @@
       case "home-use-location":
         clearHomeRegion();
         state.homeHospitalId = "";
+        state.expertHospitalId = "";
         requestLocationRecommendation({ manual: true });
         refreshHomeLocationViews();
         break;
       case "home-hospital-experts":
         resetExpertFilters();
+        state.expertVisited = true;
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
         break;
@@ -10162,8 +11077,10 @@
         resetExpertFilters({
           month: Number(el.dataset.month) || currentMonth(),
           service: "讲座",
-          availability: "bookable"
+          availability: "bookable",
+          hospitalId: el.dataset.hospitalId || ""
         });
+        state.expertVisited = true;
         releaseOverlayHistory();
         clearOverlayState();
         state.screen = "main";
@@ -10200,11 +11117,13 @@
         break;
       case "tier-open":
         resetExpertFilters({ tier: el.dataset.value });
+        state.expertVisited = true;
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
         break;
       case "service-open":
         resetExpertFilters({ service: el.dataset.value, availability: "bookable" });
+        state.expertVisited = true;
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
         break;
@@ -10213,6 +11132,7 @@
           search: el.dataset.value,
           searchOpen: true
         });
+        state.expertVisited = true;
         state.tab = "experts";
         renderApp({ scrollTo: 0 });
         break;
@@ -10252,14 +11172,21 @@
         break;
       case "expert-search-toggle":
         state.expertSearchOpen = !state.expertSearchOpen;
-        renderApp({ scrollTo: currentWindowScroll() });
+        syncExpertSearchBox();
         if (state.expertSearchOpen) {
           window.requestAnimationFrame(() => document.getElementById("expert-search")?.focus());
         }
         break;
       case "expert-search-clear":
         state.expertSearch = "";
-        renderApp({ scrollTo: currentWindowScroll() });
+        {
+          const input = document.getElementById("expert-search");
+          if (input) {
+            input.value = "";
+            input.focus();
+          }
+          refreshExpertResults();
+        }
         break;
       case "open-demand":
         openDemandCreate();
@@ -10274,14 +11201,27 @@
       case "demand-submit":
         submitDemand();
         break;
-      case "open-demand-detail":
-        state.overlay = { type: "demand", demandId: el.dataset.demandId };
+      case "open-demand-detail": {
+        const demand = demandById(el.dataset.demandId || "");
+        if (!clientOwnsDemand(demand)) {
+          return showToast(state.session ? "无权查看该提需。" : "请先登录。");
+        }
+        state.overlay = { type: "demand", demandId: demand.id };
         renderOverlay();
         break;
+      }
       case "demand-cancel": {
-        const id = state.overlay?.demandId;
-        if (!id) return;
-        updateDemand(id, { status: "cancelled", cancelledAt: new Date().toISOString() });
+        const demand = demandById(state.overlay?.demandId || "");
+        if (!clientOwnsDemand(demand)) {
+          return showToast(state.session ? "无权操作该提需。" : "请先登录。");
+        }
+        if (demand.status !== "pending") {
+          return showToast("院方已开始跟进，请联系项目对接人处理。");
+        }
+        updateDemand(demand.id, {
+          status: "cancelled",
+          cancelledAt: new Date().toISOString()
+        });
         state.overlay = null;
         releaseOverlayHistory();
         renderApp({ scrollTo: currentWindowScroll() });
@@ -10290,20 +11230,25 @@
       }
       case "record-tab":
         state.clientRecordTab = el.dataset.value;
-        renderApp({ scrollTo: currentWindowScroll() });
+        refreshRecordPanel();
         break;
       case "appointment-filter":
         state.appointmentFilter = el.dataset.value;
         refreshAppointmentList();
         break;
-      case "open-appointment":
+      case "open-appointment": {
+        const appointment = appointmentById(el.dataset.appointmentId || "");
+        if (!clientOwnsAppointment(appointment)) {
+          return showToast(state.session ? "无权查看该预约。" : "请先登录。");
+        }
         state.overlay = {
           type: "appointment",
-          appointmentId: el.dataset.appointmentId,
+          appointmentId: appointment.id,
           action: ""
         };
         renderOverlay();
         break;
+      }
       case "appointment-location-edit":
         openAppointmentLocationEdit(el.dataset.appointmentId || "");
         break;
@@ -10318,6 +11263,12 @@
       case "appointment-confirm": {
         const id = state.overlay?.appointmentId;
         if (!id) return;
+        const appointment = appointmentById(id);
+        if (!clientOwnsAppointment(appointment)) {
+          return showToast(state.session ? "无权操作该预约。" : "请先登录。");
+        }
+        const planError = finalPlanError(appointment);
+        if (planError) return showToast(planError);
         updateAppointment(id, {
           status: "confirmed",
           confirmedAt: new Date().toISOString(),
@@ -10331,9 +11282,13 @@
       }
       case "appointment-revise-submit": {
         const id = state.overlay?.appointmentId;
+        const appointment = appointmentById(id);
+        if (!clientOwnsAppointment(appointment)) {
+          return showToast(state.session ? "无权操作该预约。" : "请先登录。");
+        }
         const note = document.querySelector("[data-revise-note]")?.value.trim() || "";
         if (!note) return showToast("请填写修改意见。");
-        updateAppointment(id, {
+        updateAppointment(appointment.id, {
           status: "revision",
           feedback: note,
           feedbackAt: new Date().toISOString()
@@ -10346,8 +11301,17 @@
       }
       case "appointment-cancel-submit": {
         const id = state.overlay?.appointmentId;
-        if (!id) return;
-        updateAppointment(id, { status: "cancelled", cancelledAt: new Date().toISOString() });
+        const appointment = appointmentById(id);
+        if (!clientOwnsAppointment(appointment)) {
+          return showToast(state.session ? "无权操作该预约。" : "请先登录。");
+        }
+        if (!["pending", "planning", "review", "revision"].includes(appointment.status)) {
+          return showToast("该预约已进入执行阶段，请联系项目对接人处理。");
+        }
+        updateAppointment(appointment.id, {
+          status: "cancelled",
+          cancelledAt: new Date().toISOString()
+        });
         state.overlay = null;
         releaseOverlayHistory();
         renderApp({ scrollTo: currentWindowScroll() });
@@ -10365,8 +11329,16 @@
         state.clientRecordTab = "demands";
         renderApp({ scrollTo: 0 });
         break;
+      case "me-confirmed":
+        state.tab = "appointments";
+        state.clientRecordTab = "bookings";
+        state.appointmentFilter = "confirmed";
+        renderApp({ scrollTo: 0 });
+        break;
       case "logout":
         clearSession();
+        state.expertVisited = false;
+        state.expertHospitalId = "";
         state.tab = "home";
         state.screen = "main";
         renderApp({ scrollTo: 0 });
@@ -10459,10 +11431,16 @@
         if (!touch) return;
         const sheet = event.target.closest(".sheet");
         if (!sheet) return;
-        if (!event.target.closest(".sheet__grabber, .sheet__bar, .doctor-hero__grabber")) return;
         if (event.target.closest("button, a, input, textarea, select, label")) return;
+        const fromHandle = Boolean(
+          event.target.closest(".sheet__grabber, .sheet__bar, .doctor-hero__grabber")
+        );
+        const body = sheet.querySelector(".sheet__body");
+        if (!fromHandle && (!body || body.scrollTop > 0)) return;
         sheetDrag = {
           sheet,
+          body,
+          fromHandle,
           startY: touch.clientY,
           startX: touch.clientX,
           startedAt: performance.now(),
@@ -10482,6 +11460,10 @@
         sheetDrag.dy = Math.max(0, touch.clientY - sheetDrag.startY);
         sheetDrag.dx = touch.clientX - sheetDrag.startX;
         if (!sheetDrag.dragging) {
+          if (!sheetDrag.fromHandle && sheetDrag.dy <= 0) {
+            sheetDrag = null;
+            return;
+          }
           if (Math.abs(sheetDrag.dy) < 6 && Math.abs(sheetDrag.dx) < 6) return;
           if (Math.abs(sheetDrag.dx) > Math.abs(sheetDrag.dy)) {
             sheetDrag = null;
@@ -10581,6 +11563,9 @@
      Boot
      ========================================================= */
   async function boot() {
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
     bindEvents();
     renderApp();
     try {
@@ -10627,6 +11612,10 @@
         const region = normalizeRegion(storedHomeRegion.province, storedHomeRegion.city);
         state.homeRegion = region;
         state.homeHospitalId = hospitalForRegion(region)?.id || "";
+      }
+      const storedHomeHospital = readJSON(STORAGE.homeHospital, "");
+      if (storedHomeHospital && hospitalById(storedHomeHospital)) {
+        state.homeHospitalId = storedHomeHospital;
       }
 
       const adminSession = readJSON(STORAGE.adminSession, null);

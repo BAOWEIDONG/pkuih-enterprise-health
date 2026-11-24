@@ -9,7 +9,7 @@
   --card: #ffffff;
   --ink: #0f1726;
   --ink-2: #4f5b70;
-  --ink-3: #68758a;
+  --ink-3: #5c687c;
   --line: rgba(15, 23, 38, 0.075);
   --line-strong: rgba(15, 23, 38, 0.13);
   --brand: #0b318f;
@@ -1420,7 +1420,7 @@ textarea {
 .hero__media {
   position: absolute;
   inset: 0;
-  opacity: 0.82;
+  opacity: 1;
 }
 
 .hero__media img {
@@ -1428,7 +1428,7 @@ textarea {
   height: 100%;
   object-fit: cover;
   object-position: center 46%;
-  filter: saturate(1.08) contrast(1.02);
+  filter: saturate(1.1) contrast(1.03) brightness(1.04);
 }
 
 .hero::after {
@@ -1437,15 +1437,21 @@ textarea {
   background:
     linear-gradient(
       180deg,
-      rgba(4, 18, 48, 0.08) 0%,
-      rgba(4, 18, 48, 0.2) 18%,
-      rgba(4, 18, 48, 0.46) 42%,
-      rgba(4, 18, 48, 0.76) 70%,
-      rgba(5, 24, 59, 0.94) 100%
+      rgba(4, 18, 48, 0.32) 0%,
+      rgba(4, 18, 48, 0.18) 15%,
+      rgba(4, 18, 48, 0.3) 38%,
+      rgba(4, 18, 48, 0.58) 66%,
+      rgba(5, 24, 59, 0.84) 100%
     ),
-    linear-gradient(90deg, rgba(4, 18, 48, 0.6), rgba(4, 18, 48, 0.24) 56%, rgba(4, 18, 48, 0.04)),
-    radial-gradient(520px 380px at 100% 0%, rgba(53, 112, 235, 0.26), transparent 68%);
+    linear-gradient(90deg, rgba(4, 18, 48, 0.42), rgba(4, 18, 48, 0.12) 58%, rgba(4, 18, 48, 0)),
+    radial-gradient(520px 380px at 100% 0%, rgba(53, 112, 235, 0.18), transparent 68%);
   content: "";
+}
+
+.hero h1,
+.hero__kicker,
+.hero__content > p {
+  text-shadow: 0 2px 18px rgba(2, 12, 34, 0.32);
 }
 
 .hero__content {
@@ -1499,6 +1505,9 @@ textarea {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 9.5px;
+  line-height: 1.45;
   white-space: nowrap;
 }
 
@@ -1509,7 +1518,7 @@ textarea {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
   color: #ffd1b6;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1.5;
   white-space: nowrap;
@@ -1535,23 +1544,29 @@ textarea {
 .hero-hospital__select-wrap {
   position: relative;
   margin-top: 2px;
+  min-height: 17px;
+}
+
+.hero-hospital__selected-name {
+  display: block;
+  max-width: 100%;
+  padding-right: 18px;
+  overflow: hidden;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .hero-hospital__select-wrap select {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  padding: 0 18px 0 0;
-  overflow: hidden;
-  border: 0;
-  background: transparent;
-  color: #fff;
-  font-family: inherit;
-  font-size: 11.5px;
-  font-weight: 760;
-  line-height: 1.5;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  appearance: none;
-  -webkit-appearance: none;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .hero-hospital__select-wrap select option {
@@ -1659,8 +1674,9 @@ textarea {
 .hero__metrics small {
   display: block;
   margin-top: 2px;
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 8.5px;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 9.5px;
+  text-shadow: 0 1px 8px rgba(2, 12, 34, 0.35);
 }
 
 .nearby-card {
@@ -1951,6 +1967,16 @@ textarea {
   font-size: 8px;
   font-style: normal;
   font-weight: 750;
+}
+
+.season-banner__empty {
+  display: block;
+  padding: 10px 11px;
+  border: 1px dashed rgba(15, 23, 38, 0.12);
+  border-radius: 11px;
+  color: var(--ink-3);
+  font-size: 9px;
+  line-height: 1.5;
 }
 
 .expert-mini-list {
@@ -2770,6 +2796,14 @@ textarea {
   flex: 1;
 }
 
+.sheet__footer-hint {
+  flex: 1;
+  align-self: center;
+  text-align: right;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
 .sheet-pad {
   padding: 4px 16px 24px;
 }
@@ -3013,10 +3047,12 @@ textarea {
   overflow: hidden;
   border: 2px solid rgba(255, 255, 255, 0.42);
   border-radius: 18px;
-  background: #dce6f7;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.92), transparent 34%),
+    linear-gradient(160deg, #e8eef8 0%, #cfdbee 100%);
   box-shadow: 0 13px 30px rgba(1, 10, 27, 0.34);
-  object-fit: cover;
-  object-position: center 16%;
+  object-fit: contain;
+  object-position: center;
 }
 
 .doctor-hero__person > div {
@@ -4982,8 +5018,8 @@ textarea {
   display: block;
   overflow: hidden;
   margin-top: 2px;
-  color: rgba(255, 255, 255, 0.56);
-  font-size: 8.5px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 9.5px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -5031,8 +5067,9 @@ textarea {
 
 .profile-hero__phone span {
   margin-left: auto;
-  color: rgba(255, 255, 255, 0.58);
-  font-size: 8px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 10px;
+  font-weight: 650;
 }
 
 .profile-hero__meta {
@@ -5052,8 +5089,8 @@ textarea {
 
 .profile-hero__meta small {
   display: block;
-  color: rgba(255, 255, 255, 0.54);
-  font-size: 7.5px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 9px;
 }
 
 .profile-hero__meta strong {
@@ -5061,7 +5098,7 @@ textarea {
   overflow: hidden;
   margin-top: 2px;
   color: rgba(255, 255, 255, 0.88);
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 620;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -5932,6 +5969,55 @@ textarea {
   margin-top: 10px;
 }
 
+.review-form.is-locked {
+  opacity: 0.84;
+  pointer-events: none;
+}
+
+.review-state-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.review-state-banner > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.review-state-banner strong {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 740;
+}
+
+.review-state-banner p {
+  margin: 3px 0 0;
+  color: var(--ink-2);
+}
+
+.review-state-banner.is-success {
+  border: 1px solid rgba(15, 143, 107, 0.16);
+  background: linear-gradient(145deg, #f7fffc, #e8f8f1);
+  color: var(--green-text);
+}
+
+.review-state-banner.is-terminal {
+  border: 1px solid rgba(10, 52, 120, 0.1);
+  background: linear-gradient(145deg, #f8faff, #eef3fb);
+  color: var(--brand);
+}
+
+.review-state-banner .text-link {
+  margin-top: 6px;
+  color: var(--green-text);
+}
+
 .plan-template-import {
   margin-bottom: 10px;
   padding: 13px;
@@ -6283,6 +6369,11 @@ textarea {
   margin-top: 8px;
 }
 
+.sms-card.is-primary {
+  border-color: rgba(10, 108, 255, 0.22);
+  box-shadow: 0 14px 34px rgba(10, 76, 178, 0.12);
+}
+
 /* =========================================================
    Slot config
    ========================================================= */
@@ -6592,6 +6683,13 @@ textarea {
   opacity: 0.34;
 }
 
+.slot-cell.is-lead:not(.is-past) {
+  border-style: dashed;
+  border-color: rgba(15, 23, 38, 0.12);
+  background: #f3f5f8;
+  opacity: 0.58;
+}
+
 .slot-cell.is-blank {
   background: transparent;
 }
@@ -6625,6 +6723,11 @@ textarea {
 
 .slot-legend i.is-changed {
   background: var(--orange);
+}
+
+.slot-legend i.is-lead {
+  border: 1px dashed rgba(15, 23, 38, 0.28);
+  background: #f3f5f8;
 }
 
 .batch-card {
@@ -7214,13 +7317,15 @@ textarea {
 }
 
 .hospital-admin-card__head strong {
-  display: block;
+  display: -webkit-box;
   overflow: hidden;
   color: var(--ink);
   font-size: 12px;
   font-weight: 750;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  line-height: 1.35;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .hospital-admin-card__head span {
@@ -8420,6 +8525,33 @@ textarea {
   gap: 7px;
 }
 
+.theme-topic-empty {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 24px 18px;
+  border: 1px dashed rgba(15, 23, 38, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.66);
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.theme-topic-empty > svg {
+  color: var(--brand);
+}
+
+.theme-topic-empty strong {
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.theme-topic-empty p {
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
 .theme-topic-card {
   position: relative;
   display: block;
@@ -8532,6 +8664,7 @@ textarea {
 
 .theme-expert {
   display: grid;
+  width: 100%;
   min-width: 0;
   grid-template-columns: 51px minmax(0, 1fr);
   grid-template-rows: auto auto;
@@ -8541,6 +8674,7 @@ textarea {
   border-radius: 15px;
   background: #fff;
   box-shadow: var(--shadow-card);
+  text-align: left;
 }
 
 .theme-expert img {
@@ -9330,6 +9464,12 @@ textarea {
 @media (max-width: 375px) {
   .field-row {
     grid-template-columns: 1fr;
+  }
+
+  .expert-toolbar .filter-scroll--services {
+    flex-wrap: wrap;
+    overflow: visible;
+    row-gap: 6px;
   }
 
   .field-row .field,
