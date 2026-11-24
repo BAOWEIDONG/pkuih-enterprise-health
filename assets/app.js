@@ -23,7 +23,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261124-02";
+  const DATA_VERSION = "20261124-03";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -1001,8 +1001,14 @@
         return false;
       }
       if (
-        state.expertAvailability === "bookable" &&
+        state.expertAvailability !== "all" &&
         !doctorAvailability(expert).bookable
+      ) {
+        return false;
+      }
+      if (
+        state.expertAvailability === "local" &&
+        !hospitalMatchesRegion(hospitalById(expert.hospitalId), region)
       ) {
         return false;
       }
@@ -1951,6 +1957,24 @@
     return `${overlay.type}:${overlay.appointmentId || overlay.demandId || overlay.posterId || ""}`;
   }
 
+  function scrollDoctorMonthIntoView(month) {
+    const tabs = overlayRoot?.querySelector(".month-tabs");
+    const active = tabs?.querySelector(".is-active");
+    if (!tabs || !active) return;
+    const tabsRect = tabs.getBoundingClientRect();
+    const activeRect = active.getBoundingClientRect();
+    const maxScroll = Math.max(0, tabs.scrollWidth - tabs.clientWidth);
+    const target =
+      tabs.scrollLeft +
+      activeRect.left -
+      tabsRect.left -
+      (tabs.clientWidth - activeRect.width) / 2;
+    tabs.scrollTo({
+      left: Math.max(0, Math.min(maxScroll, target)),
+      behavior: "auto"
+    });
+  }
+
   function renderOverlay() {
     if (!overlayRoot) return;
     const hadOverlay = Boolean(overlayRoot.querySelector(".sheet, .flow"));
@@ -1979,6 +2003,11 @@
             nextBody.scrollTop = restoreScroll;
           });
         }
+      }
+      if (state.overlay?.type === "doctor") {
+        window.requestAnimationFrame(() =>
+          scrollDoctorMonthIntoView(state.overlay?.month)
+        );
       }
       state.paintedOverlayKey = nextScrollKey;
     };
@@ -2508,7 +2537,17 @@
         ) {
           return false;
         }
-        if (availability === "bookable" && !doctorAvailability(expert).bookable) return false;
+        if (availability === "local") {
+          const expertHospital = hospitalById(expert.hospitalId);
+          if (
+            scope === "nearby"
+              ? expert.hospitalId !== hospital?.id
+              : !hospitalMatchesRegion(expertHospital, region)
+          ) {
+            return false;
+          }
+        }
+        if (availability !== "all" && !doctorAvailability(expert).bookable) return false;
         if (state.expertMonth > 0 && !matchesService(expert, "讲座")) return false;
         if (!matchesService(expert, state.expertService)) return false;
         if (state.expertMonth > 0) {
@@ -3404,15 +3443,21 @@
     const list = bookableScopeExperts();
     const hospital = nearestHospital();
     const region = currentClientRegion();
+    const availabilityText =
+      state.expertAvailability === "bookable"
+        ? " · 当前可约"
+        : state.expertAvailability === "local"
+        ? " · 当地医院可约"
+        : "";
     return `
       <div class="expert-result-meta">
-        <span><b>${list.length}</b> 位专家${
-          state.expertAvailability === "bookable" ? " · 仅可约" : ""
-        }</span>
+        <span><b>${list.length}</b> 位专家${availabilityText}</span>
         <span>${
           state.expertScope === "nearby"
             ? esc(hospital?.name || "就近医院")
-            : `全部医院 · ${esc(regionText(region.province, region.city))}可履约`
+            : `${state.expertAvailability === "local" ? "当地医院" : "全部医院"} · ${esc(
+                regionText(region.province, region.city)
+              )}可履约`
         }</span>
       </div>
       ${
@@ -3473,6 +3518,7 @@
     const hospital = nearestHospital();
     const nearCount = bookableScopeExperts("nearby").length;
     const bookableCount = bookableScopeExperts(state.expertScope, "bookable").length;
+    const localCount = bookableScopeExperts(state.expertScope, "local").length;
     const allCount = bookableScopeExperts(state.expertScope, "all").length;
     const serviceScopeHospitalId = state.expertScope === "nearby" ? hospital?.id || "" : "";
     return `
@@ -3510,7 +3556,7 @@
                 </div>`
               : ""
           }
-          <div class="filter-scroll">
+          <div class="filter-scroll filter-scroll--tier">
             ${[
               ["all", "全部梯队"],
               ["elite", "大咖"],
@@ -3525,7 +3571,9 @@
               .join("")}
             <i class="filter-divider"></i>
             <button class="chip ${state.expertAvailability === "bookable" ? "is-active" : ""}" type="button"
-              data-action="expert-availability" data-value="bookable">只看可约<span class="chip__count">${bookableCount}</span></button>
+              data-action="expert-availability" data-value="bookable">当前可约<span class="chip__count">${bookableCount}</span></button>
+            <button class="chip ${state.expertAvailability === "local" ? "is-active" : ""}" type="button"
+              data-action="expert-availability" data-value="local">只看当地可约<span class="chip__count">${localCount}</span></button>
             <button class="chip ${state.expertAvailability === "all" ? "is-active" : ""}" type="button"
               data-action="expert-availability" data-value="all">全部专家<span class="chip__count">${allCount}</span></button>
           </div>
@@ -3561,11 +3609,21 @@
           <p class="expert-toolbar__hint" id="expert-scope-hint">${icon("mapPin", 11)} ${
             state.expertScope === "nearby"
               ? `优先展示 ${esc(hospital?.name || "就近医院")}${
-                  state.expertAvailability === "bookable" ? " · 仅显示可约专家" : " · 含暂无号源专家"
+                  state.expertAvailability === "all"
+                    ? " · 含暂无号源专家"
+                    : state.expertAvailability === "local"
+                    ? " · 仅显示本院可约专家"
+                    : " · 仅显示当前可约专家"
                 }`
-              : `全部医院中，仅展示可服务${esc(
+              : `${
+                  state.expertAvailability === "local" ? "当地医院" : "全部医院"
+                }中，展示可服务${esc(
                   regionText(currentClientRegion().province, currentClientRegion().city)
-                )}的专家${state.expertAvailability === "bookable" ? " · 仅显示可约" : ""}`
+                )}的专家${
+                  state.expertAvailability === "all"
+                    ? " · 含暂无号源"
+                    : " · 当前可约"
+                }`
           }</p>
         </div>
         <div id="expert-results">${renderExpertResults()}</div>
@@ -3597,14 +3655,19 @@
 
   function refreshExpertAvailabilityCounts() {
     const bookable = bookableScopeExperts(state.expertScope, "bookable").length;
+    const local = bookableScopeExperts(state.expertScope, "local").length;
     const all = bookableScopeExperts(state.expertScope, "all").length;
     const bookableCount = document.querySelector(
       '[data-action="expert-availability"][data-value="bookable"] .chip__count'
+    );
+    const localCount = document.querySelector(
+      '[data-action="expert-availability"][data-value="local"] .chip__count'
     );
     const allCount = document.querySelector(
       '[data-action="expert-availability"][data-value="all"] .chip__count'
     );
     if (bookableCount) bookableCount.textContent = String(bookable);
+    if (localCount) localCount.textContent = String(local);
     if (allCount) allCount.textContent = String(all);
   }
 
@@ -3902,6 +3965,8 @@
       preferredTheme
     );
     syncBookingDoctor(state.booking);
+    state.booking.doctorPinned = Boolean(state.booking.doctorId);
+    state.booking.doctorPickerOpen = false;
     state.overlay = { type: "booking" };
     renderOverlay();
   }
@@ -4113,6 +4178,8 @@
     if (entry?.bookable) return false;
     booking.doctorId = "";
     booking.date = "";
+    booking.doctorPinned = false;
+    booking.doctorPickerOpen = true;
     return true;
   }
 
@@ -4121,10 +4188,19 @@
     const doctor = bookingSelectedDoctor(booking);
     const themeCtx = bookingThemeContext(booking);
     const bookableCount = options.filter((item) => item.bookable).length;
+    const selectedEntry = doctor
+      ? options.find((entry) => entry.expert.id === doctor.id) || null
+      : null;
+    const pinned = Boolean(
+      doctor && selectedEntry && booking.doctorPinned && !booking.doctorPickerOpen
+    );
+    const visibleOptions = pinned ? [selectedEntry] : options;
     const topicExpert = themeCtx.topic?.expertId
       ? expertById(themeCtx.topic.expertId)
       : null;
-    const filterText = themeCtx.topic
+    const filterText = pinned
+      ? `已带入 ${doctor.name}，可直接继续填写；需要调整时可点击“更换专家”。`
+      : themeCtx.topic
       ? `已按课题「${themeCtx.topic.title}」筛选${
           topicExpert ? `，仅展示主讲专家 ${topicExpert.name}` : ""
         }；${options.length} 位相关，${bookableCount} 位可约。`
@@ -4136,7 +4212,7 @@
     return `
       <div class="booking-doctor-list">
         <p class="booking-doctor__note">${icon("sparkles", 12)}
-          专家为必选项，再次点击已选专家可取消选择。${esc(filterText)}
+          专家为必选项。${esc(filterText)}
         </p>
         ${
           themeCtx.active
@@ -4157,12 +4233,12 @@
         <div class="booking-doctor__status ${doctor ? "has-doctor" : ""}">
           <span>${doctor ? `已选专家 · ${esc(doctor.name)}` : "尚未选择专家"}</span>
           ${
-            doctor
-              ? `<button type="button" data-action="booking-doctor" data-value="">取消选择</button>`
+            pinned
+              ? `<button type="button" data-action="booking-doctor-change">更换专家</button>`
               : ""
           }
         </div>
-        ${options
+        ${visibleOptions
           .map((entry) => {
             const expert = entry.expert;
             const active = booking.doctorId === expert.id;
@@ -4184,7 +4260,7 @@
                     entry.bookable ? "" : "disabled"
                   }>
                   <i class="booking-doctor__check">${icon("check", 12)}</i>
-                  <span>${active ? "已选 · 取消" : entry.actionLabel}</span>
+                  <span>${active ? "已选" : entry.actionLabel}</span>
                 </button>
               </div>
             `;
@@ -4358,7 +4434,7 @@
         ${renderBookingServiceSection(booking)}
       </div>
       <div class="flow-section">
-        <div class="flow-section__head"><h2>专家 <em>*</em></h2><span>必选 · 点击可看详情，再点可取消</span></div>
+        <div class="flow-section__head"><h2>专家 <em>*</em></h2><span>必选 · 已选专家可直接继续</span></div>
         <div id="booking-doctors">${renderBookingDoctorSection(booking)}</div>
       </div>
       <div class="flow-section">
@@ -4554,6 +4630,8 @@
     if (doctor && !matchesService(doctor, value)) {
       state.booking.doctorId = "";
       state.booking.date = "";
+      state.booking.doctorPinned = false;
+      state.booking.doctorPickerOpen = false;
     }
     syncBookingDoctor(state.booking);
     const wrap = document.getElementById("booking-doctors");
@@ -4591,6 +4669,8 @@
     }
     booking.doctorId = nextDoctorId;
     booking.date = "";
+    booking.doctorPinned = Boolean(nextDoctorId);
+    booking.doctorPickerOpen = !nextDoctorId;
     const expert = nextDoctorId ? expertById(nextDoctorId) : null;
     if (expert) {
       booking.tier = expert.tier;
@@ -4628,6 +4708,8 @@
     const applied = () => {
       booking.doctorId = expert.id;
       booking.tier = expert.tier;
+      booking.doctorPinned = true;
+      booking.doctorPickerOpen = false;
       if (booking.date && !doctorAvailability(expert).dates.includes(booking.date)) {
         booking.date = "";
       }
@@ -5612,10 +5694,13 @@
                 draft.preferredDate
               )}" min="${todayIso()}">
             </div>
-            <div class="field">
-              <label>活动省市</label>
-              <div class="field-row">
+            <div class="field-row">
+              <div class="field">
+                <label>活动省份</label>
                 <select data-demand-province>${renderProvinceOptions(draft.province)}</select>
+              </div>
+              <div class="field">
+                <label>活动城市</label>
                 <select data-demand-city>${renderCityOptions(draft.province, draft.city)}</select>
               </div>
             </div>
@@ -9027,13 +9112,19 @@
     hint.innerHTML =
       state.expertScope === "nearby"
         ? `${icon("mapPin", 11)} 优先展示 ${esc(hospital?.name || "就近医院")}${
-            state.expertAvailability === "bookable"
-              ? " · 仅显示可约专家"
-              : " · 含暂无号源专家"
+            state.expertAvailability === "all"
+              ? " · 含暂无号源专家"
+              : state.expertAvailability === "local"
+              ? " · 仅显示本院可约专家"
+              : " · 仅显示当前可约专家"
           }`
-        : `${icon("mapPin", 11)} 全部医院中，仅展示可服务${esc(
+        : `${icon("mapPin", 11)} ${
+            state.expertAvailability === "local" ? "当地医院" : "全部医院"
+          }中，展示可服务${esc(
             regionText(region.province, region.city)
-          )}的专家${state.expertAvailability === "bookable" ? " · 仅显示可约" : ""}`;
+          )}的专家${
+            state.expertAvailability === "all" ? " · 含暂无号源" : " · 当前可约"
+          }`;
   }
 
   /* =========================================================
@@ -9932,6 +10023,11 @@
         break;
       case "booking-doctor":
         setBookingDoctor(el.dataset.value);
+        break;
+      case "booking-doctor-change":
+        if (!state.booking) return;
+        state.booking.doctorPickerOpen = true;
+        refreshBookingDoctors();
         break;
       case "booking-doctor-preview": {
         const expert = expertById(el.dataset.value || "");

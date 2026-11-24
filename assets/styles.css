@@ -2413,6 +2413,16 @@ textarea {
   padding: 0 0 2px;
 }
 
+.expert-toolbar .filter-scroll--tier {
+  flex-wrap: wrap;
+  overflow: visible;
+  row-gap: 6px;
+}
+
+.expert-toolbar .filter-scroll--tier .filter-divider {
+  display: none;
+}
+
 .expert-toolbar .filter-scroll .chip {
   min-height: 29px;
   padding: 0 9px;
@@ -2458,6 +2468,8 @@ textarea {
 
 .expert-card {
   display: flex;
+  width: 100%;
+  min-width: 0;
   align-items: stretch;
   gap: 11px;
   padding: 10px;
@@ -7959,8 +7971,12 @@ textarea {
   display: flex;
   height: 100%;
   flex-direction: column;
-  justify-content: flex-end;
   padding: 16px;
+}
+
+.season-banner--media .season-banner__content {
+  justify-content: center;
+  padding: 14px 16px 16px;
 }
 
 .season-banner--media .season-banner__head {
