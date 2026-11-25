@@ -27,7 +27,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261125-7";
+  const DATA_VERSION = "20261125-8";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -5638,9 +5638,44 @@
     return "可选本月主题，也可自定义";
   }
 
+  function bookingThemeTopicLocked(booking) {
+    return Boolean(booking?.themeMonth && booking?.themeTopicId);
+  }
+
+  function syncBookingTopicField() {
+    const booking = state.booking;
+    const input = document.querySelector('[data-booking-field="customTopic"]');
+    if (!booking || !input) return;
+    const locked = bookingThemeTopicLocked(booking);
+    input.readOnly = locked;
+    input.classList.toggle("is-locked", locked);
+    input.setAttribute("aria-readonly", locked ? "true" : "false");
+    if (locked) input.value = booking.customTopic || "";
+    const hint = document.getElementById("booking-topic-field-hint");
+    if (hint) {
+      hint.textContent = locked
+        ? "已选时令主题 · 不可修改"
+        : bookingTopicFieldHint(booking.serviceType);
+    }
+    let lockHelp = document.getElementById("booking-topic-lock-help");
+    if (locked && !lockHelp) {
+      lockHelp = document.createElement("span");
+      lockHelp.id = "booking-topic-lock-help";
+      lockHelp.className = "field-help booking-topic-lock-help";
+      lockHelp.innerHTML = `${icon(
+        "lock",
+        10
+      )} 课题名称由院方统一配置，取消时令主题后可自定义。`;
+      input.insertAdjacentElement("afterend", lockHelp);
+    } else if (!locked && lockHelp) {
+      lockHelp.remove();
+    }
+  }
+
   function renderBookingStepOne() {
     const booking = state.booking;
     if (!booking) return "";
+    const topicLocked = bookingThemeTopicLocked(booking);
     return `
       <div class="flow-section ${bookingErrorClass("service")}">
         <div class="flow-section__head"><h2>服务类型</h2><span>选择到企服务形式</span></div>
@@ -5691,11 +5726,20 @@
         ${bookingFieldErrorMarkup("topics")}
         <div class="field">
           <label>活动主题 <span id="booking-topic-field-hint">${esc(
-            bookingTopicFieldHint(booking.serviceType)
+            topicLocked ? "已选时令主题 · 不可修改" : bookingTopicFieldHint(booking.serviceType)
           )}</span></label>
-          <input type="text" data-booking-field="customTopic" value="${esc(
-            booking.customTopic
-          )}" placeholder="如：职场人群心血管风险识别">
+          <input class="${topicLocked ? "is-locked" : ""}" type="text"
+            data-booking-field="customTopic" value="${esc(booking.customTopic)}"
+            placeholder="如：职场人群心血管风险识别"
+            ${topicLocked ? 'readonly aria-readonly="true"' : ""}>
+          ${
+            topicLocked
+              ? `<span id="booking-topic-lock-help" class="field-help booking-topic-lock-help">${icon(
+                  "lock",
+                  10
+                )} 课题名称由院方统一配置，取消时令主题后可自定义。</span>`
+              : ""
+          }
         </div>
         <div class="field-row">
           <div class="field"><label>参与人群</label>
@@ -5897,8 +5941,7 @@
     refreshBookingTopics();
     const demandHint = document.getElementById("booking-demand-hint");
     if (demandHint) demandHint.textContent = bookingDemandHint(service);
-    const topicFieldHint = document.getElementById("booking-topic-field-hint");
-    if (topicFieldHint) topicFieldHint.textContent = bookingTopicFieldHint(service);
+    syncBookingTopicField();
     const topicCoverage = bookingSelectedTopicCoverage(state.booking);
     if (topicCoverage && !topicCoverage.available) {
       showToast(
@@ -6016,6 +6059,7 @@
     booking.themeCoverage = "";
     const input = document.querySelector('[data-booking-field="customTopic"]');
     if (input) input.value = "";
+    syncBookingTopicField();
   }
 
   function chooseBookingTopic(month, topicIndex) {
@@ -6084,6 +6128,7 @@
       refreshBookingDoctors();
       refreshBookingDates();
       refreshBookingTopics();
+      syncBookingTopicField();
       showToast(`已取消主题「${title}」，时令主题为可选项。`);
       return;
     }
@@ -6111,6 +6156,7 @@
     booking.themeCoverage = coverage.label;
     const input = document.querySelector('[data-booking-field="customTopic"]');
     if (input) input.value = topic.title;
+    syncBookingTopicField();
     const doctorCleared = syncBookingDoctor(booking);
     refreshBookingDoctors();
     refreshBookingDates();

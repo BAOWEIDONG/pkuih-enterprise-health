@@ -933,6 +933,25 @@ textarea {
   color: #97a1b2;
 }
 
+.field > input.is-locked {
+  border-color: rgba(11, 49, 143, 0.18);
+  background: #f3f7ff;
+  color: var(--brand);
+  font-weight: 650;
+  cursor: default;
+}
+
+.booking-topic-lock-help {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--brand);
+}
+
+.booking-topic-lock-help svg {
+  flex: 0 0 auto;
+}
+
 .field-static {
   display: flex;
   min-height: 45px;
