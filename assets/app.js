@@ -27,7 +27,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261125-5";
+  const DATA_VERSION = "20261125-6";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -9347,20 +9347,27 @@
                   : `<p class="muted">暂无沟通记录。建议先电话联系机构确认需求。</p>`
               }
               <textarea data-demand-followup placeholder="记录电话沟通结果、可匹配专家或待确认事项"></textarea>
-              <div class="followup-card__actions">
-                <button class="btn btn--ghost btn--sm" type="button" data-action="admin-demand-followup">保存沟通记录</button>
-                <button class="btn btn--primary btn--sm" type="button" data-action="admin-demand-match">标记已匹配</button>
+              <div class="followup-card__actions ${
+                ["matched", "closed"].includes(demand.status)
+                  ? "is-single"
+                  : demand.status === "pending"
+                  ? ""
+                  : "is-contacted"
+              }">
+                <button class="btn ${
+                  demand.status === "pending" ? "btn--primary" : "btn--ghost"
+                } btn--sm" type="button" data-action="admin-demand-followup">${
+                  demand.status === "pending" ? "保存并标记已联系" : "保存沟通记录"
+                }</button>
+                ${
+                  ["matched", "closed"].includes(demand.status)
+                    ? ""
+                    : `<button class="btn ${
+                        demand.status === "pending" ? "btn--ghost" : "btn--primary"
+                      } btn--sm" type="button" data-action="admin-demand-match">标记已匹配</button>`
+                }
               </div>
             </section>
-            <div class="sheet-actions-row">
-              <a class="btn btn--soft" href="${esc(phoneHref(demand.phone))}">${icon(
-                "phone",
-                14
-              )} 拨打电话</a>
-              <button class="btn btn--ghost" type="button" data-action="admin-demand-contact">
-                标记已联系
-              </button>
-            </div>
             ${
               demand.status !== "closed"
                 ? `<button class="text-link text-link--danger record-cancel" type="button"
@@ -9370,7 +9377,6 @@
           </div>
         </div>
         <div class="sheet__footer">
-          <button class="btn btn--ghost" type="button" data-action="close-overlay">关闭</button>
           <a class="btn btn--primary" href="${esc(phoneHref(demand.phone))}">${icon(
             "phone",
             14

@@ -5219,6 +5219,14 @@ textarea {
   margin-top: 9px;
 }
 
+.followup-card__actions.is-single {
+  grid-template-columns: 1fr;
+}
+
+.followup-card__actions.is-contacted {
+  grid-template-columns: 0.9fr 1.1fr;
+}
+
 /* =========================================================
    Me & profile
    ========================================================= */
