@@ -7763,6 +7763,13 @@ textarea {
   min-width: 0;
 }
 
+.hospital-admin-card__titleline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
 .hospital-admin-card__head strong {
   display: -webkit-box;
   overflow: hidden;
@@ -7773,6 +7780,36 @@ textarea {
   white-space: normal;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.hospital-phone-chip {
+  display: inline-flex;
+  max-width: 138px;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  border: 1px solid rgba(11, 49, 143, 0.12);
+  border-radius: 7px;
+  background: #f3f7ff;
+  color: var(--brand);
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.hospital-phone-chip span {
+  overflow: hidden;
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  text-overflow: ellipsis;
+}
+
+.hospital-phone-chip svg:last-child {
+  flex: 0 0 auto;
+  color: #7f8ca1;
 }
 
 .hospital-admin-card__head span {

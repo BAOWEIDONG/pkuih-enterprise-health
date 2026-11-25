@@ -19,6 +19,7 @@
     slots: "pkuih_h6_slots",
     smsLogs: "pkuih_h6_sms_logs",
     marketingPosters: "pkuih_h6_marketing_posters",
+    hospitalConfig: "pkuih_h6_hospital_config",
     homeRegion: "pkuih_h6_home_region",
     homeHospital: "pkuih_h6_home_hospital",
     lastPortal: "pkuih_h6_portal",
@@ -27,7 +28,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261125-8";
+  const DATA_VERSION = "20261125-9";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -388,6 +389,7 @@
     adminAccountDraft: null,
     institutionAccountDraft: null,
     adminDoctorDraft: null,
+    hospitalPhoneDraft: null,
     adminTemplateDraft: null,
     marketingFilter: "all",
     marketingDraft: null,
@@ -925,6 +927,27 @@
 
   function hospitalById(id) {
     return state.hospitals.find((item) => item.id === id) || null;
+  }
+
+  function getHospitalConfigStore() {
+    return readJSON(STORAGE.hospitalConfig, {});
+  }
+
+  function applyHospitalConfig(hospitals) {
+    const store = getHospitalConfigStore();
+    return hospitals.map((hospital) => ({
+      ...hospital,
+      ...(store?.[hospital.id] || {})
+    }));
+  }
+
+  function saveHospitalConfig(hospitalId, patch) {
+    const store = getHospitalConfigStore();
+    store[hospitalId] = {
+      ...(store[hospitalId] || {}),
+      ...patch
+    };
+    writeJSON(STORAGE.hospitalConfig, store);
   }
 
   function versionedDefaultAvatar(path) {
@@ -2355,7 +2378,7 @@
           );
         });
         if (expert) {
-          const coverageCities = coverageCitiesFor(expert);
+          const coverageCities = defaultThemeCoverage(hospital);
           topics.push({
             id: `${month}-fallback-${topics.length}`,
             dept: topic.dept,
@@ -2784,6 +2807,7 @@
     state.adminAccountDraft = null;
     state.institutionAccountDraft = null;
     state.adminDoctorDraft = null;
+    state.hospitalPhoneDraft = null;
     state.adminTemplateDraft = null;
     state.adminThemeDraft = null;
     state.appointmentLocationDraft = null;
@@ -2900,6 +2924,7 @@
     if (type === "poster-upload") return paint(renderPosterUploadSheet());
     if (type === "admin-review") return paint(renderAdminReviewSheet());
     if (type === "admin-demand") return paint(renderAdminDemandSheet());
+    if (type === "hospital-phone") return paint(renderHospitalPhoneSheet());
     if (type === "admin-account") return paint(renderAdminAccountSheet());
     if (type === "admin-institution") return paint(renderInstitutionAccountSheet());
     if (type === "admin-doctor") return paint(renderAdminDoctorSheet());
@@ -7828,6 +7853,8 @@
     const appointments = appointmentsForUser(session.phone);
     const demands = demandsForUser(session.phone);
     const profileIssues = profileValidationErrors(session);
+    const hospital = nearestHospital(session);
+    const hospitalPhone = hospital?.phone || "";
     return `
       <div class="screen me-screen">
         <header class="page-head page-head--tight">
@@ -7893,9 +7920,11 @@
             <span><strong>企业资料</strong><small>姓名、职务、单位与通知邮箱</small></span>
             ${icon("chevronRight", 15)}
           </button>
-          <a href="${esc(phoneHref("010-69006900"))}">
+          <a href="${hospitalPhone ? esc(phoneHref(hospitalPhone)) : "#"}">
             <span class="me-menu__icon">${icon("phone", 17)}</span>
-            <span><strong>医院服务咨询</strong><small>010-69006900 · 工作日 9:00–18:00</small></span>
+            <span><strong>医院服务咨询</strong><small>${esc(
+              hospital?.short || hospital?.name || "当前医院"
+            )} · ${esc(hospitalPhone || "电话待补充")}</small></span>
             ${icon("chevronRight", 15)}
           </a>
         </section>
@@ -11591,6 +11620,91 @@
   /* =========================================================
      Admin hospitals & accounts
      ========================================================= */
+  function openHospitalPhoneEditor(hospitalId) {
+    if (!isSuperadmin()) return showToast("仅超级管理员可维护医院电话。");
+    const hospital = hospitalById(hospitalId);
+    if (!hospital) return;
+    state.hospitalPhoneDraft = {
+      hospitalId: hospital.id,
+      phone: hospital.phone || ""
+    };
+    state.overlay = { type: "hospital-phone" };
+    renderOverlay();
+  }
+
+  function renderHospitalPhoneSheet() {
+    const draft = state.hospitalPhoneDraft;
+    const hospital = hospitalById(draft?.hospitalId);
+    if (!draft || !hospital) return "";
+    return `
+      <div class="sheet-backdrop" data-action="close-overlay"></div>
+      <section class="sheet hospital-phone-sheet" role="dialog" aria-modal="true" aria-label="编辑医院电话">
+        <div class="sheet__grabber"></div>
+        <div class="sheet__bar">
+          <div><h2>编辑医院电话</h2><p>${esc(hospital.name)}</p></div>
+          <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">
+            ${icon("close", 15)}
+          </button>
+        </div>
+        <div class="sheet__body">
+          <div class="sheet-pad">
+            <div class="info-card">
+              <div class="info-row"><span>医院</span><strong>${esc(
+                hospital.name
+              )}</strong></div>
+              <div class="info-row"><span>所在地区</span><strong>${esc(
+                regionText(hospital.province, hospital.city)
+              )}</strong></div>
+            </div>
+            <div class="field">
+              <label>对外联系电话 <em>*</em></label>
+              <input type="tel" inputmode="tel" maxlength="24"
+                data-hospital-phone-input value="${esc(draft.phone)}"
+                placeholder="如：010-69007777">
+              <span class="field-help">${icon(
+                "phone",
+                11
+              )} 保存后同步到机构端「我的 · 医院服务咨询」，支持点击拨号。</span>
+            </div>
+          </div>
+        </div>
+        <div class="sheet__footer">
+          <button class="btn btn--ghost" type="button" data-action="close-overlay">取消</button>
+          <button class="btn btn--primary" type="button" data-action="hospital-phone-save">
+            保存电话 ${icon("check", 14)}
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
+  function saveHospitalPhoneDraft() {
+    if (!isSuperadmin()) return showToast("仅超级管理员可维护医院电话。");
+    const draft = state.hospitalPhoneDraft;
+    const hospital = hospitalById(draft?.hospitalId);
+    if (!draft || !hospital) return;
+    const phone = String(draft.phone || "").trim();
+    if (!/^[\d\s()+-]{6,24}$/.test(phone)) {
+      return showToast("请填写正确的医院联系电话。");
+    }
+    saveHospitalConfig(hospital.id, { phone });
+    state.hospitals = state.hospitals.map((item) =>
+      item.id === hospital.id ? { ...item, phone } : item
+    );
+    logOperation("更新医院联系电话", `${hospital.name} · ${phone}`, {
+      entityType: "hospital",
+      entityId: hospital.id,
+      hospitalId: hospital.id
+    });
+    const scroll = currentWindowScroll();
+    state.hospitalPhoneDraft = null;
+    state.overlay = null;
+    releaseOverlayHistory();
+    renderApp({ scrollTo: scroll });
+    document.body.classList.remove("is-locked");
+    showToast("医院电话已保存。");
+  }
+
   function renderAdminHospitalsPage() {
     if (!isSuperadmin()) {
       state.adminTab = "appointments";
@@ -11618,9 +11732,20 @@
             return `
               <article class="hospital-admin-card">
                 <div class="hospital-admin-card__head">
-                  <div><strong>${esc(hospital.name)}</strong><span>${esc(
-                    regionText(hospital.province, hospital.city)
-                  )}</span></div>
+                  <div>
+                    <div class="hospital-admin-card__titleline">
+                      <strong>${esc(hospital.name)}</strong>
+                      <button class="hospital-phone-chip" type="button"
+                        data-action="hospital-phone-edit" data-hospital-id="${esc(
+                          hospital.id
+                        )}" aria-label="编辑${esc(hospital.name)}联系电话">
+                        ${icon("phone", 9)}
+                        <span>${esc(hospital.phone || "电话待配置")}</span>
+                        ${icon("edit", 9)}
+                      </button>
+                    </div>
+                    <span>${esc(regionText(hospital.province, hospital.city))}</span>
+                  </div>
                   <span class="${operators.length ? "is-on" : "is-off"}">${
                     operators.length ? "已配置运营" : "待配置运营"
                   }</span>
@@ -12238,23 +12363,18 @@
 
   function visibleMarketingPosters() {
     const all = getMarketingPosters();
-    if (isSuperadmin()) {
-      return all.filter((poster) => {
-        if (state.marketingFilter === "official") return poster.source === "official";
-        if (state.marketingFilter === "hospital") return poster.source !== "official";
-        return true;
-      });
-    }
-    const hospital = operatorHospital();
-    const own = all.filter(
+    const scopeHospitalId = isSuperadmin()
+      ? state.adminHospitalId
+      : operatorHospital()?.id || "";
+    const official = all.filter((poster) => poster.source === "official");
+    const hospitalPosters = all.filter(
       (poster) =>
         poster.source !== "official" &&
-        poster.hospitalId === (hospital?.id || "")
+        (!scopeHospitalId || poster.hospitalId === scopeHospitalId)
     );
-    const official = all.filter((poster) => poster.source === "official");
     if (state.marketingFilter === "official") return official;
-    if (state.marketingFilter === "hospital") return own;
-    return [...official, ...own];
+    if (state.marketingFilter === "hospital") return hospitalPosters;
+    return [...official, ...hospitalPosters];
   }
 
   function renderMarketingPage() {
@@ -12265,7 +12385,9 @@
     const hospitalCount = all.filter(
       (poster) =>
         poster.source !== "official" &&
-        (isSuperadmin() || poster.hospitalId === (hospital?.id || ""))
+        (isSuperadmin()
+          ? !state.adminHospitalId || poster.hospitalId === state.adminHospitalId
+          : poster.hospitalId === (hospital?.id || ""))
     ).length;
     const hospitalFilterLabel = isSuperadmin() ? "医院上传" : "本院海报";
     return `
@@ -12813,6 +12935,10 @@
       const field = target.dataset.adminLogin;
       state.adminLogin = state.adminLogin || { username: "", password: "", error: "" };
       state.adminLogin[field] = target.value;
+      return;
+    }
+    if (target.matches("[data-hospital-phone-input]") && state.hospitalPhoneDraft) {
+      state.hospitalPhoneDraft.phone = target.value;
       return;
     }
     if (target.matches("[data-expert-search]")) {
@@ -13638,6 +13764,12 @@
       case "admin-hospital-operator":
         openAdminAccountEditor("", el.dataset.hospitalId, "operator");
         break;
+      case "hospital-phone-edit":
+        openHospitalPhoneEditor(el.dataset.hospitalId || "");
+        break;
+      case "hospital-phone-save":
+        saveHospitalPhoneDraft();
+        break;
       case "account-role":
         if (!state.adminAccountDraft) return;
         state.adminAccountDraft.role = el.dataset.value;
@@ -14341,7 +14473,7 @@
       const cities = citiesRes?.ok ? await citiesRes.json().catch(() => null) : null;
       if (!Array.isArray(experts) || !experts.length) throw new Error("专家数据为空");
       state.baseExperts = experts;
-      state.hospitals = hospitals;
+      state.hospitals = applyHospitalConfig(hospitals);
       state.seasonal = seasonal;
       state.themeMatches = matches;
       if (cities && typeof cities === "object" && !Array.isArray(cities)) state.chinaCities = cities;
