@@ -28,7 +28,6 @@
   <ellipse cx="120" cy="115" rx="37" ry="43" fill="#eac5a8"/>
   <path d="M84 111c1-30 16-47 36-47s35 17 36 47c-6-15-17-23-36-23s-30 8-36 23z" fill="#203448"/>
   <path d="M88 106c-2-27 12-43 32-43s34 16 32 43c-3-17-14-27-32-27s-29 10-32 27z" fill="url(#cap)"/>
-  <path d="M88 104c13-4 21-11 32-25 11 14 19 21 32 25-9 4-20 5-32 5s-23-1-32-5z" fill="#ffffff" opacity=".8"/>
   <ellipse cx="106" cy="115" rx="4" ry="4.8" fill="#334052"/>
   <ellipse cx="134" cy="115" rx="4" ry="4.8" fill="#334052"/>
   <path d="M98 106c4-2 8-2 12 0M130 106c4-2 8-2 12 0" stroke="#3d4654" stroke-width="2.2" fill="none" stroke-linecap="round"/>

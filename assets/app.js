@@ -27,7 +27,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261125-2";
+  const DATA_VERSION = "20261125-3";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -173,20 +173,6 @@
     "事业单位",
     "其他机构"
   ];
-  const THEME_COVERAGE_OPTIONS = [
-    "北京",
-    "北京/京外",
-    "天津",
-    "山东省",
-    "山东省内",
-    "山东省内、省外",
-    "山东省外",
-    "山西",
-    "深圳",
-    "湖南",
-    "全国"
-  ];
-
   const STATUS = {
     pending: { label: "待接单", cls: "is-pending", help: "已提交，等待院方接单" },
     planning: { label: "方案制作中", cls: "is-planning", help: "院方已接单，正在确认方案" },
@@ -937,15 +923,25 @@
     return state.hospitals.find((item) => item.id === id) || null;
   }
 
+  function versionedDefaultAvatar(path) {
+    return `${path}?v=${DATA_VERSION}`;
+  }
+
   function expertAvatar(expert) {
-    if (!expert) return AVATARS.neutral;
+    if (!expert) return versionedDefaultAvatar(AVATARS.neutral);
     if (expert.photoCard) return expert.photoCard;
     if (expert.photo) return expert.photo;
     if (expert.gender === "female") {
-      return expert.senior ? AVATARS.femaleSenior : AVATARS.female;
+      return versionedDefaultAvatar(
+        expert.senior ? AVATARS.femaleSenior : AVATARS.female
+      );
     }
-    if (expert.gender === "male") return expert.senior ? AVATARS.maleSenior : AVATARS.male;
-    return AVATARS.neutral;
+    if (expert.gender === "male") {
+      return versionedDefaultAvatar(
+        expert.senior ? AVATARS.maleSenior : AVATARS.male
+      );
+    }
+    return versionedDefaultAvatar(AVATARS.neutral);
   }
 
   function derivedCoverageCities(raw = "") {
@@ -1066,11 +1062,15 @@
     return [...new Set(cities)];
   }
 
-  function themeTopicCoverage(topic, theme, hospitalId = "") {
+  function resolveTopicCoverageCities(topic, theme, hospitalId = "") {
+    const expert = topic?.expertId ? expertById(topic.expertId) : null;
+    let cities = Array.isArray(topic?.coverageCities)
+      ? topic.coverageCities.filter(Boolean)
+      : [];
     let label = String(topic?.coverage || "").trim();
-    if (!label) {
+    if (!cities.length && label) cities = themeCoverageCitiesFromLabel(label);
+    if (!cities.length) {
       const hospital = hospitalById(hospitalId);
-      const expert = topic?.expertId ? expertById(topic.expertId) : null;
       const row = state.themeMatches.find((item) => {
         if (Number(item.month) !== Number(theme?.month)) return false;
         if (String(item.topic || "") !== String(topic?.title || "")) return false;
@@ -1086,19 +1086,27 @@
         return true;
       });
       label = row?.coverage || "";
+      if (label) cities = themeCoverageCitiesFromLabel(label);
     }
-    let cities = Array.isArray(topic?.coverageCities)
-      ? topic.coverageCities.filter(Boolean)
-      : [];
-    if (!cities.length && label) cities = themeCoverageCitiesFromLabel(label);
-    if (!cities.length) {
-      cities = Array.isArray(theme?.coverageCities)
-        ? theme.coverageCities.filter(Boolean)
-        : [];
+    if (!cities.length && expert) cities = coverageCitiesFor(expert);
+    if (!cities.length && Array.isArray(theme?.coverageCities)) {
+      cities = theme.coverageCities.filter(Boolean);
     }
     return {
-      label: coverageDisplayLabel(label || coverageText(cities)),
-      cities
+      cities: mergeCoverageCities(cities).filter(Boolean),
+      label: String(label || "").trim()
+    };
+  }
+
+  function themeTopicCoverage(topic, theme, hospitalId = "") {
+    const resolved = resolveTopicCoverageCities(topic, theme, hospitalId);
+    return {
+      label: coverageDisplayLabel(
+        resolved.cities.length
+          ? coverageText(resolved.cities)
+          : resolved.label || "待配置"
+      ),
+      cities: resolved.cities
     };
   }
 
@@ -1149,7 +1157,7 @@
   }
 
   function expertAvatarDetail(expert) {
-    if (!expert) return AVATARS.neutral;
+    if (!expert) return versionedDefaultAvatar(AVATARS.neutral);
     return expert.photoDetail || expertAvatar(expert);
   }
 
@@ -2315,12 +2323,14 @@
       )
       .map((row) => {
         const expert = byName.get(row.doctor);
+        const coverageCities = themeCoverageCitiesFromLabel(row.coverage);
         return {
           id: `${month}-${row.doctor}-${row.topic}`,
           dept: row.dept,
           title: row.topic,
           expertId: expert?.id || "",
-          coverage: row.coverage || ""
+          coverage: row.coverage || "",
+          coverageCities
         };
       });
     const seen = new Set();
@@ -2341,18 +2351,25 @@
           );
         });
         if (expert) {
+          const coverageCities = coverageCitiesFor(expert);
           topics.push({
             id: `${month}-fallback-${topics.length}`,
             dept: topic.dept,
             title: topic.title,
-            expertId: expert.id
+            expertId: expert.id,
+            coverage: coverageText(coverageCities),
+            coverageCities
           });
         }
       });
     }
     const expertIds = [...new Set(topics.map((topic) => topic.expertId).filter(Boolean))];
     const topicCoverageCities = mergeCoverageCities(
-      topics.flatMap((topic) => themeCoverageCitiesFromLabel(topic.coverage))
+      topics.flatMap(
+        (topic) =>
+          resolveTopicCoverageCities(topic, { month: Number(month) }, hospital.id)
+            .cities
+      )
     );
     return {
       month: Number(month),
@@ -2370,15 +2387,38 @@
     };
   }
 
-  function clientThemeTopics(theme, hospitalId = "") {
+  function clientThemeTopics(
+    theme,
+    hospitalId = "",
+    province = "",
+    city = "",
+    include = {}
+  ) {
     if (!theme) return [];
+    const includeId = String(include?.topicId || "");
+    const includeTitle = String(include?.title || "").trim();
     return (theme.topics || []).filter((topic) => {
       const expert = topic?.expertId ? expertById(topic.expertId) : null;
-      return Boolean(
+      const valid = Boolean(
         expert &&
           expert.active !== false &&
           matchesService(expert, "讲座") &&
           (!hospitalId || expert.hospitalId === hospitalId)
+      );
+      if (!valid) return false;
+      if (!province && !city) return true;
+      const selected =
+        (includeId &&
+          String(topic.id || "") === includeId) ||
+        (includeTitle &&
+          String(topic.title || "").trim() === includeTitle);
+      return (
+        selected ||
+        themeTopicCoversRegion(
+          themeTopicCoverage(topic, theme, hospitalId),
+          province,
+          city
+        )
       );
     });
   }
@@ -2400,6 +2440,23 @@
     const themes = Array.from({ length: 12 }, (_, index) => {
       const month = index + 1;
       const base = defaultThemeConfig(hospital.id, month);
+      const rawTopics =
+        saved[month]?.topics !== undefined ? saved[month].topics : base?.topics || [];
+      const themeLike = {
+        ...(base || {}),
+        ...(saved[month] || {}),
+        month
+      };
+      const topics = rawTopics.map((topic) => {
+        const resolved = resolveTopicCoverageCities(topic, themeLike, hospital.id);
+        return {
+          ...topic,
+          coverageCities: resolved.cities,
+          coverage: resolved.cities.length
+            ? coverageText(resolved.cities)
+            : topic.coverage || ""
+        };
+      });
       return {
         ...base,
         ...(saved[month] || {}),
@@ -2416,7 +2473,7 @@
                 : base?.expertIds || []
             )
           ],
-        topics: saved[month]?.topics !== undefined ? saved[month].topics : base?.topics || [],
+        topics,
         image: saved[month]?.image || base?.image || themeImageFor(month)
       };
     });
@@ -2432,17 +2489,25 @@
     if (!hospitalId || !draft?.month) return;
     const store = getThemeConfigStore();
     store[hospitalId] = store[hospitalId] || {};
+    const topics = (draft.topics || []).map((topic, index) => {
+      const resolved = resolveTopicCoverageCities(topic, draft, hospitalId);
+      return {
+        ...topic,
+        id: topic.id || `${draft.month}-custom-${index}-${Date.now()}`,
+        coverage: resolved.cities.length
+          ? coverageText(resolved.cities)
+          : String(topic.coverage || "").trim(),
+        coverageCities: resolved.cities
+      };
+    });
     store[hospitalId][draft.month] = {
       ...draft,
       month: Number(draft.month),
-      coverageCities: [...(draft.coverageCities || [])],
-      expertIds: [...new Set(draft.expertIds || [])],
-      topics: (draft.topics || []).map((topic, index) => ({
-        ...topic,
-        id: topic.id || `${draft.month}-custom-${index}-${Date.now()}`,
-        coverage: String(topic.coverage || "").trim(),
-        coverageCities: themeCoverageCitiesFromLabel(topic.coverage || "")
-      }))
+      coverageCities: mergeCoverageCities(
+        topics.flatMap((topic) => topic.coverageCities || [])
+      ),
+      expertIds: [...new Set(topics.map((topic) => topic.expertId).filter(Boolean))],
+      topics
     };
     saveThemeConfigStore(store);
     hospitalThemesCache.clear();
@@ -2819,6 +2884,7 @@
     if (type === "booking") return paint(renderBookingFlow());
     if (type === "doctor") return paint(renderDoctorSheet());
     if (type === "appointment") return paint(renderAppointmentSheet());
+    if (type === "appointment-action") return paint(renderAppointmentActionDialog());
     if (type === "plan-pdf") return paint(renderPlanPdfSheet());
     if (type === "appointment-location") return paint(renderAppointmentLocationSheet());
     if (type === "home-city") return paint(renderHomeCitySheet());
@@ -3541,7 +3607,9 @@
         </span>
         <span class="expert-mini__body">
           <span class="expert-mini__name">${esc(expert.name)}<i>${esc(expert.deptTitle)}</i></span>
-          <span class="expert-mini__hospital">${esc(expert.hospital)}</span>
+          <span class="expert-mini__hospital"><strong class="hospital-name">${esc(
+            expert.hospital
+          )}</strong></span>
           <span class="expert-mini__services">${(expert.services || [])
             .map((service) => `<span>${esc(serviceLabel(service))}</span>`)
             .join("")}</span>
@@ -3638,13 +3706,13 @@
                 .join("")}
             </select>
             <span class="hero-hospital__chevron">${icon("chevronDown", 13)}</span>
-            <button class="hero-hospital__city ${
-              locationFailed ? "is-needed" : ""
-            }" type="button" data-action="home-city-open">${
-              state.homeRegion ? "改城市" : "选择城市"
-            }</button>
           </span>
         </span>
+        <button class="hero-hospital__city ${
+          locationFailed ? "is-needed" : ""
+        }" type="button" data-action="home-city-open">${
+          state.homeRegion ? "改城市" : "选择城市"
+        }</button>
         <button class="hero-hospital__locate" type="button" data-action="home-use-location"
           aria-label="重新定位" title="重新定位">
           ${icon("crosshair", 15)}
@@ -3689,7 +3757,15 @@
       hospitalExperts.map((expert) => String(expert.dept || "").trim()).filter(Boolean)
     );
     const theme = hospital ? hospitalTheme(hospital.id, currentMonth()) : null;
-    const topicCount = hospital ? clientThemeTopics(theme, hospital.id).length : 0;
+    const region = currentClientRegion();
+    const topicCount = hospital
+      ? clientThemeTopics(
+          theme,
+          hospital.id,
+          region.province,
+          region.city
+        ).length
+      : 0;
     return `
       <div><strong>${hospitalExperts.length}<span>位</span></strong><small>本院专家</small></div>
       <div><strong>${departments.size}<span>个</span></strong><small>覆盖科室</small></div>
@@ -3796,9 +3872,18 @@
     const hospital = nearestHospital() || state.hospitals[0];
     const currentTheme = hospital ? hospitalTheme(hospital.id, month) : null;
     const season = seasonalOf(month);
+    const region = currentClientRegion();
     const topics = (
-      currentTheme ? clientThemeTopics(currentTheme, hospital?.id) : []
+      currentTheme
+        ? clientThemeTopics(
+            currentTheme,
+            hospital?.id,
+            region.province,
+            region.city
+          )
+        : []
     ).slice(0, 2);
+    if (!topics.length) return "";
     return `
         <section class="season-banner season-banner--media season-banner--art season-tone--${seasonKeyOf(
           month
@@ -4040,7 +4125,18 @@
     const hospital =
       hospitalById(state.overlay?.hospitalId) || nearestHospital() || state.hospitals[0];
     const theme = hospitalTheme(hospital?.id, month);
-    const topics = clientThemeTopics(theme, hospital?.id);
+    const fromBooking =
+      state.overlayStack.some((item) => item.type === "booking") &&
+      Boolean(state.booking);
+    const region = fromBooking
+      ? { province: state.booking.province, city: state.booking.city }
+      : currentClientRegion();
+    const topics = clientThemeTopics(
+      theme,
+      hospital?.id,
+      region.province,
+      region.city
+    );
     const topic = topicIndex >= 0 ? topics[topicIndex] : null;
     const coverage = topic
       ? themeTopicCoverage(topic, theme, hospital?.id)
@@ -4076,7 +4172,6 @@
     const boundExperts = themeExpertList(theme, hospital?.id);
     const topicIndex = Number(state.overlay?.topicIndex);
     const selectedTopic = Number.isInteger(topicIndex) && topicIndex >= 0 ? topicIndex : -1;
-    const topics = clientThemeTopics(theme, hospital?.id);
     const rawLocation =
       fromBooking && state.booking
         ? {
@@ -4097,6 +4192,18 @@
             };
           })();
     const location = normalizeRegion(rawLocation.province, rawLocation.city);
+    const topics = clientThemeTopics(
+      theme,
+      hospital?.id,
+      location.province,
+      location.city,
+      fromBooking && state.booking
+        ? {
+            topicId: state.booking.themeTopicId,
+            title: state.booking.customTopic
+          }
+        : {}
+    );
     const experts = boundExperts.filter((expert) =>
       expertThemeCoversRegion(
         expert,
@@ -4137,7 +4244,13 @@
     const bookableCount = topicRows.filter((row) => row.bookable).length;
     const selectedRow = selectedTopic >= 0 ? topicRows[selectedTopic] : null;
     const selectedAvailable = !selectedRow || selectedRow.available;
-    const coverageLabels = themeCoverageLabels(theme, hospital?.id);
+    const coverageLabels = [
+      ...new Set(topicRows.map((row) => row.coverage.label).filter(Boolean))
+    ];
+    const coverageSummary =
+      coverageLabels.length <= 1
+        ? coverageLabels[0] || "待院方配置"
+        : `${coverageLabels.length} 类`;
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet theme-sheet" role="dialog" aria-modal="true" aria-label="${
@@ -4191,9 +4304,7 @@
             <div class="theme-stats">
               <div><strong>${experts.length}</strong><span>位本院专家</span></div>
               <div><strong>${topics.length}</strong><span>个讲座课题</span></div>
-              <div><strong>${esc(
-                themeCoverageSummary(theme, hospital?.id)
-              )}</strong><span>主题履约范围</span></div>
+              <div><strong>${esc(coverageSummary)}</strong><span>主题履约范围</span></div>
             </div>
             <section class="theme-section">
               <div class="theme-section__head">
@@ -4398,9 +4509,9 @@
               ${availability.bookable ? `可约 ${formatMD(availability.next)}` : "暂无号源"}
             </span>
           </span>
-          <span class="expert-card__hospital">${icon("building", 12)} ${esc(expert.hospital)} · ${esc(
-            expert.dept
-          )}</span>
+          <span class="expert-card__hospital">${icon("building", 12)} <strong class="hospital-name">${esc(
+            expert.hospital
+          )}</strong> · ${esc(expert.dept)}</span>
           <span class="expert-card__intro">${esc(doctorExpertise(expert))}</span>
           <span class="expert-card__foot">
             <span class="expert-card__services">${serviceTags
@@ -5108,7 +5219,16 @@
   function bookingTopicChoices(booking) {
     if (booking?.serviceType !== "讲座") return [];
     const { expert, theme, hospitalId } = bookingTopicContext(booking);
-    const hospitalTopics = clientThemeTopics(theme, hospitalId);
+    const hospitalTopics = clientThemeTopics(
+      theme,
+      hospitalId,
+      booking?.province || "",
+      booking?.city || "",
+      {
+        topicId: booking?.themeTopicId || "",
+        title: booking?.customTopic || ""
+      }
+    );
     const expertTopics = expert
       ? hospitalTopics.filter((topic) => String(topic.expertId || "") === String(expert.id))
       : [];
@@ -5309,7 +5429,9 @@
                   data-action="booking-doctor-preview" data-value="${esc(expert.id)}">
                   <img src="${esc(expertAvatar(expert))}" alt="${esc(expert.name)}" loading="lazy">
                   <span><strong>${esc(expert.name)}<i>${esc(expert.deptTitle)}</i></strong>
-                    <small>${esc(expert.hospital)} · <b class="booking-doctor__availability booking-doctor__availability--${esc(
+                    <small><strong class="hospital-name">${esc(
+                      expert.hospital
+                    )}</strong> · <b class="booking-doctor__availability booking-doctor__availability--${esc(
                       entry.status
                     )}">${esc(entry.label)}</b> · <em>查看简介</em></small></span>
                 </button>
@@ -5856,7 +5978,17 @@
     const booking = state.booking;
     if (!booking) return;
     const { month, hospitalId, theme } = bookingTopicContext(booking);
-    const index = clientThemeTopics(theme, hospitalId).findIndex(
+    const topics = clientThemeTopics(
+      theme,
+      hospitalId,
+      booking.province,
+      booking.city,
+      {
+        topicId: booking.themeTopicId,
+        title: booking.customTopic
+      }
+    );
+    const index = topics.findIndex(
       (topic) => String(topic.title || "").trim() === String(title || "").trim()
     );
     if (index < 0) return showToast("该主题详情暂不可用。");
@@ -5882,7 +6014,16 @@
       bookingSelectedDoctor(booking)?.hospitalId ||
       "";
     const theme = hospitalTheme(hospitalId, Number(month));
-    const topic = clientThemeTopics(theme, hospitalId)[Number(topicIndex)];
+    const topic = clientThemeTopics(
+      theme,
+      hospitalId,
+      booking?.province || "",
+      booking?.city || "",
+      {
+        topicId: booking?.themeTopicId || "",
+        title: booking?.customTopic || ""
+      }
+    )[Number(topicIndex)];
     if (!booking || !topic) return showToast("该主题暂不可用。");
     if (Number(month) !== currentMonth()) {
       return showToast("非本月时令主题仅可浏览，不能预约。");
@@ -6503,7 +6644,9 @@
           <span>${icon("experts", 12)} ${esc(
             expert ? expert.name : appointment.doctorName || "专家待确认"
           )}</span>
-          <span>${icon("building", 12)} ${esc(hospital?.short || hospital?.name || "")}</span>
+          <span>${icon("building", 12)} <strong class="hospital-name">${esc(
+            hospital?.short || hospital?.name || ""
+          )}</strong></span>
         </div>
         <div class="record-card__assignee">
           ${icon("user", 12)}
@@ -6557,6 +6700,7 @@
 
   function renderDemandCard(demand) {
     const targetName = demandTargetName(demand);
+    const isGroup = demand.targetType === "group";
     const meta = DEMAND_STATUS[demand.status] || DEMAND_STATUS.pending;
     return `
       <article class="record-card" role="button" tabindex="0" data-action="open-demand-detail"
@@ -6575,11 +6719,13 @@
           ${icon("phone", 12)}
           ${
             demand.assignedStaff
-              ? `院方对接人 <strong>${esc(demand.assignedStaff.name)}</strong> · ${phoneLink(
+              ? `${isGroup ? "集团对接人" : "院方对接人"} <strong>${esc(
+                  demand.assignedStaff.name
+                )}</strong> · ${phoneLink(
                   demand.assignedStaff.phone,
                   demand.assignedStaff.phone
                 )}`
-              : "提交后由医院运营电话联系"
+              : `提交后由${isGroup ? "集团企康版管理员" : "医院运营"}电话联系`
           }
         </div>
         <div class="record-card__foot">
@@ -6900,26 +7046,7 @@
             }
             ${
               appointment.status === "review"
-                ? action === "confirm"
-                  ? `<div class="confirm-card">
-                      <h3>确认最终预约？</h3>
-                      <p>确认后预约正式生效，院方将按方案执行。如需调整，请选择“提出修改”。</p>
-                      <div class="confirm-card__actions">
-                        <button class="btn btn--ghost btn--sm" type="button" data-action="appointment-action" data-value="">再看看</button>
-                        <button class="btn btn--primary btn--sm" type="button" data-action="appointment-confirm">确认最终预约</button>
-                      </div>
-                    </div>`
-                  : action === "revise"
-                  ? `<div class="confirm-card">
-                      <h3>提出修改意见</h3>
-                      <p>请说明需要调整的主题、时间、地点或流程，院方会更新方案后再次发送。</p>
-                      <textarea data-revise-note placeholder="请输入修改意见"></textarea>
-                      <div class="confirm-card__actions">
-                        <button class="btn btn--ghost btn--sm" type="button" data-action="appointment-action" data-value="">取消</button>
-                        <button class="btn btn--primary btn--sm" type="button" data-action="appointment-revise-submit">提交修改意见</button>
-                      </div>
-                    </div>`
-                  : policy.canModify
+                ? policy.canModify
                   ? `<div class="review-actions">
                       <button class="btn btn--primary" type="button" data-action="appointment-action" data-value="confirm">确认最终预约</button>
                       <button class="btn btn--ghost" type="button" data-action="appointment-action" data-value="revise">提出修改</button>
@@ -6984,39 +7111,9 @@
                 : ""
             }
             ${
-              action === "change"
-                ? `<div class="confirm-card">
-                    <h3>申请修改已确认方案</h3>
-                    <p>提交后院方会更新方案并再次发送确认。${
-                      policy.cycleDays < 30
-                        ? "本次会占用 14 天周期内 1 次修改机会。"
-                        : ""
-                    }</p>
-                    <textarea data-change-note placeholder="请说明需要修改的主题、时间、地点、流程或其他内容"></textarea>
-                    <div class="confirm-card__actions">
-                      <button class="btn btn--ghost btn--sm" type="button" data-action="appointment-action" data-value="">取消</button>
-                      <button class="btn btn--primary btn--sm" type="button" data-action="appointment-change-submit">提交修改申请</button>
-                    </div>
-                  </div>`
-                : ""
-            }
-            ${
-              action === "cancel"
-                ? `<div class="confirm-card">
-                    <h3>取消本次预约？</h3>
-                    <p>取消后号源会释放，如需重新预约请再次提交。${
-                      appointment.status === "confirmed"
-                        ? "已确认预约取消后将同步通知院方。"
-                        : ""
-                    }</p>
-                    <div class="confirm-card__actions">
-                      <button class="btn btn--ghost btn--sm" type="button" data-action="appointment-action" data-value="">保留预约</button>
-                      <button class="btn btn--danger btn--sm" type="button" data-action="appointment-cancel-submit">确认取消</button>
-                    </div>
-                  </div>`
-                : ["pending", "planning", "review", "revision"].includes(
-                    appointment.status
-                  ) && policy.canCancel
+              ["pending", "planning", "review", "revision"].includes(
+                appointment.status
+              ) && policy.canCancel
                 ? `<button class="text-link text-link--danger record-cancel" type="button"
                     data-action="appointment-action" data-value="cancel">取消本次预约</button>`
                 : ""
@@ -7036,6 +7133,117 @@
         </div>
       </section>
     `;
+  }
+
+  function renderAppointmentActionDialog() {
+    const appointment = appointmentById(state.overlay?.appointmentId);
+    if (!appointment) return "";
+    const mode = state.overlay?.mode || "";
+    const policy = appointmentChangePolicy(appointment);
+    const hospital = hospitalById(appointment.hospitalId);
+    const isNoteMode = mode === "change" || mode === "revise";
+    const config = {
+      confirm: {
+        iconName: "checkCircle",
+        tone: "is-confirm",
+        title: "确认最终预约？",
+        desc: "确认后预约正式生效，院方将按当前方案执行。如需调整，请先提出修改。",
+        cancelText: "再看看",
+        submitText: "确认最终预约",
+        action: "appointment-confirm",
+        submitClass: "btn--primary"
+      },
+      revise: {
+        iconName: "edit",
+        tone: "is-modify",
+        title: "提出修改意见",
+        desc: "说明需要调整的主题、时间、地点或流程，院方更新方案后会再次发送确认。",
+        cancelText: "返回方案",
+        submitText: "提交修改意见",
+        action: "appointment-revise-submit",
+        submitClass: "btn--primary"
+      },
+      change: {
+        iconName: "edit",
+        tone: "is-modify",
+        title: "申请修改已确认方案",
+        desc: `提交后院方会更新方案并重新发送确认。${
+          policy.cycleDays < 30
+            ? "本次会占用 14 天周期内 1 次修改机会。"
+            : ""
+        }`,
+        cancelText: "暂不修改",
+        submitText: "提交修改申请",
+        action: "appointment-change-submit",
+        submitClass: "btn--primary"
+      },
+      cancel: {
+        iconName: "alert",
+        tone: "is-cancel",
+        title: "取消本次预约？",
+        desc: `取消后号源会释放，如需重新预约请再次提交。当前预约需提前 ${
+          policy.cancelLeadDays
+        } 天取消${
+          policy.remainingDays == null ? "" : `，距活动还有 ${policy.remainingDays} 天`
+        }。`,
+        cancelText: "保留预约",
+        submitText: "确认取消",
+        action: "appointment-cancel-submit",
+        submitClass: "btn--danger"
+      }
+    }[mode];
+    if (!config) return "";
+    return `
+      <div class="sheet-backdrop appointment-dialog-backdrop" data-action="close-overlay"></div>
+      <section class="appointment-action-dialog ${config.tone}" role="dialog" aria-modal="true"
+        aria-label="${esc(config.title)}">
+        <div class="appointment-action-dialog__head">
+          <span class="appointment-action-dialog__icon">${icon(config.iconName, 20)}</span>
+          <button class="appointment-action-dialog__close" type="button"
+            data-action="close-overlay" aria-label="关闭">
+            ${icon("close", 14)}
+          </button>
+        </div>
+        <div class="appointment-action-dialog__context">
+          <small>${esc(serviceLabel(appointment.serviceType))} · ${esc(
+            hospital?.short || hospital?.name || ""
+          )}</small>
+          <strong>${esc(topicOf(appointment))}</strong>
+          <span>${esc(formatDateCN(appointment.date, true))}</span>
+        </div>
+        <h2>${esc(config.title)}</h2>
+        <p>${esc(config.desc)}</p>
+        ${
+          isNoteMode
+            ? `<label class="appointment-action-dialog__field">
+                <span>修改内容</span>
+                <textarea ${
+                  mode === "revise" ? "data-revise-note" : "data-change-note"
+                } rows="4" placeholder="请写清楚需要调整的内容，方便院方一次更新到位"></textarea>
+              </label>`
+            : ""
+        }
+        ${
+          mode === "cancel" && appointment.plan
+            ? `<div class="appointment-action-dialog__hint">${icon("shield", 13)} 取消后，院方将收到状态变更；已上传的方案附件会保留在历史记录中。</div>`
+            : ""
+        }
+        <div class="appointment-action-dialog__actions">
+          <button class="btn btn--ghost" type="button" data-action="close-overlay">${esc(
+            config.cancelText
+          )}</button>
+          <button class="btn ${config.submitClass}" type="button"
+            data-action="${config.action}">${esc(config.submitText)}</button>
+        </div>
+      </section>
+    `;
+  }
+
+  function returnFromAppointmentAction(action = "") {
+    if (!popOverlayLayer()) return false;
+    if (state.overlay?.type === "appointment") state.overlay.action = action;
+    renderApp({ scrollTo: currentWindowScroll() });
+    return true;
   }
 
   function openAppointmentLocationEdit(appointmentId) {
@@ -7427,13 +7635,18 @@
     state.clientRecordTab = "demands";
     state.tab = "appointments";
     renderApp({ scrollTo: 0 });
-    showToast("提需已提交，医院运营会尽快电话联系。");
+    showToast(
+      demand.targetType === "group"
+        ? "提需已提交，集团企康版将由超级管理员跟进。"
+        : "提需已提交，医院运营会尽快电话联系。"
+    );
   }
 
   function renderDemandSheet() {
     const demand = demandById(state.overlay?.demandId);
     if (!demand) return "";
     const targetName = demandTargetName(demand);
+    const isGroup = demand.targetType === "group";
     const meta = DEMAND_STATUS[demand.status] || DEMAND_STATUS.pending;
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
@@ -7459,6 +7672,17 @@
               </div>
               <span class="status-pill ${meta.cls}">${esc(meta.label)}</span>
             </div>
+            ${
+              isGroup
+                ? `<section class="demand-route-note">
+                    ${icon("shield", 15)}
+                    <div>
+                      <strong>集团企康版 · 超级管理员跟进</strong>
+                      <p>该需求不会进入具体医院需求池，由超级管理员统一联系、分配并跟进落地。</p>
+                    </div>
+                  </section>`
+                : ""
+            }
             <section class="info-card">
               <div class="info-row"><span>目标机构</span><strong>${esc(
                 targetName
@@ -7472,7 +7696,7 @@
               <div class="info-row"><span>联系人</span><strong>${esc(
                 demand.contactName
               )} · ${phoneLink(demand.phone, demand.phone)}</strong></div>
-              <div class="info-row"><span>院方对接人</span><strong>${assigneeMarkup(
+              <div class="info-row"><span>${isGroup ? "集团对接人" : "院方对接人"}</span><strong>${assigneeMarkup(
                 demand.assignedStaff
               )}</strong></div>
               ${
@@ -7485,7 +7709,9 @@
             </section>
             ${
               demand.followUps?.length
-                ? `<section class="feedback-card"><span>院方沟通记录</span>${demand.followUps
+                ? `<section class="feedback-card"><span>${
+                    isGroup ? "集团沟通记录" : "院方沟通记录"
+                  }</span>${demand.followUps
                     .map(
                       (item) =>
                         `<p>${esc(item.note)}<small>${esc(
@@ -7508,7 +7734,7 @@
             demand.assignedStaff
               ? `<a class="btn btn--ghost" href="${esc(
                   phoneHref(demand.assignedStaff.phone)
-                )}">${icon("phone", 15)} 联系院方</a>`
+                )}">${icon("phone", 15)} 联系${isGroup ? "集团" : "院方"}</a>`
               : `<button class="btn btn--ghost" type="button" data-action="close-overlay">返回</button>`
           }
           <button class="btn btn--primary" type="button" data-action="close-overlay">关闭</button>
@@ -7812,7 +8038,6 @@
     state.adminHospitalId = account.role === "operator" ? account.hospitalId : "";
     setLastPortal("admin");
     renderApp({ scrollTo: 0 });
-    showToast(`已进入${ROLE[account.role]?.label || "院方"}工作台。`);
   }
 
   function adminRoleMeta(account) {
@@ -7999,7 +8224,7 @@
         <h3>${esc(topicOf(appointment))}</h3>
         <div class="admin-record__tags">
           <span>${esc(serviceLabel(appointment.serviceType))}</span>
-          <span>${esc(hospital?.short || "")}</span>
+          <span class="is-hospital">${esc(hospital?.short || "")}</span>
           <span>${esc(expert ? expert.name : appointment.doctorName || "待匹配专家")}</span>
           ${pushPending ? '<span class="is-push">推送待发送</span>' : ""}
         </div>
@@ -8284,6 +8509,8 @@
       ),
       feedback: "",
       feedbackAt: "",
+      changeRequest: null,
+      previousStatus: "",
       planSentAt: new Date().toISOString(),
       requestedDate: appointment.requestedDate || appointment.date,
       date: fields.date,
@@ -8460,7 +8687,13 @@
               </div>
               ${
                 appointment.feedback
-                  ? `<div class="feedback-card"><span>机构修改意见</span><p>${esc(
+                  ? `<div class="feedback-card"><span>${
+                      appointment.changeRequest?.type === "confirmed-change"
+                        ? "已确认方案 · 机构修改申请"
+                        : appointment.status === "revision"
+                        ? "机构修改意见 · 待处理"
+                        : "机构修改意见"
+                    }</span><p>${esc(
                       appointment.feedback
                     )}</p><small>${esc(formatDateTime(appointment.feedbackAt))}</small></div>`
                   : ""
@@ -8475,6 +8708,17 @@
                         appointment.status === "completed" ? "活动已完成归档" : "预约已取消"
                       }</strong>
                       <p>终态预约仅供查看，方案、活动地点与内部备注不可再编辑。</p>
+                    </div>
+                  </div>`
+                : ""
+            }
+            ${
+              !saved && appointment.status === "revision"
+                ? `<div class="review-state-banner is-revision">
+                    ${icon("edit", 18)}
+                    <div>
+                      <strong>机构已提出修改，等待本院更新方案</strong>
+                      <p>请根据下方“机构修改意见”调整课题、专家、日期、流程或说明。保存后会重新发送给机构确认，并生成新的推送通知。</p>
                     </div>
                   </div>`
                 : ""
@@ -8753,7 +8997,13 @@
                 </button>`
               : canEdit
               ? `<button class="btn btn--primary" type="button" data-action="review-save">
-                  ${appointment.plan ? "保存并重新发送" : "保存方案并发送"} ${icon("send", 14)}
+                  ${
+                    appointment.status === "revision"
+                      ? "更新方案并重新发送"
+                      : appointment.plan
+                      ? "保存并重新发送"
+                      : "保存方案并发送"
+                  } ${icon("send", 14)}
                 </button>`
               : terminal
               ? ""
@@ -9008,6 +9258,7 @@
     const demand = demandById(state.adminDemandId);
     if (!demand) return "";
     const targetName = demandTargetName(demand);
+    const isGroup = demand.targetType === "group";
     const meta = DEMAND_STATUS[demand.status] || DEMAND_STATUS.pending;
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
@@ -9033,6 +9284,17 @@
               </div>
               <span class="status-pill ${meta.cls}">${esc(meta.label)}</span>
             </div>
+            ${
+              isGroup
+                ? `<section class="demand-route-note">
+                    ${icon("shield", 15)}
+                    <div>
+                      <strong>集团企康版 · 超级管理员需求池</strong>
+                      <p>该需求仅超级管理员可见，请直接电话联系机构并统筹匹配，不需要分配具体医院运营。</p>
+                    </div>
+                  </section>`
+                : ""
+            }
             <section class="info-card">
               <div class="info-row"><span>机构</span><strong>${esc(demand.orgName)}</strong></div>
               <div class="info-row"><span>目标机构</span><strong>${esc(
@@ -9047,7 +9309,7 @@
               <div class="info-row"><span>活动地区</span><strong>${esc(
                 regionText(demand.province, demand.city)
               )}</strong></div>
-              <div class="info-row"><span>院方对接人</span><strong>${assigneeMarkup(
+              <div class="info-row"><span>${isGroup ? "集团对接人" : "院方对接人"}</span><strong>${assigneeMarkup(
                 demand.assignedStaff
               )}</strong></div>
               ${
@@ -9484,7 +9746,9 @@
         <img src="${esc(expertAvatar(doctor))}" alt="${esc(doctor.name)}">
         <div>
           <strong>${esc(doctor.name)} · ${esc(tierOf(doctor).short)}</strong>
-          <span>${esc(doctor.hospital)} · ${esc(doctor.deptTitle)}</span>
+          <span><strong class="hospital-name">${esc(doctor.hospital)}</strong> · ${esc(
+            doctor.deptTitle
+          )}</span>
           <small>${esc(doctor.leadLabel)} · 按整天配置，不区分时段</small>
         </div>
         <select data-slot-doctor>
@@ -10086,7 +10350,7 @@
     const hospital = adminThemeHospital();
     return `
       <div class="admin-page-head">
-        <div><h1>时令主题</h1><p>按月配置课题、绑定专家与讲座覆盖城市</p></div>
+        <div><h1>时令主题</h1><p>按月配置课题、主讲专家与课题履约地</p></div>
       </div>
       ${renderAdminTabs()}
       ${renderAdminHospitalFilter()}
@@ -10098,7 +10362,7 @@
               12
             )} ${esc(
               hospital.name
-            )} 的 12 个月主题独立生效；机构端看到的课题、专家与覆盖城市以这里保存的内容为准。</p>
+            )} 的 12 个月主题独立生效；机构端仅展示当前城市落在课题履约地内的主题。</p>
             <div class="admin-theme-grid">
               ${hospitalThemes(hospital.id)
                 .map(
@@ -10140,36 +10404,60 @@
     if (!theme) return;
     state.adminThemeMonth = Number(month);
     state.adminThemeDraft = clone(theme);
-    state.adminThemeDraft.expertIds = [...new Set(state.adminThemeDraft.expertIds || [])];
-    const coverageProvince = coverageProvinceForCities(
-      state.adminThemeDraft.coverageCities,
-      hospital.province
-    );
-    const selectedCity = (state.adminThemeDraft.coverageCities || []).find(
-      (city) =>
-        city !== "全国" &&
-        (state.chinaCities?.[coverageProvince] || []).includes(city)
-    );
-    state.adminThemeDraft.coverageProvince = coverageProvince;
-    state.adminThemeDraft.coverageCity =
-      selectedCity || state.chinaCities?.[coverageProvince]?.[0] || coverageProvince;
+    const draft = state.adminThemeDraft;
+    draft.expertIds = [...new Set(draft.expertIds || [])];
+    draft.topics = (draft.topics || []).map((topic) => {
+      const resolved = resolveTopicCoverageCities(topic, draft, hospital.id);
+      const coverageProvince = coverageProvinceForCities(
+        resolved.cities,
+        hospital.province
+      );
+      const selectedCity = resolved.cities.find(
+        (city) =>
+          city !== "全国" &&
+          (state.chinaCities?.[coverageProvince] || []).includes(city)
+      );
+      return {
+        ...topic,
+        coverageCities: resolved.cities,
+        coverage: resolved.cities.length
+          ? coverageText(resolved.cities)
+          : topic.coverage || "",
+        coverageProvince,
+        coverageCity:
+          selectedCity ||
+          state.chinaCities?.[coverageProvince]?.[0] ||
+          coverageProvince
+      };
+    });
     state.overlay = { type: "admin-theme" };
     renderOverlay();
   }
 
-  function refreshThemeCoverageChips() {
-    if (!state.adminThemeDraft) return;
-    const chips = document.getElementById("theme-coverage-chips");
+  function refreshThemeTopicCoverageChips(index) {
+    const topic = state.adminThemeDraft?.topics?.[Number(index)];
+    if (!topic) return;
+    const chips = document.getElementById(`theme-topic-coverage-chips-${index}`);
     if (chips) {
       chips.innerHTML =
-        coverageChipsMarkup(state.adminThemeDraft.coverageCities || [], "theme-city-remove") ||
-        "<small>尚未选择覆盖城市</small>";
+        coverageChipsMarkup(
+          topic.coverageCities || [],
+          "theme-topic-coverage-remove"
+        ) ||
+        "<small>尚未选择课题履约地</small>";
+      chips.dataset.index = String(index);
     }
-    const national = document.querySelector('[data-action="theme-coverage-national"]');
+    const national = document.querySelector(
+      `[data-action="theme-topic-coverage-national"][data-index="${index}"]`
+    );
     if (national) {
       national.classList.toggle(
         "is-active",
-        Boolean(state.adminThemeDraft.coverageCities?.includes("全国"))
+        Boolean(topic.coverageCities?.includes("全国"))
+      );
+      national.setAttribute(
+        "aria-pressed",
+        topic.coverageCities?.includes("全国") ? "true" : "false"
       );
     }
   }
@@ -10233,46 +10521,7 @@
               </div>
             </div>
             <div class="field">
-              <label>讲座覆盖城市 <em>*</em> <span>省市级联，可多选</span></label>
-              <div class="theme-city-editor doctor-coverage-editor">
-                <div class="theme-city-chips" id="theme-coverage-chips">
-                  ${coverageChipsMarkup(
-                    draft.coverageCities || [],
-                    "theme-city-remove"
-                  ) || "<small>尚未选择覆盖城市</small>"}
-                </div>
-                <div class="doctor-coverage-controls">
-                  <button class="coverage-national ${
-                    draft.coverageCities?.includes("全国") ? "is-active" : ""
-                  }" type="button" data-action="theme-coverage-national">
-                    <span class="coverage-national__icon">${icon("mapPin", 14)}</span>
-                    <span><strong>全国（不限城市）</strong><small>覆盖全国任意履约城市</small></span>
-                    <span class="coverage-national__check">${icon("check", 12)}</span>
-                  </button>
-                  <div class="field-row doctor-coverage-picker">
-                    <div class="field">
-                      <label>省份</label>
-                      <select data-theme-coverage-province>${renderProvinceOptions(
-                        draft.coverageProvince
-                      )}</select>
-                    </div>
-                    <div class="field">
-                      <label>城市</label>
-                      <select data-theme-coverage-city>${renderCoverageCitySelectOptions(
-                        draft.coverageProvince,
-                        draft.coverageCity
-                      )}</select>
-                    </div>
-                  </div>
-                  <button class="btn btn--ghost btn--sm" type="button" data-action="theme-coverage-add">
-                    ${icon("plus", 13)} 添加当前城市
-                  </button>
-                  <span class="field-help">先选省份再选城市，点击“添加当前城市”加入；可继续切换省份添加多个城市。含“京外”或“省外”的履约地，机构端按全国可履约展示。</span>
-                </div>
-              </div>
-            </div>
-            <div class="field">
-              <label>讲座课题与主讲专家 <span>每位专家只需在课题中选择一次</span></label>
+              <label>讲座课题与履约配置 <span>课题、主讲专家、履约地按课题独立保存</span></label>
               <div class="theme-topic-editor">
                 ${(draft.topics || [])
                   .map(
@@ -10306,18 +10555,66 @@
                               .join("")}
                           </select>
                         </div>
-                        <label class="theme-topic-coverage-field">
-                          <span>课题履约地</span>
-                          <select data-theme-topic-field="coverage" data-index="${index}">
-                            <option value="">沿用主题覆盖城市</option>
-                            ${THEME_COVERAGE_OPTIONS.map(
-                              (coverage) =>
-                                `<option value="${esc(coverage)}" ${
-                                  topic.coverage === coverage ? "selected" : ""
-                                }>${esc(coverage)}</option>`
-                            ).join("")}
-                          </select>
-                        </label>
+                        <div class="theme-topic-coverage" data-topic-coverage-index="${index}">
+                          <div class="theme-topic-coverage__head">
+                            <span>课题履约地 <em>*</em></span>
+                            <small>省市级联 · 可多选</small>
+                          </div>
+                          <div class="theme-city-chips theme-topic-city-chips"
+                            id="theme-topic-coverage-chips-${index}" data-index="${index}">
+                            ${coverageChipsMarkup(
+                              topic.coverageCities || [],
+                              "theme-topic-coverage-remove"
+                            ) || "<small>尚未选择课题履约地</small>"}
+                          </div>
+                          <div class="theme-topic-city-controls">
+                            <div class="field-row">
+                              <div class="field">
+                                <label>省份</label>
+                                <select data-theme-topic-coverage-province data-index="${index}">
+                                  ${renderProvinceOptions(topic.coverageProvince)}
+                                </select>
+                              </div>
+                              <div class="field">
+                                <label>城市</label>
+                                <select data-theme-topic-coverage-city data-index="${index}">
+                                  ${renderCoverageCitySelectOptions(
+                                    topic.coverageProvince,
+                                    topic.coverageCity
+                                  )}
+                                </select>
+                              </div>
+                            </div>
+                            <div class="theme-topic-city-actions">
+                              <button class="btn btn--soft btn--sm" type="button"
+                                data-action="theme-topic-coverage-add" data-index="${index}">
+                                ${icon("plus", 12)} 添加城市
+                              </button>
+                              <button class="coverage-national ${
+                                topic.coverageCities?.includes("全国")
+                                  ? "is-active"
+                                  : ""
+                              }" type="button" data-action="theme-topic-coverage-national"
+                                data-index="${index}" aria-pressed="${
+                                  topic.coverageCities?.includes("全国") ? "true" : "false"
+                                }">
+                                <span class="coverage-national__icon">${icon(
+                                  "mapPin",
+                                  12
+                                )}</span>
+                                <span><strong>全国</strong><small>不限城市</small></span>
+                                <span class="coverage-national__check">${icon(
+                                  "check",
+                                  10
+                                )}</span>
+                              </button>
+                              <button class="theme-topic-coverage__from-expert" type="button"
+                                data-action="theme-topic-coverage-from-expert" data-index="${index}">
+                                ${icon("sparkles", 11)} 使用专家履约地
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     `
                   )
@@ -10327,7 +10624,7 @@
                 ${icon("plus", 12)} 添加讲座课题
               </button>
             </div>
-            <p class="field-help">主讲专家直接跟随课题关联，无需再重复绑定；机构端将按这里的课题、专家和城市范围展示。每个课题的履约地独立于专家日常服务范围，未单独配置时沿用主题覆盖城市。</p>
+            <p class="field-help">每个课题独立配置主讲专家与履约城市；切换专家后可一键套用该专家的履约范围。机构端只展示当前城市在课题履约地内的主题，不在范围内的城市不展示、也不能预约。</p>
           </div>
         </div>
         <div class="sheet__footer">
@@ -10360,7 +10657,6 @@
     if (!draft.topics?.length || draft.topics.some((topic) => !topic.title?.trim())) {
       return showToast("请至少完整填写一个讲座课题。");
     }
-    if (!draft.coverageCities?.length) return showToast("请至少选择一个覆盖城市。");
     const invalidTopic = draft.topics.find((topic) => {
       const expert = topic.expertId ? expertById(topic.expertId) : null;
       return (
@@ -10378,11 +10674,12 @@
     }
     const invalidCoverage = draft.topics.find(
       (topic) =>
-        topic.coverage &&
-        !THEME_COVERAGE_OPTIONS.includes(String(topic.coverage).trim())
+        !resolveTopicCoverageCities(topic, draft, hospital.id).cities.length
     );
     if (invalidCoverage) {
-      return showToast(`课题「${invalidCoverage.title}」的履约地选项无效，请重新选择。`);
+      return showToast(
+        `课题「${invalidCoverage.title || "未填写"}」请至少选择一个履约城市，或点击“使用专家履约地”。`
+      );
     }
     draft.expertIds = [
       ...new Set(draft.topics.map((topic) => topic.expertId).filter(Boolean))
@@ -10460,9 +10757,9 @@
             }</span>
           </span>
           <span class="doctor-admin-card__role">${esc(expert.deptTitle)} · ${esc(expert.dept)}</span>
-          <span class="doctor-admin-card__hospital">${esc(expert.hospital)} · ${esc(
-            coverageText(expert)
-          )}</span>
+          <span class="doctor-admin-card__hospital"><strong class="hospital-name">${esc(
+            expert.hospital
+          )}</strong> · ${esc(coverageText(expert))}</span>
           <span class="doctor-admin-card__services">${(expert.services || [])
         .map((service) => `<span>${esc(serviceLabel(service))}</span>`)
             .join("")}<i>${esc(expert.leadLabel)}</i>${
@@ -11424,12 +11721,15 @@
                   value="${esc(draft.email || "")}" placeholder="name@company.com">
               </div>
             </div>
-            <div class="field">
-              <label>所在省市</label>
-              <div class="field-row">
+            <div class="field-row">
+              <div class="field">
+                <label>所在省份</label>
                 <select data-institution-province>${renderProvinceOptions(
                   draft.province
                 )}</select>
+              </div>
+              <div class="field">
+                <label>所在城市</label>
                 <select data-institution-city>${renderCityOptions(
                   draft.province,
                   draft.city
@@ -12571,21 +12871,34 @@
       state.institutionAccountDraft.city = target.value;
       return;
     }
-    if (target.matches("[data-theme-coverage-province]") && state.adminThemeDraft) {
-      state.adminThemeDraft.coverageProvince = target.value;
-      state.adminThemeDraft.coverageCity =
+    if (
+      target.matches("[data-theme-topic-coverage-province]") &&
+      state.adminThemeDraft
+    ) {
+      const topic =
+        state.adminThemeDraft.topics?.[Number(target.dataset.index)];
+      if (!topic) return;
+      topic.coverageProvince = target.value;
+      topic.coverageCity =
         (state.chinaCities?.[target.value] || [target.value])[0] || target.value;
-      const city = document.querySelector("[data-theme-coverage-city]");
+      const city = document.querySelector(
+        `[data-theme-topic-coverage-city][data-index="${target.dataset.index}"]`
+      );
       if (city) {
         city.innerHTML = renderCoverageCitySelectOptions(
-          state.adminThemeDraft.coverageProvince,
-          state.adminThemeDraft.coverageCity
+          topic.coverageProvince,
+          topic.coverageCity
         );
       }
       return;
     }
-    if (target.matches("[data-theme-coverage-city]") && state.adminThemeDraft) {
-      state.adminThemeDraft.coverageCity = target.value;
+    if (
+      target.matches("[data-theme-topic-coverage-city]") &&
+      state.adminThemeDraft
+    ) {
+      const topic =
+        state.adminThemeDraft.topics?.[Number(target.dataset.index)];
+      if (topic) topic.coverageCity = target.value;
       return;
     }
     if (target.matches("[data-doctor-coverage-province]") && state.adminDoctorDraft) {
@@ -12611,12 +12924,39 @@
       return;
     }
     if (target.matches("[data-theme-topic-field]") && state.adminThemeDraft) {
-      const topic = state.adminThemeDraft.topics?.[Number(target.dataset.index)];
+      const index = Number(target.dataset.index);
+      const topic = state.adminThemeDraft.topics?.[index];
       if (topic) topic[target.dataset.themeTopicField] = target.value;
-      if (target.dataset.themeTopicField === "expertId" && target.value) {
+      if (
+        target.dataset.themeTopicField === "expertId" &&
+        target.value &&
+        topic
+      ) {
         state.adminThemeDraft.expertIds = [
           ...new Set([...(state.adminThemeDraft.expertIds || []), target.value])
         ];
+        const expert = expertById(target.value);
+        if (expert) {
+          if (!topic.coverageCities?.length) {
+            topic.coverageCities = coverageCitiesFor(expert);
+            topic.coverage = coverageText(topic.coverageCities);
+          }
+          const province = coverageProvinceForCities(
+            topic.coverageCities,
+            expert.province || expert.region || ""
+          );
+          const selectedCity = (topic.coverageCities || []).find(
+            (city) =>
+              city !== "全国" &&
+              (state.chinaCities?.[province] || []).includes(city)
+          );
+          topic.coverageProvince = province;
+          topic.coverageCity =
+            selectedCity ||
+            state.chinaCities?.[province]?.[0] ||
+            province;
+          renderOverlay();
+        }
       }
       return;
     }
@@ -13041,48 +13381,95 @@
       case "open-admin-theme":
         openAdminThemeEditor(el.dataset.month);
         break;
-      case "theme-city-remove":
+      case "theme-topic-coverage-remove": {
         if (!state.adminThemeDraft) return;
-        state.adminThemeDraft.coverageCities = (
-          state.adminThemeDraft.coverageCities || []
-        ).filter((city) => city !== el.dataset.city);
-        refreshThemeCoverageChips();
+        const index = Number(
+          el.closest("[data-topic-coverage-index]")?.dataset.topicCoverageIndex
+        );
+        const topic = state.adminThemeDraft.topics?.[index];
+        if (!topic) return;
+        topic.coverageCities = (topic.coverageCities || []).filter(
+          (city) => city !== el.dataset.city
+        );
+        topic.coverage = coverageText(topic.coverageCities);
+        refreshThemeTopicCoverageChips(index);
         break;
-      case "theme-coverage-national":
+      }
+      case "theme-topic-coverage-national": {
         if (!state.adminThemeDraft) return;
-        state.adminThemeDraft.coverageCities = state.adminThemeDraft.coverageCities?.includes(
-          "全国"
-        )
+        const index = Number(el.dataset.index);
+        const topic = state.adminThemeDraft.topics?.[index];
+        if (!topic) return;
+        topic.coverageCities = topic.coverageCities?.includes("全国")
           ? []
           : ["全国"];
-        refreshThemeCoverageChips();
+        topic.coverage = coverageText(topic.coverageCities);
+        refreshThemeTopicCoverageChips(index);
         break;
-      case "theme-coverage-add":
+      }
+      case "theme-topic-coverage-add": {
         if (!state.adminThemeDraft) return;
-        if (!state.adminThemeDraft.coverageCity) {
+        const index = Number(el.dataset.index);
+        const topic = state.adminThemeDraft.topics?.[index];
+        if (!topic?.coverageCity) {
           return showToast("请先选择要添加的城市。");
         }
-        if (state.adminThemeDraft.coverageCities?.includes(
-          state.adminThemeDraft.coverageCity
-        )) {
-          return showToast(`「${state.adminThemeDraft.coverageCity}」已在覆盖范围中。`);
+        if (topic.coverageCities?.includes(topic.coverageCity)) {
+          return showToast(`「${topic.coverageCity}」已在本课题履约地中。`);
         }
-        state.adminThemeDraft.coverageCities = addCoverageCity(
-          state.adminThemeDraft.coverageCities,
-          state.adminThemeDraft.coverageCity
+        topic.coverageCities = addCoverageCity(
+          topic.coverageCities,
+          topic.coverageCity
         );
-        refreshThemeCoverageChips();
-        showToast(`已添加覆盖城市：${state.adminThemeDraft.coverageCity}。`);
+        topic.coverage = coverageText(topic.coverageCities);
+        refreshThemeTopicCoverageChips(index);
+        showToast(`已添加课题履约地：${topic.coverageCity}。`);
         break;
+      }
+      case "theme-topic-coverage-from-expert": {
+        if (!state.adminThemeDraft) return;
+        const index = Number(el.dataset.index);
+        const topic = state.adminThemeDraft.topics?.[index];
+        const expert = topic?.expertId ? expertById(topic.expertId) : null;
+        if (!topic || !expert) {
+          return showToast("请先为本课题选择主讲专家。");
+        }
+        topic.coverageCities = coverageCitiesFor(expert);
+        topic.coverage = coverageText(topic.coverageCities);
+        const province = coverageProvinceForCities(
+          topic.coverageCities,
+          expert.province || expert.region || ""
+        );
+        const selectedCity = topic.coverageCities.find(
+          (city) =>
+            city !== "全国" &&
+            (state.chinaCities?.[province] || []).includes(city)
+        );
+        topic.coverageProvince = province;
+        topic.coverageCity =
+          selectedCity || state.chinaCities?.[province]?.[0] || province;
+        renderOverlay();
+        showToast(`已套用 ${expert.name} 的履约范围。`);
+        break;
+      }
       case "theme-topic-add":
         if (!state.adminThemeDraft) return;
-        state.adminThemeDraft.topics = (state.adminThemeDraft.topics || []).concat({
-          id: `${state.adminThemeDraft.month}-custom-${Date.now()}`,
-          dept: "内科",
-          title: "",
-          expertId: "",
-          coverage: ""
-        });
+        {
+          const hospital = adminThemeHospital();
+          const province = coverageProvinceForCities([], hospital?.province);
+          const city =
+            state.chinaCities?.[province]?.[0] || hospital?.city || province;
+          state.adminThemeDraft.topics = (state.adminThemeDraft.topics || []).concat({
+            id: `${state.adminThemeDraft.month}-custom-${Date.now()}`,
+            dept: "内科",
+            title: "",
+            expertId: "",
+            coverage: "",
+            coverageCities: [],
+            coverageProvince: province,
+            coverageCity: city
+          });
+        }
         renderOverlay();
         break;
       case "theme-topic-remove":
@@ -13419,24 +13806,31 @@
         saveAppointmentLocation();
         break;
       case "appointment-action":
-        if (!state.overlay) return;
+        if (!state.overlay || state.overlay.type !== "appointment") return;
         {
           const appointment = appointmentById(state.overlay.appointmentId);
+          if (!appointment) return;
+          const mode = el.dataset.value || "";
+          if (!mode) return;
           const policy = appointmentChangePolicy(appointment);
           if (
-            (["change", "revise"].includes(el.dataset.value) &&
+            (["change", "revise"].includes(mode) &&
               !policy.canModify) ||
-            (el.dataset.value === "cancel" && !policy.canCancel)
+            (mode === "cancel" && !policy.canCancel) ||
+            (mode === "confirm" && !policy.canModify)
           ) {
             return showToast(
-              el.dataset.value === "cancel"
+              mode === "cancel"
                 ? policy.cancelReason || "当前阶段不可取消。"
                 : policy.modifyReason || "当前阶段不可修改。"
             );
           }
+          openOverlayLayer({
+            type: "appointment-action",
+            appointmentId: appointment.id,
+            mode
+          });
         }
-        state.overlay.action = el.dataset.value || "";
-        renderOverlay();
         break;
       case "appointment-confirm": {
         const id = state.overlay?.appointmentId;
@@ -13452,9 +13846,7 @@
           confirmedAt: new Date().toISOString(),
           feedback: ""
         });
-        state.overlay.action = "success";
-        renderOverlay();
-        renderApp({ scrollTo: currentWindowScroll() });
+        returnFromAppointmentAction("success");
         showToast("预约已确认，院方将按方案执行。");
         break;
       }
@@ -13481,9 +13873,7 @@
           },
           clientChangeCount: (Number(appointment.clientChangeCount) || 0) + 1
         });
-        state.overlay.action = "";
-        renderOverlay();
-        renderApp({ scrollTo: currentWindowScroll() });
+        returnFromAppointmentAction();
         showToast("修改意见已提交，院方会更新方案。");
         break;
       }
@@ -13511,9 +13901,7 @@
           clientChangeCount: (Number(appointment.clientChangeCount) || 0) + 1,
           previousStatus: appointment.status
         });
-        state.overlay.action = "";
-        renderOverlay();
-        renderApp({ scrollTo: currentWindowScroll() });
+        returnFromAppointmentAction();
         showToast("修改申请已提交，院方更新方案后会再次发送确认。");
         break;
       }
@@ -13534,6 +13922,7 @@
           cancelReason: "机构侧主动取消"
         });
         state.overlay = null;
+        state.overlayStack = [];
         releaseOverlayHistory();
         renderApp({ scrollTo: currentWindowScroll() });
         showToast("预约已取消，号源已释放。");
