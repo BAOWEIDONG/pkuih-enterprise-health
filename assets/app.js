@@ -27,7 +27,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261125-4";
+  const DATA_VERSION = "20261125-5";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -500,6 +500,10 @@
     if (size <= 0) return "大小未知";
     if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
     return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+  }
+
+  function isWeChatBrowser() {
+    return /MicroMessenger/i.test(navigator.userAgent || "");
   }
 
   function maskPhone(phone) {
@@ -2106,7 +2110,7 @@
 
   function demandTargetName(demand) {
     if (!demand) return "";
-    if (demand.targetType === "group") return "集团企康版";
+    if (demand.targetType === "group") return "集团企康办";
     return hospitalById(demand.hospitalId)?.name || "医院待分配";
   }
 
@@ -6733,7 +6737,7 @@
                   demand.assignedStaff.phone,
                   demand.assignedStaff.phone
                 )}`
-              : `提交后由${isGroup ? "集团企康版管理员" : "医院运营"}电话联系`
+              : `提交后由${isGroup ? "集团企康办管理员" : "医院运营"}电话联系`
           }
         </div>
         <div class="record-card__foot">
@@ -7492,7 +7496,7 @@
               <select data-demand-target>
                 <option value="group" ${
                   draft.targetType === "group" ? "selected" : ""
-                }>集团企康版 · 由集团统筹匹配</option>
+                }>集团企康办 · 由集团统筹匹配</option>
                 ${state.hospitals
                   .map(
                     (hospital) =>
@@ -7505,7 +7509,7 @@
                   )
                   .join("")}
               </select>
-              <span class="field-help">默认提交至集团企康版，也可指定具体履约医院。</span>
+              <span class="field-help">默认提交至集团企康办，也可指定具体履约医院。</span>
             </div>
             <div class="field">
               <label>服务类型</label>
@@ -7645,7 +7649,7 @@
     renderApp({ scrollTo: 0 });
     showToast(
       demand.targetType === "group"
-        ? "提需已提交，集团企康版将由超级管理员跟进。"
+        ? "提需已提交，集团企康办将由超级管理员跟进。"
         : "提需已提交，医院运营会尽快电话联系。"
     );
   }
@@ -7685,7 +7689,7 @@
                 ? `<section class="demand-route-note">
                     ${icon("shield", 15)}
                     <div>
-                      <strong>集团企康版 · 超级管理员跟进</strong>
+                      <strong>集团企康办 · 超级管理员跟进</strong>
                       <p>该需求不会进入具体医院需求池，由超级管理员统一联系、分配并跟进落地。</p>
                     </div>
                   </section>`
@@ -9297,7 +9301,7 @@
                 ? `<section class="demand-route-note">
                     ${icon("shield", 15)}
                     <div>
-                      <strong>集团企康版 · 超级管理员需求池</strong>
+                      <strong>集团企康办 · 超级管理员需求池</strong>
                       <p>该需求仅超级管理员可见，请直接电话联系机构并统筹匹配，不需要分配具体医院运营。</p>
                     </div>
                   </section>`
@@ -9382,7 +9386,7 @@
     if (!adminCanManageDemand(demand)) {
       return showToast(
         demand.targetType === "group"
-          ? "集团企康版需求仅超级管理员可跟进。"
+          ? "集团企康办需求仅超级管理员可跟进。"
           : "只能跟进本院需求。"
       );
     }
@@ -9415,7 +9419,7 @@
     if (!adminCanManageDemand(demand)) {
       return showToast(
         demand.targetType === "group"
-          ? "集团企康版需求仅超级管理员可跟进。"
+          ? "集团企康办需求仅超级管理员可跟进。"
           : "只能跟进本院需求。"
       );
     }
@@ -9439,7 +9443,7 @@
     if (!adminCanManageDemand(demand)) {
       return showToast(
         demand.targetType === "group"
-          ? "集团企康版需求仅超级管理员可跟进。"
+          ? "集团企康办需求仅超级管理员可跟进。"
           : "只能跟进本院需求。"
       );
     }
@@ -11405,6 +11409,37 @@
     openOverlayLayer({ type: "plan-pdf", appointmentId: appointment.id });
   }
 
+  function openPlanAttachmentInBrowser() {
+    const view = state.planPdfView;
+    if (!view?.url) return showToast("方案附件已失效，请重新打开。");
+    if (view.kind !== "pdf") {
+      return showToast("PPT 无法在微信内直接预览，请下载后使用 WPS 或 PowerPoint 打开。");
+    }
+    if (isWeChatBrowser() && /iPhone|iPad|iPod/i.test(navigator.userAgent || "")) {
+      window.location.href = view.url;
+      return;
+    }
+    let popup = null;
+    try {
+      popup = window.open(view.url, "_blank");
+    } catch (error) {
+      popup = null;
+    }
+    if (popup) {
+      try {
+        popup.opener = null;
+      } catch {
+        // Cross-window access is best effort.
+      }
+      return;
+    }
+    try {
+      window.location.href = view.url;
+    } catch {
+      showToast("当前环境无法直接打开，请使用下方“下载附件”。");
+    }
+  }
+
   function renderPlanPdfSheet() {
     const view = state.planPdfView;
     if (!view) return "";
@@ -11442,16 +11477,25 @@
             ${icon("shield", 13)}
             <span>${
               isPdf
-                ? "如微信内无法直接显示，请点击下方“下载附件”后打开；"
-                : "微信内通常不支持直接打开 PPT，请点击下方“下载附件”后查看；"
+                ? "页面内预览受微信内核限制；如显示空白，可点击“微信内打开”交给微信浏览器查看。"
+                : "微信不支持直接预览 PPT，请下载后使用 WPS 或 PowerPoint 打开。"
             }附件支持最大 20MB。</span>
           </div>
         </div>
-        <div class="sheet__footer">
+        <div class="sheet__footer pdf-sheet__footer">
           <button class="btn btn--ghost" type="button" data-action="close-overlay">关闭</button>
-          <a class="btn btn--primary" href="${esc(view.url)}" download="${esc(
-            view.name
-          )}" target="_blank" rel="noopener">${icon("download", 15)} 下载附件</a>
+          ${
+            isPdf
+              ? `<a class="btn btn--soft" href="${esc(view.url)}" download="${esc(
+                  view.name
+                )}">${icon("download", 14)} 下载</a>
+                <button class="btn btn--primary" type="button" data-action="plan-attachment-open">
+                  ${icon("arrowUpRight", 14)} ${isWeChatBrowser() ? "微信内打开" : "新窗口打开"}
+                </button>`
+              : `<a class="btn btn--primary" href="${esc(view.url)}" download="${esc(
+                  view.name
+                )}">${icon("download", 15)} 下载后用 WPS 打开</a>`
+          }
         </div>
       </section>
     `;
@@ -13194,7 +13238,7 @@
           if (!adminCanManageDemand(demand)) {
             return showToast(
               demand.targetType === "group"
-                ? "集团企康版需求仅超级管理员可查看。"
+                ? "集团企康办需求仅超级管理员可查看。"
                 : "无权查看其他医院的需求。"
             );
           }
@@ -13817,6 +13861,9 @@
       }
       case "open-plan-pdf":
         openPlanPdf(el.dataset.appointmentId || "");
+        break;
+      case "plan-attachment-open":
+        openPlanAttachmentInBrowser();
         break;
       case "appointment-location-edit":
         openAppointmentLocationEdit(el.dataset.appointmentId || "");
