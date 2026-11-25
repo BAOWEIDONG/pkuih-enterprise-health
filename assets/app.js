@@ -28,7 +28,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261125-9";
+  const DATA_VERSION = "20261125-10";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -5750,13 +5750,18 @@
         ${renderBookingTopics(booking)}
         ${bookingFieldErrorMarkup("topics")}
         <div class="field">
-          <label>活动主题 <span id="booking-topic-field-hint">${esc(
+          <label>活动主题 <em>*</em> <span id="booking-topic-field-hint">${esc(
             topicLocked ? "已选时令主题 · 不可修改" : bookingTopicFieldHint(booking.serviceType)
           )}</span></label>
-          <input class="${topicLocked ? "is-locked" : ""}" type="text"
-            data-booking-field="customTopic" value="${esc(booking.customTopic)}"
+          <input class="${[topicLocked ? "is-locked" : "", bookingInputErrorClass("topic")]
+            .filter(Boolean)
+            .join(" ")}" type="text"
+            data-booking-field="customTopic" data-booking-error="topic" value="${esc(
+              booking.customTopic
+            )}"
             placeholder="如：职场人群心血管风险识别"
             ${topicLocked ? 'readonly aria-readonly="true"' : ""}>
+          ${bookingFieldErrorMarkup("topic")}
           ${
             topicLocked
               ? `<span id="booking-topic-lock-help" class="field-help booking-topic-lock-help">${icon(
@@ -5767,12 +5772,15 @@
           }
         </div>
         <div class="field-row">
-          <div class="field"><label>参与人群</label>
-            <input type="text" data-booking-field="audience" value="${esc(
+          <div class="field"><label>参与人群 <em>*</em></label>
+            <input class="${bookingInputErrorClass(
+              "audience"
+            )}" type="text" data-booking-field="audience" data-booking-error="audience" value="${esc(
               booking.audience
             )}" placeholder="如：企业员工 / 高客">
+            ${bookingFieldErrorMarkup("audience")}
           </div>
-          <div class="field"><label>预计人数</label>
+          <div class="field"><label>预计人数 <em>*</em></label>
             <input class="${bookingInputErrorClass(
               "headcount"
             )}" type="number" inputmode="numeric" data-booking-field="headcount" data-booking-error="headcount" value="${esc(
@@ -6306,6 +6314,15 @@
     if (!booking.address.trim()) {
       add("address", "请填写活动详细地址。");
     }
+    if (!booking.customTopic.trim()) {
+      add("topic", "请选择时令主题或填写活动主题。");
+    }
+    if (!booking.audience.trim()) {
+      add("audience", "请填写参与人群。");
+    }
+    if (!String(booking.headcount || "").trim()) {
+      add("headcount", "请填写预计人数。");
+    }
     if (!booking.contactName.trim()) {
       add("contactName", "请填写联系人姓名。");
     }
@@ -6344,6 +6361,8 @@
       doctor: '[data-booking-error="doctor"]',
       date: "#booking-dates",
       address: '[data-booking-field="address"]',
+      topic: '[data-booking-field="customTopic"]',
+      audience: '[data-booking-field="audience"]',
       contactName: '[data-booking-field="contactName"]',
       contactPhone: '[data-booking-field="contactPhone"]',
       headcount: '[data-booking-field="headcount"]',
