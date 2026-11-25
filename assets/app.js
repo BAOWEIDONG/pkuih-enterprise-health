@@ -18,6 +18,7 @@
     planTemplates: "pkuih_h6_plan_templates",
     slots: "pkuih_h6_slots",
     smsLogs: "pkuih_h6_sms_logs",
+    marketingPosters: "pkuih_h6_marketing_posters",
     homeRegion: "pkuih_h6_home_region",
     homeHospital: "pkuih_h6_home_hospital",
     lastPortal: "pkuih_h6_portal",
@@ -26,7 +27,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261124-15";
+  const DATA_VERSION = "20261125-1";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -161,6 +162,16 @@
     }
   };
   const SERVICE_IDS = ["讲座", "健康咨询", "1V1报告解读"];
+  const INSTITUTION_TYPES = [
+    "保险公司",
+    "银行",
+    "证券",
+    "基金",
+    "信托",
+    "企业",
+    "事业单位",
+    "其他机构"
+  ];
   const THEME_COVERAGE_OPTIONS = [
     "北京",
     "北京/京外",
@@ -389,6 +400,8 @@
     institutionAccountDraft: null,
     adminDoctorDraft: null,
     adminTemplateDraft: null,
+    marketingFilter: "all",
+    marketingDraft: null,
     // history & scroll
     viewScroll: { main: {}, admin: {} },
     historyDepth: 0,
@@ -738,7 +751,7 @@
     if (!String(profile.name || "").trim()) issues.push("请填写姓名");
     if (!String(profile.title || "").trim()) issues.push("请填写职务");
     if (!String(profile.orgName || "").trim()) issues.push("请填写单位名称");
-    if (!["保险公司", "企业", "其他机构"].includes(profile.orgType)) {
+    if (!INSTITUTION_TYPES.includes(profile.orgType)) {
       issues.push("请选择机构类型");
     }
     const contactPhone = String(profile.contactPhone || profile.phone || "").trim();
@@ -2732,6 +2745,7 @@
     if (type === "profile") return paint(renderProfileSheet());
     if (type === "theme") return paint(renderThemeSheet());
     if (type === "poster") return paint(renderPosterSheet());
+    if (type === "poster-upload") return paint(renderPosterUploadSheet());
     if (type === "admin-review") return paint(renderAdminReviewSheet());
     if (type === "admin-demand") return paint(renderAdminDemandSheet());
     if (type === "admin-account") return paint(renderAdminAccountSheet());
@@ -2882,14 +2896,14 @@
                 </div>
                 <div class="field">
                   <label for="login-org">单位名称 <em>*</em></label>
-                  <input id="login-org" type="text" placeholder="请输入保险公司或企业名称" value="${esc(
+                  <input id="login-org" type="text" placeholder="请输入机构全称" value="${esc(
                     state.login.orgName
                   )}" data-login-field="orgName">
                 </div>
                 <div class="field">
-                  <label>机构类型</label>
+                  <label>机构类型 <em>*</em></label>
                   <div class="choice-grid">
-                    ${["保险公司", "企业", "其他机构"]
+                    ${INSTITUTION_TYPES
                       .map(
                         (type) => `
                           <button class="choice-tile ${
@@ -3526,11 +3540,6 @@
         <span class="hero-hospital__body">
           <span class="hero-hospital__meta">
             <small>${esc(meta)}${sortHint}</small>
-            <button type="button" data-action="home-city-open" ${
-              locationFailed ? 'class="is-needed"' : ""
-            }>${
-              state.homeRegion ? "改城市" : "选择城市"
-            }</button>
           </span>
           <span class="hero-hospital__select-wrap">
             <span class="hero-hospital__selected-name" title="${esc(
@@ -3547,6 +3556,11 @@
                 .join("")}
             </select>
             <span class="hero-hospital__chevron">${icon("chevronDown", 13)}</span>
+            <button class="hero-hospital__city ${
+              locationFailed ? "is-needed" : ""
+            }" type="button" data-action="home-city-open">${
+              state.homeRegion ? "改城市" : "选择城市"
+            }</button>
           </span>
         </span>
         <button class="hero-hospital__locate" type="button" data-action="home-use-location"
@@ -7549,7 +7563,7 @@
             </div>
             <div class="field"><label>机构类型 <em>*</em></label>
               <select data-profile-field="orgType">
-                ${["保险公司", "企业", "其他机构"]
+                ${INSTITUTION_TYPES
                   .map(
                     (type) =>
                       `<option value="${type}" ${
@@ -10039,7 +10053,6 @@
           CLIENT_TIER_ORDER.indexOf(a.tier) - CLIENT_TIER_ORDER.indexOf(b.tier) ||
           a.name.localeCompare(b.name, "zh-CN")
       );
-    const boundIds = new Set((draft.expertIds || []).map(String));
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet theme-editor-sheet" role="dialog" aria-modal="true" aria-label="时令主题配置">
@@ -10112,32 +10125,12 @@
                   <button class="btn btn--ghost btn--sm" type="button" data-action="theme-coverage-add">
                     ${icon("plus", 13)} 添加当前城市
                   </button>
-                  <span class="field-help">先选省份再选城市，选中城市后自动加入；可继续切换省份添加多个城市。含“京外”或“省外”的履约地，机构端按全国可履约展示。</span>
+                  <span class="field-help">先选省份再选城市，点击“添加当前城市”加入；可继续切换省份添加多个城市。含“京外”或“省外”的履约地，机构端按全国可履约展示。</span>
                 </div>
               </div>
             </div>
             <div class="field">
-              <label>绑定本院专家 <span>仅可选择本院已显示讲座专家</span></label>
-              <div class="theme-expert-picker">
-                ${hospitalExperts
-                  .map(
-                    (expert) => `
-                      <button class="theme-expert-toggle ${
-                        boundIds.has(expert.id) ? "is-active" : ""
-                      }" type="button" data-action="theme-expert-toggle" data-id="${esc(expert.id)}">
-                        <img src="${esc(expertAvatar(expert))}" alt="${esc(expert.name)}" loading="lazy">
-                        <span><strong>${esc(expert.name)}</strong><small>${esc(
-                          expert.dept
-                        )} · ${esc(expert.deptTitle)}</small></span>
-                        <i>${icon("check", 11)}</i>
-                      </button>
-                    `
-                  )
-                  .join("") || "<small>本院暂无可绑定讲座专家</small>"}
-              </div>
-            </div>
-            <div class="field">
-              <label>讲座课题与主讲专家</label>
+              <label>讲座课题与主讲专家 <span>每位专家只需在课题中选择一次</span></label>
               <div class="theme-topic-editor">
                 ${(draft.topics || [])
                   .map(
@@ -10192,7 +10185,7 @@
                 ${icon("plus", 12)} 添加讲座课题
               </button>
             </div>
-            <p class="field-help">机构端将按这里的专家、课题和城市范围展示；每个课题的履约地独立于专家日常服务范围，未单独配置时沿用主题覆盖城市。</p>
+            <p class="field-help">主讲专家直接跟随课题关联，无需再重复绑定；机构端将按这里的课题、专家和城市范围展示。每个课题的履约地独立于专家日常服务范围，未单独配置时沿用主题覆盖城市。</p>
           </div>
         </div>
         <div class="sheet__footer">
@@ -10250,10 +10243,7 @@
       return showToast(`课题「${invalidCoverage.title}」的履约地选项无效，请重新选择。`);
     }
     draft.expertIds = [
-      ...new Set([
-        ...(draft.expertIds || []),
-        ...draft.topics.map((topic) => topic.expertId).filter(Boolean)
-      ])
+      ...new Set(draft.topics.map((topic) => topic.expertId).filter(Boolean))
     ];
     saveHospitalTheme(hospital.id, draft);
     state.overlay = null;
@@ -10312,6 +10302,7 @@
   }
 
   function renderDoctorAdminCard(expert) {
+    const themeMonths = [...monthsForExpert(expert)].sort((a, b) => a - b);
     return `
       <button class="doctor-admin-card" type="button" data-action="open-admin-doctor"
         data-doctor-id="${esc(expert.id)}">
@@ -10332,7 +10323,11 @@
           )}</span>
           <span class="doctor-admin-card__services">${(expert.services || [])
         .map((service) => `<span>${esc(serviceLabel(service))}</span>`)
-            .join("")}<i>${esc(expert.leadLabel)}</i></span>
+            .join("")}<i>${esc(expert.leadLabel)}</i>${
+              themeMonths.length
+                ? `<i>${themeMonths.length} 个月令课题</i>`
+                : ""
+            }</span>
         </span>
         <span class="doctor-admin-card__edit">${icon("edit", 13)}</span>
       </button>
@@ -10558,6 +10553,7 @@
                     )}</button>`
                 ).join("")}
               </div>
+              <span class="field-help">月令讲座在「时令主题」中按课题绑定；已绑定讲师的专家不能直接取消讲座服务或停用。</span>
             </div>
             <div class="field">
               <label>履约城市 <em>*</em> <span>可多选</span></label>
@@ -10656,6 +10652,19 @@
     if (!draft.deptTitle) return showToast("请填写科室/任职。");
     if (!draft.services?.length) return showToast("请至少选择一个服务类型。");
     if (!draft.coverageCities?.length) return showToast("请至少选择一个履约城市。");
+    const previous = draft.id ? expertById(draft.id) : null;
+    if (previous) {
+      const months = [...monthsForExpert(previous)].sort((a, b) => a - b);
+      const losesLecture =
+        previous.hospitalId !== draft.hospitalId ||
+        draft.active === false ||
+        !matchesService(draft, "讲座");
+      if (months.length && losesLecture) {
+        return showToast(
+          `该专家已在 ${months.join("、")} 月时令课题中担任主讲，请先在「时令主题」中更换主讲专家，再取消讲座服务、停用或调整履约机构。`
+        );
+      }
+    }
     const payload = { ...draft };
     delete payload.custom;
     delete payload.coverageProvince;
@@ -10970,12 +10979,12 @@
             <div class="field"><label>单位名称 <em>*</em></label>
               <input type="text" data-institution-field="orgName" value="${esc(
                 draft.orgName
-              )}" placeholder="保险公司、集团或企业全称">
+              )}" placeholder="请输入机构全称">
             </div>
             <div class="field-row">
               <div class="field"><label>机构类型 <em>*</em></label>
                 <select data-institution-field="orgType">
-                  ${["保险公司", "企业", "其他机构"]
+                  ${INSTITUTION_TYPES
                     .map(
                       (type) =>
                         `<option value="${esc(type)}" ${
@@ -11037,6 +11046,9 @@
     if (!draft.name?.trim()) return showToast("请填写机构联系人姓名。");
     if (!draft.title?.trim()) return showToast("请填写机构联系人职务。");
     if (!draft.orgName?.trim()) return showToast("请填写单位名称。");
+    if (!INSTITUTION_TYPES.includes(draft.orgType)) {
+      return showToast("请选择机构类型。");
+    }
     const contactPhone = String(draft.contactPhone || draft.phone || "").trim();
     if (!/^1\d{10}$/.test(contactPhone)) {
       return showToast("联系方式格式不正确。");
@@ -11338,51 +11350,177 @@
     }
   ];
 
+  function defaultMarketingPosters() {
+    const now = new Date().toISOString();
+    return MARKETING_POSTERS.map((poster) => ({
+      ...poster,
+      source: "official",
+      hospitalId: "",
+      builtin: true,
+      createdAt: now,
+      updatedAt: now
+    }));
+  }
+
+  function getMarketingPosters() {
+    const stored = readJSON(STORAGE.marketingPosters, null);
+    if (Array.isArray(stored)) return stored;
+    const seeded = defaultMarketingPosters();
+    writeJSON(STORAGE.marketingPosters, seeded);
+    return seeded;
+  }
+
+  function saveMarketingPosters(list) {
+    writeJSON(STORAGE.marketingPosters, list);
+  }
+
   function marketingPosterById(id) {
-    return MARKETING_POSTERS.find((item) => item.id === id) || null;
+    return getMarketingPosters().find((item) => item.id === id) || null;
+  }
+
+  function marketingPosterScopeLabel(poster) {
+    if (poster?.source === "official") return "官方海报";
+    const hospital = hospitalById(poster?.hospitalId);
+    return hospital ? `${hospital.short || hospital.name} · 自有海报` : "医院自有海报";
+  }
+
+  function marketingPosterManageable(poster) {
+    if (!poster) return false;
+    if (isSuperadmin()) return true;
+    const hospital = operatorHospital();
+    return Boolean(
+      hospital &&
+        poster.source !== "official" &&
+        poster.hospitalId === hospital.id
+    );
+  }
+
+  function visibleMarketingPosters() {
+    const all = getMarketingPosters();
+    if (isSuperadmin()) {
+      return all.filter((poster) => {
+        if (state.marketingFilter === "official") return poster.source === "official";
+        if (state.marketingFilter === "hospital") return poster.source !== "official";
+        return true;
+      });
+    }
+    const hospital = operatorHospital();
+    const own = all.filter(
+      (poster) =>
+        poster.source !== "official" &&
+        poster.hospitalId === (hospital?.id || "")
+    );
+    const official = all.filter((poster) => poster.source === "official");
+    if (state.marketingFilter === "official") return official;
+    if (state.marketingFilter === "hospital") return own;
+    return [...official, ...own];
   }
 
   function renderMarketingPage() {
+    const all = getMarketingPosters();
+    const posters = visibleMarketingPosters();
+    const officialCount = all.filter((poster) => poster.source === "official").length;
+    const hospital = operatorHospital();
+    const hospitalCount = all.filter(
+      (poster) =>
+        poster.source !== "official" &&
+        (isSuperadmin() || poster.hospitalId === (hospital?.id || ""))
+    ).length;
+    const hospitalFilterLabel = isSuperadmin() ? "医院上传" : "本院海报";
     return `
       <div class="admin-page-head">
-        <div><h1>展业物料</h1><p>院方统一宣传海报，打开即可保存转发</p></div>
-        <span class="admin-page-head__date">${MARKETING_POSTERS.length} 套场景</span>
+        <div><h1>展业海报</h1><p>${
+          isSuperadmin()
+            ? "统一维护官方海报，医院运营可直接下载分享"
+            : "官方海报统一配置，本院海报可自行上传分享"
+        }</p></div>
+        <span class="admin-page-head__date">${posters.length} 张可分享</span>
       </div>
       ${renderAdminTabs()}
+      ${renderAdminHospitalFilter()}
+      <div class="marketing-tools">
+        <div class="marketing-filter">
+          ${[
+            ["all", "全部"],
+            ["official", "官方海报"],
+            ["hospital", hospitalFilterLabel]
+          ]
+            .map(
+              ([value, label]) => `
+                <button class="${state.marketingFilter === value ? "is-active" : ""}"
+                  type="button" data-action="marketing-filter" data-value="${value}">${label}</button>
+              `
+            )
+            .join("")}
+        </div>
+        <button class="btn btn--primary btn--sm" type="button" data-action="marketing-poster-add">
+          ${icon("plus", 13)} ${isSuperadmin() ? "上传官方海报" : "上传本院海报"}
+        </button>
+      </div>
       <section class="marketing-hero">
-        <span class="marketing-hero__badge">${icon("send", 13)} 项目展业物料库</span>
+        <span class="marketing-hero__badge">${icon("send", 13)} 统一展业海报库</span>
         <h2>把专业服务，变成可分享的邀请</h2>
-        <p>四套海报由院方统一设计，突出名医资源、医院权威与服务价值。海报仅保留预约二维码，不展示项目人员姓名与电话。</p>
+        <p>${
+          isSuperadmin()
+            ? "官方海报由超级管理员统一配置；上传后医院运营可直接保存、下载并分享给客户。"
+            : "官方海报由超级管理员统一配置；医院运营也可上传本院自有海报，保存后即可分享或下载。"
+        }海报仅保留预约二维码，不展示项目人员姓名与电话。</p>
         <div class="marketing-hero__facts">
-          <span><b>4</b>套场景</span><span><b>1080</b>×1920</span><span><b>1</b>个预约二维码</span>
+          <span><b>${officialCount}</b>张官方</span><span><b>${hospitalCount}</b>张${
+            isSuperadmin() ? "医院上传" : "本院自有"
+          }</span><span><b>1</b>个预约二维码</span>
         </div>
       </section>
-      <div class="poster-list">
-        ${MARKETING_POSTERS.map(
+      ${
+        posters.length
+          ? `<div class="poster-list">
+        ${posters.map(
           (poster) => `
             <button class="poster-card" type="button" data-action="open-poster" data-poster-id="${esc(
               poster.id
             )}">
               <span class="poster-card__visual">
-                <img src="${esc(poster.thumb)}" alt="${esc(poster.title)}" loading="eager" decoding="async">
+                <img src="${esc(poster.thumb || poster.image)}" alt="${esc(poster.title)}" loading="eager" decoding="async">
                 <i>${esc(poster.eyebrow)}</i>
+                <em class="poster-card__scope ${
+                  poster.source === "official" ? "is-official" : "is-hospital"
+                }">${esc(marketingPosterScopeLabel(poster))}</em>
               </span>
               <span class="poster-card__copy">
                 <strong>${esc(poster.title)}</strong>
                 <span>${esc(poster.desc)}</span>
-                <span class="poster-card__tags">${poster.tags
+                <span class="poster-card__tags">${(poster.tags || [])
                   .map((tag) => `<i>${esc(tag)}</i>`)
                   .join("")}</span>
-                <b>查看并保存 ${icon("arrowRight", 12)}</b>
+                <b>查看 · 下载 · 分享 ${icon("arrowRight", 12)}</b>
               </span>
             </button>
           `
-        ).join("")}
-      </div>
+        ).join("")}</div>`
+          : `<div class="empty-state marketing-empty">
+              <span class="empty-state__icon">${icon("send", 26)}</span>
+              <h3>${state.marketingFilter === "hospital" ? "暂无自有海报" : "暂无海报"}</h3>
+              <p>${
+                isSuperadmin()
+                  ? "上传官方海报后，医院运营即可下载分享。"
+                  : "可上传本院自有海报，保存后直接分享给客户。"
+              }</p>
+              <button class="btn btn--primary btn--sm" type="button" data-action="marketing-poster-add">
+                ${icon("plus", 13)} 上传海报
+              </button>
+              ${
+                isSuperadmin()
+                  ? `<button class="btn btn--ghost btn--sm" type="button" data-action="marketing-poster-reset">
+                      恢复官方海报
+                    </button>`
+                  : ""
+              }
+            </div>`
+      }
       <div class="marketing-guide">
-        <div><span>01</span><strong>按客户场景选择</strong><p>品牌、专家、保险高客与企业价值四套海报。</p></div>
-        <div><span>02</span><strong>打开高清海报</strong><p>预置静态图片，无需等待生成。</p></div>
-        <div><span>03</span><strong>保存后直接发送</strong><p>微信中长按图片保存，发朋友圈或客户群。</p></div>
+        <div><span>01</span><strong>官方统一配置</strong><p>超级管理员维护品牌主视觉与标准海报。</p></div>
+        <div><span>02</span><strong>本院可上传自有海报</strong><p>医院运营上传本地物料，自动保存到海报库。</p></div>
+        <div><span>03</span><strong>下载或分享给客户</strong><p>保存高清图发朋友圈，或复制预约链接。</p></div>
       </div>
     `;
   }
@@ -11397,12 +11535,15 @@
   function renderPosterSheet() {
     const poster = marketingPosterById(state.posterId);
     if (!poster) return "";
+    const manageable = marketingPosterManageable(poster);
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet poster-sheet" role="dialog" aria-modal="true" aria-label="海报预览">
         <div class="sheet__grabber"></div>
         <div class="sheet__bar">
-          <div><h2>${esc(poster.eyebrow)}</h2><p>高清宣传海报 · 无需生成 · 打开即可保存</p></div>
+          <div><h2>${esc(poster.eyebrow || "展业海报")}</h2><p>${esc(
+            marketingPosterScopeLabel(poster)
+          )} · 高清海报</p></div>
           <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">${icon(
             "close",
             15
@@ -11411,11 +11552,29 @@
         <div class="sheet__body">
           <div class="poster-sheet__frame">
             <img src="${esc(poster.image)}" alt="${esc(poster.title)}" decoding="async"
-              style="background-image:url('${esc(poster.thumb)}')">
+              style="background-image:url('${esc(poster.thumb || poster.image)}')">
           </div>
           <div class="poster-sheet__meta">
-            <span>${poster.tags.map((tag) => `<i>${esc(tag)}</i>`).join("")}</span>
+            <span>${(poster.tags || [])
+              .map((tag) => `<i>${esc(tag)}</i>`)
+              .join("")}</span>
+            <strong>${esc(poster.title)}</strong>
+            <p>${esc(poster.desc)}</p>
             <p>二维码统一指向企业健康服务平台。微信中可直接长按图片保存到相册，再发送朋友圈或客户群。</p>
+            ${
+              manageable
+                ? `<div class="poster-admin-actions">
+                    <button class="btn btn--ghost btn--sm" type="button" data-action="marketing-poster-edit">${icon(
+                      "edit",
+                      13
+                    )} 编辑</button>
+                    <button class="btn btn--ghost btn--sm poster-delete" type="button" data-action="marketing-poster-delete">${icon(
+                      "trash",
+                      13
+                    )} 删除</button>
+                  </div>`
+                : ""
+            }
           </div>
         </div>
         <div class="sheet__footer">
@@ -11423,21 +11582,244 @@
             "checkCircle",
             15
           )} 保存高清海报</button>
-          <button class="btn btn--ghost" type="button" data-action="copy-poster-link">${icon(
+          <button class="btn btn--ghost" type="button" data-action="marketing-poster-share">${icon(
             "send",
             14
-          )} 复制活动链接</button>
+          )} 分享给客户</button>
         </div>
       </section>
     `;
   }
 
+  function openPosterUpload(id = "") {
+    const existing = id ? marketingPosterById(id) : null;
+    if (existing && !marketingPosterManageable(existing)) {
+      return showToast("只能编辑本账号可管理的海报。");
+    }
+    const hospital = operatorHospital();
+    state.marketingDraft = existing
+      ? {
+          ...existing,
+          tagsText: (existing.tags || []).join("、")
+        }
+      : {
+          id: "",
+          source: isSuperadmin() ? "official" : "hospital",
+          hospitalId: isSuperadmin() ? "" : hospital?.id || "",
+          eyebrow: isSuperadmin() ? "官方海报" : `${hospital?.short || "本院"} · 自有海报`,
+          title: "",
+          desc: "",
+          tagsText: "",
+          image: "",
+          thumb: "",
+          builtin: false
+        };
+    state.overlay = { type: "poster-upload" };
+    renderOverlay();
+  }
+
+  function renderPosterUploadSheet() {
+    const draft = state.marketingDraft;
+    if (!draft) return "";
+    const editing = Boolean(draft.id);
+    return `
+      <div class="sheet-backdrop" data-action="close-overlay"></div>
+      <section class="sheet poster-upload-sheet" role="dialog" aria-modal="true" aria-label="上传海报">
+        <div class="sheet__grabber"></div>
+        <div class="sheet__bar">
+          <div><h2>${editing ? "编辑海报" : "上传海报"}</h2><p>${
+            isSuperadmin() ? "官方海报，统一供医院运营下载分享" : "本院自有海报，仅本院运营可见"
+          }</p></div>
+          <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">${icon(
+            "close",
+            15
+          )}</button>
+        </div>
+        <div class="sheet__body">
+          <div class="sheet-pad">
+            <div class="poster-upload-preview ${
+              draft.image ? "has-image" : ""
+            }">
+              ${
+                draft.image
+                  ? `<img src="${esc(draft.image)}" alt="海报预览">`
+                  : `<span>${icon("send", 22)}<strong>上传海报图片</strong><small>建议竖版 1080×1920，支持 JPG / PNG</small></span>`
+              }
+              <label class="poster-upload-action">
+                ${draft.image ? "更换图片" : "选择图片"}
+                <input type="file" accept="image/*" data-marketing-file hidden>
+              </label>
+            </div>
+            <div class="field"><label>海报标题 <em>*</em></label>
+              <input type="text" data-marketing-field="title" value="${esc(
+                draft.title || ""
+              )}" placeholder="如：让权威医疗，走近企业">
+            </div>
+            <div class="field-row">
+              <div class="field"><label>角标 / 场景</label>
+                <input type="text" data-marketing-field="eyebrow" value="${esc(
+                  draft.eyebrow || ""
+                )}" placeholder="如：权威主视觉">
+              </div>
+              <div class="field"><label>标签</label>
+                <input type="text" data-marketing-field="tagsText" value="${esc(
+                  draft.tagsText || ""
+                )}" placeholder="用顿号分隔，如：医院权威、名医资源">
+              </div>
+            </div>
+            <div class="field"><label>海报说明</label>
+              <textarea data-marketing-field="desc" placeholder="填写这张海报适合的使用场景">${esc(
+                draft.desc || ""
+              )}</textarea>
+            </div>
+            <p class="field-help">${icon(
+              "shield",
+              12
+            )} 海报由${
+              isSuperadmin() ? "超级管理员统一配置" : "医院运营上传"
+            }。保存后可在列表中下载、分享给客户。</p>
+          </div>
+        </div>
+        <div class="sheet__footer">
+          <button class="btn btn--ghost" type="button" data-action="close-overlay">取消</button>
+          <button class="btn btn--primary" type="button" data-action="marketing-poster-save">
+            ${editing ? "保存修改" : "保存海报"} ${icon("check", 14)}
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
+  function collectMarketingDraft() {
+    const draft = state.marketingDraft;
+    if (!draft) return null;
+    document.querySelectorAll("[data-marketing-field]").forEach((input) => {
+      draft[input.dataset.marketingField] = input.value.trim();
+    });
+    return draft;
+  }
+
+  function saveMarketingDraft() {
+    const draft = collectMarketingDraft();
+    if (!draft) return;
+    if (!draft.title?.trim()) return showToast("请填写海报标题。");
+    if (!draft.image) return showToast("请先上传海报图片。");
+    const tags = String(draft.tagsText || "")
+      .split(/[、,，/]/)
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+    const list = getMarketingPosters();
+    const now = new Date().toISOString();
+    const payload = {
+      id: draft.id || `poster-${Date.now()}`,
+      source: draft.id ? draft.source || "official" : isSuperadmin() ? "official" : "hospital",
+      hospitalId: draft.id
+        ? draft.hospitalId || ""
+        : isSuperadmin()
+        ? ""
+        : operatorHospital()?.id || "",
+      eyebrow: draft.eyebrow?.trim() || (isSuperadmin() ? "官方海报" : "本院海报"),
+      title: draft.title.trim(),
+      desc: draft.desc?.trim() || "院方统一展业海报，可直接下载分享。",
+      tags,
+      image: draft.image,
+      thumb: draft.thumb || draft.image,
+      builtin: Boolean(draft.builtin),
+      createdAt: draft.createdAt || now,
+      updatedAt: now
+    };
+    const next = draft.id
+      ? list.map((item) => (item.id === draft.id ? payload : item))
+      : [payload, ...list];
+    try {
+      saveMarketingPosters(next);
+    } catch (error) {
+      return showToast("海报保存失败，图片可能过大，请换一张较小的图片。");
+    }
+    state.marketingDraft = null;
+    state.overlay = null;
+    releaseOverlayHistory();
+    renderApp({ scrollTo: currentWindowScroll() });
+    showToast(draft.id ? "海报已更新。" : "海报已保存，可下载或分享。");
+  }
+
+  function handleMarketingImageUpload(file) {
+    if (!file || !state.marketingDraft) return;
+    if (!/^image\//.test(file.type)) return showToast("请选择图片文件。");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const maxSide = 1920;
+        const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(image, 0, 0, width, height);
+        let data = canvas.toDataURL("image/jpeg", 0.84);
+        if (data.length > 2600000) data = canvas.toDataURL("image/jpeg", 0.62);
+        state.marketingDraft.image = data;
+        state.marketingDraft.thumb = data;
+        renderOverlay();
+        showToast("海报图片已载入。");
+      };
+      image.onerror = () => showToast("图片读取失败，请换一张图片。");
+      image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function deleteMarketingPoster() {
+    const poster = marketingPosterById(state.posterId);
+    if (!poster) return;
+    if (!marketingPosterManageable(poster)) return showToast("无权删除该海报。");
+    if (!window.confirm(`确定删除「${poster.title}」吗？`)) return;
+    saveMarketingPosters(getMarketingPosters().filter((item) => item.id !== poster.id));
+    state.overlay = null;
+    releaseOverlayHistory();
+    renderApp({ scrollTo: currentWindowScroll() });
+    showToast("海报已删除。");
+  }
+
+  async function shareMarketingPoster() {
+    const poster = marketingPosterById(state.posterId);
+    if (!poster) return;
+    const shareText = `【北京大学国际医院 · 名医入企】${poster.title} ${SERVICE_LINK}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: poster.title,
+          text: `${poster.desc || poster.title}\n${SERVICE_LINK}`,
+          url: SERVICE_LINK
+        });
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+      }
+    }
+    const copied = await copyText(shareText);
+    showToast(
+      copied
+        ? "分享文案与预约链接已复制，可粘贴发送给客户。"
+        : "请手动复制链接分享给客户。"
+    );
+  }
+
   function saveMarketingPoster() {
     const poster = marketingPosterById(state.posterId);
     if (!poster) return;
+    const dataMatch = /^data:image\/([a-zA-Z0-9+.-]+)/.exec(poster.image || "");
+    const ext = dataMatch
+      ? dataMatch[1].replace("jpeg", "jpg").replace("svg+xml", "svg")
+      : "webp";
     const anchor = document.createElement("a");
     anchor.href = poster.image;
-    anchor.download = `北大医疗名医入企-${poster.id}.webp`;
+    anchor.download = `${poster.title || "北大医疗名医入企"}.${ext}`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -11544,9 +11926,13 @@
       )} · ${esc(regionText(region.province, region.city))}`;
       return;
     }
+    const serviceText =
+      state.expertService === "all" ? "全部服务" : serviceLabel(state.expertService);
     hint.innerHTML =
       state.expertScope === "nearby"
-        ? `${icon("mapPin", 11)} 优先展示 ${esc(hospital?.name || "就近医院")}${
+        ? `${icon("mapPin", 11)} 优先展示 ${esc(hospital?.name || "就近医院")}的${esc(
+            serviceText
+          )}专家${
             state.expertAvailability === "all"
               ? " · 含暂无号源专家"
               : state.expertAvailability === "local"
@@ -11557,7 +11943,7 @@
             state.expertAvailability === "local" ? "当地医院" : "全部医院"
           }中，展示可服务${esc(
             regionText(region.province, region.city)
-          )}的专家${
+          )}的${esc(serviceText)}专家${
             state.expertAvailability === "all" ? " · 含暂无号源" : " · 当前可约"
           }`;
   }
@@ -11570,6 +11956,10 @@
     if (target.matches("[data-slot-batch]")) {
       state.slotBatch[target.dataset.slotBatch] = target.value;
       refreshSlotBatchSummary();
+      return;
+    }
+    if (target.matches("[data-marketing-field]") && state.marketingDraft) {
+      state.marketingDraft[target.dataset.marketingField] = target.value;
       return;
     }
     if (target.matches("[data-login-field]")) {
@@ -11663,11 +12053,6 @@
         state.adminThemeDraft.expertIds = [
           ...new Set([...(state.adminThemeDraft.expertIds || []), target.value])
         ];
-        const buttons = [
-          ...document.querySelectorAll('[data-action="theme-expert-toggle"]')
-        ];
-        const button = buttons.find((item) => item.dataset.id === target.value);
-        button?.classList.add("is-active");
       }
       return;
     }
@@ -11787,11 +12172,6 @@
     }
     if (target.matches("[data-theme-coverage-city]") && state.adminThemeDraft) {
       state.adminThemeDraft.coverageCity = target.value;
-      state.adminThemeDraft.coverageCities = addCoverageCity(
-        state.adminThemeDraft.coverageCities,
-        target.value
-      );
-      refreshThemeCoverageChips();
       return;
     }
     if (target.matches("[data-doctor-coverage-province]") && state.adminDoctorDraft) {
@@ -11823,10 +12203,6 @@
         state.adminThemeDraft.expertIds = [
           ...new Set([...(state.adminThemeDraft.expertIds || []), target.value])
         ];
-        const button = [
-          ...document.querySelectorAll('[data-action="theme-expert-toggle"]')
-        ].find((item) => item.dataset.id === target.value);
-        button?.classList.add("is-active");
       }
       return;
     }
@@ -11883,6 +12259,10 @@
     }
     if (target.matches("[data-doctor-photo]")) {
       handleDoctorPhotoUpload(target.files?.[0]);
+      return;
+    }
+    if (target.matches("[data-marketing-file]")) {
+      handleMarketingImageUpload(target.files?.[0]);
       return;
     }
     if (target.matches("[data-review-pdf]")) {
@@ -12263,33 +12643,21 @@
         break;
       case "theme-coverage-add":
         if (!state.adminThemeDraft) return;
+        if (!state.adminThemeDraft.coverageCity) {
+          return showToast("请先选择要添加的城市。");
+        }
+        if (state.adminThemeDraft.coverageCities?.includes(
+          state.adminThemeDraft.coverageCity
+        )) {
+          return showToast(`「${state.adminThemeDraft.coverageCity}」已在覆盖范围中。`);
+        }
         state.adminThemeDraft.coverageCities = addCoverageCity(
           state.adminThemeDraft.coverageCities,
           state.adminThemeDraft.coverageCity
         );
         refreshThemeCoverageChips();
+        showToast(`已添加覆盖城市：${state.adminThemeDraft.coverageCity}。`);
         break;
-      case "theme-expert-toggle": {
-        if (!state.adminThemeDraft) return;
-        const id = el.dataset.id;
-        const ids = new Set(state.adminThemeDraft.expertIds || []);
-        if (ids.has(id)) {
-          const boundTopic = (state.adminThemeDraft.topics || []).find(
-            (topic) => String(topic.expertId || "") === String(id)
-          );
-          if (boundTopic) {
-            return showToast(
-              `「${boundTopic.title || "该课题"}」正在使用这位专家，请先更换或删除课题。`
-            );
-          }
-          ids.delete(id);
-        } else {
-          ids.add(id);
-        }
-        state.adminThemeDraft.expertIds = [...ids];
-        el.classList.toggle("is-active");
-        break;
-      }
       case "theme-topic-add":
         if (!state.adminThemeDraft) return;
         state.adminThemeDraft.topics = (state.adminThemeDraft.topics || []).concat({
@@ -12361,6 +12729,32 @@
         showToast(copied ? "活动链接已复制。" : "复制失败，请手动复制。");
         break;
       }
+      case "marketing-filter":
+        state.marketingFilter = el.dataset.value || "all";
+        renderApp({ scrollTo: currentWindowScroll() });
+        break;
+      case "marketing-poster-add":
+        openPosterUpload();
+        break;
+      case "marketing-poster-edit":
+        openPosterUpload(state.posterId);
+        break;
+      case "marketing-poster-delete":
+        deleteMarketingPoster();
+        break;
+      case "marketing-poster-share":
+        shareMarketingPoster();
+        break;
+      case "marketing-poster-save":
+        saveMarketingDraft();
+        break;
+      case "marketing-poster-reset":
+        if (!isSuperadmin()) return;
+        saveMarketingPosters(defaultMarketingPosters());
+        state.marketingFilter = "all";
+        renderApp({ scrollTo: currentWindowScroll() });
+        showToast("已恢复 4 套官方海报。");
+        break;
       case "close-overlay":
         dismissOverlay();
         break;
