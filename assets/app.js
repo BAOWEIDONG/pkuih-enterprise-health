@@ -27,7 +27,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261125-6";
+  const DATA_VERSION = "20261125-7";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -9404,8 +9404,9 @@
         by: { name: state.adminUser.name, username: state.adminUser.username }
       });
     }
+    const wasPending = demand.status === "pending";
     updateDemand(demand.id, {
-      status: demand.status === "pending" ? "contacted" : demand.status,
+      status: wasPending ? "contacted" : demand.status,
       assignedStaff: demand.assignedStaff || staffSnapshot(state.adminUser),
       contactedAt: demand.contactedAt || new Date().toISOString(),
       followUps
@@ -9416,7 +9417,13 @@
       hospitalId: demand.hospitalId
     });
     renderOverlay();
-    showToast(note ? "沟通记录已保存。" : "已标记为已联系。");
+    showToast(
+      wasPending
+        ? "已标记为已联系，请继续匹配资源。"
+        : note
+        ? "沟通记录已保存。"
+        : "已保存沟通记录。"
+    );
   }
 
   function adminDemandMatch() {
@@ -9428,6 +9435,12 @@
           ? "集团企康办需求仅超级管理员可跟进。"
           : "只能跟进本院需求。"
       );
+    }
+    if (demand.status === "pending") {
+      return showToast("请先保存沟通记录并标记「已联系」，再标记已匹配。");
+    }
+    if (demand.status === "closed") {
+      return showToast("该需求已关闭，不能再标记为已匹配。");
     }
     updateDemand(demand.id, {
       status: "matched",
