@@ -27,7 +27,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261125-3";
+  const DATA_VERSION = "20261125-4";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -651,7 +651,7 @@
       phone,
       name: String(account.name || "").trim(),
       orgName: String(account.orgName || "").trim(),
-      orgType: String(account.orgType || "保险公司").trim(),
+      orgType: String(account.orgType || "").trim(),
       title: String(account.title || "").trim(),
       contactPhone: String(account.contactPhone || phone).replace(/\s+/g, ""),
       email: String(account.email || "").trim(),
@@ -782,7 +782,7 @@
     const region = profileRegionFromContext(profile);
     state.login.name = profile.name || "";
     state.login.orgName = profile.orgName || "";
-    state.login.orgType = profile.orgType || "保险公司";
+    state.login.orgType = profile.orgType || "";
     state.login.title = profile.title || "";
     state.login.contactPhone = profile.contactPhone || profile.phone || state.login.phone;
     state.login.email = profile.email || "";
@@ -3018,9 +3018,17 @@
                   <span>${initialOf(state.login.name || state.login.phone)}</span>
                   <div>
                     <strong>${esc(state.login.phone)}</strong>
-                    <small>${existing ? "请补全企业与联系资料后登录" : "首次登录，请完善全部联系信息"}</small>
+                    <small>${
+                      existing
+                        ? "请补全企业与联系资料后登录"
+                        : "院方已开通登录权限，请补充企业资料后进入"
+                    }</small>
                   </div>
                 </div>
+                <p class="auth-form-note">${icon(
+                  "alert",
+                  13
+                )} 白名单开通时仅登记手机号与姓名，单位、职务、联系方式和通知邮箱需由你补充完整后才能预约。</p>
                 ${
                   state.login.error
                     ? `<p class="auth-inline-error">${icon("alert", 13)} ${esc(
@@ -3049,20 +3057,20 @@
                   )}" data-login-field="orgName">
                 </div>
                 <div class="field">
-                  <label>机构类型 <em>*</em></label>
-                  <div class="choice-grid">
+                  <label for="login-org-type">机构类型 <em>*</em></label>
+                  <select id="login-org-type" data-login-field="orgType">
+                    <option value="" ${
+                      state.login.orgType ? "" : "selected"
+                    }>请选择机构类型</option>
                     ${INSTITUTION_TYPES
                       .map(
-                        (type) => `
-                          <button class="choice-tile ${
-                            state.login.orgType === type ? "is-active" : ""
-                          }" type="button" data-action="login-org-type" data-value="${type}">
-                            ${esc(type)}
-                          </button>
-                        `
+                        (type) =>
+                          `<option value="${esc(type)}" ${
+                            state.login.orgType === type ? "selected" : ""
+                          }>${esc(type)}</option>`
                       )
                       .join("")}
-                  </div>
+                  </select>
                 </div>
                 <div class="field">
                   <label for="login-contact">联系方式 <em>*</em> <span>默认使用登录手机号，可修改</span></label>
@@ -11591,12 +11599,14 @@
         <div class="admin-stat"><small>已开通</small><strong>${activeCount}</strong><span>可登录机构账号</span></div>
         <div class="admin-stat"><small>已停用</small><strong>${accounts.length - activeCount}</strong><span>不可登录</span></div>
         <div class="admin-stat"><small>覆盖机构</small><strong>${new Set(
-          accounts.filter((item) => item.active).map((item) => item.orgName)
+          accounts
+            .filter((item) => item.active && item.orgName)
+            .map((item) => item.orgName)
         ).size}</strong><span>集团与分支机构</span></div>
       </div>
       <div class="institution-account-note">
         ${icon("shield", 15)}
-        <span>机构手机号是登录白名单。开通时同步录入姓名、单位、机构类型、职务、联系方式、通知邮箱与省市；未开通手机号将无法获取验证码登录。</span>
+        <span>机构手机号是登录白名单。开通时只需填写手机号与姓名，单位、机构类型、职务、联系方式和通知邮箱由机构首次登录后补充完整；未开通手机号将无法获取验证码登录。</span>
       </div>
       <div class="account-list institution-account-list">
         ${
@@ -11609,7 +11619,9 @@
                       <span class="account-row__avatar">${esc(initialOf(account.orgName || account.name))}</span>
                       <span class="account-row__body">
                         <strong>${esc(account.orgName || "未填写单位")}
-                          <i class="role-tag role-tag--operator">${esc(account.orgType || "机构")}</i>
+                          <i class="role-tag role-tag--operator">${esc(
+                            account.orgType || "资料待补充"
+                          )}</i>
                           ${account.active ? "" : '<i class="role-tag is-off">已停用</i>'}
                         </strong>
                         <span>${esc(account.name || "未填写姓名")} · ${phoneLink(
@@ -11644,7 +11656,7 @@
           originalPhone: "",
           name: "",
           orgName: "",
-          orgType: "保险公司",
+          orgType: "",
           title: "",
           contactPhone: "",
           email: "",
@@ -11665,7 +11677,7 @@
       <section class="sheet institution-account-sheet" role="dialog" aria-modal="true" aria-label="机构账号">
         <div class="sheet__grabber"></div>
         <div class="sheet__bar">
-          <div><h2>${draft.isNew ? "开通机构账号" : "编辑机构账号"}</h2><p>字段与机构端企业资料一致</p></div>
+          <div><h2>${draft.isNew ? "开通机构账号" : "编辑机构账号"}</h2><p>仅手机号与姓名为必填，其余资料由机构登录后补充</p></div>
           <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">
             ${icon("close", 15)}
           </button>
@@ -11674,7 +11686,7 @@
           <div class="sheet-pad">
             <div class="institution-account-banner">
               ${icon("phone", 15)}
-              <span><strong>登录手机号即机构登录白名单</strong><small>停用后该手机号无法登录，但历史预约与提需仍保留。</small></span>
+              <span><strong>手机号与姓名即可开通白名单</strong><small>其余资料选填，机构人员首次登录后必须补充完整才能预约；停用后该手机号无法登录。</small></span>
             </div>
             <div class="field-row">
               <div class="field"><label>登录手机号 <em>*</em></label>
@@ -11687,14 +11699,17 @@
                 )}" placeholder="机构联系人姓名">
               </div>
             </div>
-            <div class="field"><label>单位名称 <em>*</em></label>
+            <div class="field"><label>单位名称 <span>选填，机构登录后补充</span></label>
               <input type="text" data-institution-field="orgName" value="${esc(
                 draft.orgName
-              )}" placeholder="请输入机构全称">
+              )}" placeholder="如已知可填写，否则留空">
             </div>
             <div class="field-row">
-              <div class="field"><label>机构类型 <em>*</em></label>
+              <div class="field"><label>机构类型 <span>选填</span></label>
                 <select data-institution-field="orgType">
+                  <option value="" ${
+                    draft.orgType ? "" : "selected"
+                  }>待机构登录后选择</option>
                   ${INSTITUTION_TYPES
                     .map(
                       (type) =>
@@ -11705,25 +11720,25 @@
                     .join("")}
                 </select>
               </div>
-              <div class="field"><label>职务 <em>*</em></label>
+              <div class="field"><label>职务 <span>选填</span></label>
                 <input type="text" data-institution-field="title" value="${esc(
                   draft.title
-                )}" placeholder="如：员工健康负责人">
+                )}" placeholder="机构登录后补充">
               </div>
             </div>
             <div class="field-row">
-              <div class="field"><label>联系方式 <em>*</em></label>
+              <div class="field"><label>联系方式 <span>选填</span></label>
                 <input type="tel" inputmode="numeric" maxlength="11" data-institution-field="contactPhone"
                   value="${esc(draft.contactPhone || draft.phone)}" placeholder="默认同登录手机号">
               </div>
-              <div class="field"><label>通知邮箱 <em>*</em></label>
+              <div class="field"><label>通知邮箱 <span>选填，登录后必填</span></label>
                 <input type="email" inputmode="email" data-institution-field="email"
                   value="${esc(draft.email || "")}" placeholder="name@company.com">
               </div>
             </div>
             <div class="field-row">
               <div class="field">
-                <label>所在省份</label>
+                <label>所在省份 <span>登录后按定位同步</span></label>
                 <select data-institution-province>${renderProvinceOptions(
                   draft.province
                 )}</select>
@@ -11756,32 +11771,31 @@
     if (!isSuperadmin()) return showToast("仅超级管理员可配置机构账号。");
     const draft = state.institutionAccountDraft;
     if (!draft) return;
-    if (!/^1\d{10}$/.test(draft.phone || "")) return showToast("请填写正确的 11 位登录手机号。");
+    const phone = String(draft.phone || "").replace(/\s+/g, "");
+    if (!/^1\d{10}$/.test(phone)) return showToast("请填写正确的 11 位登录手机号。");
     if (!draft.name?.trim()) return showToast("请填写机构联系人姓名。");
-    if (!draft.title?.trim()) return showToast("请填写机构联系人职务。");
-    if (!draft.orgName?.trim()) return showToast("请填写单位名称。");
-    if (!INSTITUTION_TYPES.includes(draft.orgType)) {
+    if (draft.orgType && !INSTITUTION_TYPES.includes(draft.orgType)) {
       return showToast("请选择机构类型。");
     }
     const contactPhone = String(draft.contactPhone || draft.phone || "").trim();
-    if (!/^1\d{10}$/.test(contactPhone)) {
+    if (contactPhone && !/^1\d{10}$/.test(contactPhone)) {
       return showToast("联系方式格式不正确。");
     }
-    if (!draft.email?.trim()) return showToast("请填写通知邮箱。");
-    if (!validProfileEmail(draft.email)) {
+    if (draft.email?.trim() && !validProfileEmail(draft.email)) {
       return showToast("通知邮箱格式不正确。");
     }
     const accounts = getInstitutionAccounts();
     const duplicate = accounts.find(
       (item) =>
-        item.phone === draft.phone &&
+        item.phone === phone &&
         (!draft.originalPhone || item.phone !== draft.originalPhone)
     );
     if (duplicate) return showToast("该手机号已经开通机构账号。");
     const region = normalizeRegion(draft.province, draft.city);
     const payload = normalizeInstitutionAccount({
       ...draft,
-      phone: draft.phone.trim(),
+      phone,
+      orgType: draft.orgType || "",
       contactPhone,
       province: region.province,
       city: region.city,
@@ -11809,14 +11823,18 @@
     }
     logOperation(
       draft.isNew ? "开通机构账号" : "更新机构账号",
-      `${payload.orgName} · ${payload.name} · ${payload.phone}`,
+      `${payload.orgName || "待补充单位"} · ${payload.name} · ${payload.phone}`,
       { entityType: "institution", entityId: payload.phone }
     );
     state.overlay = null;
     state.institutionAccountDraft = null;
     releaseOverlayHistory();
     renderApp();
-    showToast(draft.isNew ? "机构账号已开通，该手机号可登录。" : "机构账号已更新。");
+    showToast(
+      draft.isNew
+        ? "机构账号已开通，机构首次登录后需补充企业资料。"
+        : "机构账号已更新。"
+    );
   }
 
   function renderAdminLogsPage() {
@@ -12777,6 +12795,13 @@
 
   function handleChange(event) {
     const target = event.target;
+    if (target.matches("[data-login-field]")) {
+      const field = target.dataset.loginField;
+      state.login[field] =
+        target.type === "checkbox" ? target.checked : target.value;
+      state.login.error = "";
+      return;
+    }
     if (target.matches("[data-expert-month]")) {
       state.expertMonth = Math.max(0, Number(target.value) || 0);
       state.expertService = state.expertMonth > 0 ? "讲座" : "all";
@@ -13097,12 +13122,6 @@
       case "login-back":
         state.login.step = 1;
         renderApp({ scrollTo: 0 });
-        break;
-      case "login-org-type":
-        state.login.orgType = el.dataset.value;
-        document.querySelectorAll('[data-action="login-org-type"]').forEach((button) => {
-          button.classList.toggle("is-active", button.dataset.value === el.dataset.value);
-        });
         break;
       case "login-submit":
         submitProfileLogin();

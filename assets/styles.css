@@ -1415,6 +1415,26 @@ textarea {
   font-size: 9px;
 }
 
+.auth-form-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 9px 11px;
+  border: 1px solid rgba(11, 49, 143, 0.1);
+  border-radius: 12px;
+  background: #f1f5ff;
+  color: var(--brand);
+  font-size: 9px;
+  font-weight: 620;
+  line-height: 1.55;
+}
+
+.auth-form-note svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
 .auth-back {
   display: block;
   margin: 14px auto 0;
