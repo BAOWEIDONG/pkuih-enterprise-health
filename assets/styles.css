@@ -10285,12 +10285,29 @@ textarea {
 
 .plan-pdf-upload > span {
   display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
   min-width: 0;
   align-items: center;
   gap: 5px;
   color: var(--green-text);
   font-size: 9px;
   font-weight: 650;
+}
+
+.plan-pdf-upload > span b {
+  flex: 1 1 120px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-pdf-upload > span small {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+  font-size: 8px;
+  font-weight: 600;
 }
 
 .plan-pdf-upload > span button {
@@ -10300,6 +10317,10 @@ textarea {
   text-decoration: underline;
 }
 
+.plan-pdf-upload > span button[data-action="open-plan-pdf"] {
+  color: var(--blue-text);
+}
+
 .plan-pdf-upload > small {
   color: var(--ink-3);
   font-size: 8.5px;
@@ -10307,16 +10328,144 @@ textarea {
 
 .plan-pdf-link {
   display: flex;
+  width: 100%;
   align-items: center;
-  gap: 6px;
+  justify-content: flex-start;
+  gap: 9px;
   margin-top: 10px;
-  padding: 10px 11px;
-  border: 1px solid rgba(10, 108, 255, 0.12);
-  border-radius: 11px;
-  background: #f1f6ff;
+  padding: 10px;
+  border: 1px solid rgba(10, 76, 178, 0.14);
+  border-radius: 13px;
+  background: linear-gradient(145deg, #f7faff, #eef5ff);
   color: var(--blue-text);
+  font: inherit;
+  text-align: left;
+}
+
+.plan-pdf-link__icon {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 3px 9px rgba(10, 76, 178, 0.1);
+}
+
+.plan-pdf-link__meta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.plan-pdf-link__meta strong {
+  overflow: hidden;
   font-size: 9.5px;
-  font-weight: 700;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-pdf-link__meta small {
+  color: var(--ink-3);
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.plan-pdf-link > svg {
+  flex: 0 0 auto;
+  opacity: 0.7;
+}
+
+.pdf-sheet__body {
+  background: #e9eef6;
+}
+
+.pdf-sheet__frame {
+  height: clamp(320px, 58vh, 560px);
+  overflow: hidden;
+  margin: 4px 14px 0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 14px 32px rgba(7, 24, 58, 0.14);
+}
+
+.pdf-sheet__frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+
+.pdf-sheet__frame.attachment-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(10, 76, 178, 0.08), transparent 38%),
+    #fff;
+  text-align: center;
+}
+
+.pdf-sheet__frame.attachment-preview > span {
+  display: inline-flex;
+  width: 68px;
+  height: 68px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  background: var(--blue-soft);
+  color: var(--blue-text);
+}
+
+.pdf-sheet__frame.attachment-preview > strong {
+  margin-top: 16px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.pdf-sheet__frame.attachment-preview > p {
+  max-width: 100%;
+  margin: 7px 0 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: 10px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-sheet__frame.attachment-preview > small {
+  margin-top: 8px;
+  color: var(--ink-3);
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.pdf-sheet__hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 10px 14px 16px;
+  padding: 10px 11px;
+  border: 1px solid rgba(10, 76, 178, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--ink-3);
+  font-size: 8px;
+  line-height: 1.55;
+}
+
+.pdf-sheet__hint svg {
+  flex: 0 0 auto;
+  color: var(--blue-text);
 }
 
 .email-card {

@@ -27,7 +27,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261125-1";
+  const DATA_VERSION = "20261125-2";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -115,6 +115,7 @@
     }
   ];
   const SERVICE_LINK = "https://baoweidong.github.io/pkuih-enterprise-health/";
+  const PLAN_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
   const AVATARS = {
     neutral: "assets/avatars/doctor-neutral.svg",
     male: "assets/avatars/doctor-male.svg",
@@ -366,6 +367,7 @@
     overlayScrollMemory: {},
     paintedOverlayKey: "",
     posterId: "",
+    planPdfView: null,
     profileDraft: null,
     // admin
     adminTab: "appointments",
@@ -380,6 +382,7 @@
     adminDraft: null,
     adminNoteEditing: false,
     adminReviewSaved: false,
+    reviewSaving: false,
     adminDemandId: "",
     adminDemandDraft: null,
     appointmentLocationDraft: null,
@@ -504,6 +507,13 @@
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
       date.getHours()
     )}:${pad(date.getMinutes())}`;
+  }
+
+  function formatFileSize(bytes) {
+    const size = Number(bytes) || 0;
+    if (size <= 0) return "大小未知";
+    if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+    return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
   }
 
   function maskPhone(phone) {
@@ -1635,6 +1645,7 @@
           }
         });
       }
+      ensurePlanningDemoAppointment();
       return;
     }
     if (!getUser(DEMO_PHONE)) {
@@ -1879,12 +1890,77 @@
       demandChanged = true;
     }
     if (appointmentChanged) saveAppointments(appointments);
+    ensurePlanningDemoAppointment();
     if (demandChanged) saveDemands(demands);
     writeJSON(STORAGE.seed, {
       ...seeded,
       records: true,
       recordsAt: new Date().toISOString()
     });
+  }
+
+  function ensurePlanningDemoAppointment() {
+    const appointments = getAppointments();
+    if (appointments.some((item) => item.id === "BD-DEMO-04")) return;
+    const hospital = hospitalById("pkuih") || state.hospitals[0];
+    if (!hospital) return;
+    const staff = {
+      username: "pkuih",
+      name: "周老师",
+      phone: "13800001111"
+    };
+    const expert =
+      state.experts.find(
+        (item) =>
+          item.hospitalId === hospital.id &&
+          item.active !== false &&
+          matchesService(item, "讲座")
+      ) || null;
+    if (!expert) return;
+    const available = doctorAvailability(expert).dates;
+    const fallbackDate = isoDate(
+      addDays(startOfDay(), Math.max(10, Number(expert.leadDays) || 7) + 2)
+    );
+    const date =
+      available.find(
+        (item) => item >= isoDate(addDays(startOfDay(), Math.max(7, Number(expert.leadDays) || 7)))
+      ) ||
+      available[0] ||
+      fallbackDate;
+    const now = new Date().toISOString();
+    appointments.push({
+      id: "BD-DEMO-04",
+      ownerPhone: DEMO_PHONE,
+      orgName: DEMO_PROFILE.orgName,
+      orgType: DEMO_PROFILE.orgType,
+      contactName: DEMO_PROFILE.name,
+      contactTitle: DEMO_PROFILE.title,
+      phone: DEMO_PHONE,
+      province: "北京市",
+      city: "北京市",
+      address: "北京市朝阳区望京国际商务区 A 座",
+      venue: "12 层客户活动厅",
+      serviceType: "讲座",
+      doctorId: expert.id,
+      doctorName: expert.name,
+      tier: expert.tier,
+      hospitalId: hospital.id,
+      date,
+      topic: "高压职场人群的睡眠与精力管理",
+      audience: "核心业务团队",
+      headcount: "70",
+      note: "希望加入现场互动答疑，活动对象以业务骨干为主。",
+      status: "planning",
+      assignedStaff: staff,
+      plan: null,
+      planHistory: [],
+      internalNote: "已接单，等待与机构确认最终课题和现场流程。",
+      feedback: "",
+      acceptedAt: now,
+      createdAt: now,
+      updatedAt: now
+    });
+    saveAppointments(appointments);
   }
 
   function getAppointments() {
@@ -2427,6 +2503,7 @@
       '<circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c.4-3.4 2.5-5.3 6-5.3s5.6 1.9 6 5.3"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M16.2 14.9c3 .3 4.6 2 5 5.1"/>',
     clipboard:
       '<rect x="5" y="4.5" width="14" height="17" rx="2.5"/><path d="M9 4.5V3h6v1.5M8.5 9h7M8.5 12.5h7M8.5 16h4.5"/>',
+    download: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 20h16"/>',
     history: '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8"/><path d="M3.5 4v4.5H8"/><path d="M12 8v4.5l3 1.8"/>',
     alert: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.1"/>',
     star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9Z"/>'
@@ -2573,6 +2650,7 @@
       state.overlayHistoryDepth = currentDepth;
       return;
     }
+    if (state.overlay?.type === "plan-pdf") releasePlanPdfView();
     while (state.overlayStack.length && state.overlayStack.length + 1 > target) {
       state.overlay = state.overlayStack.pop();
     }
@@ -2593,6 +2671,7 @@
   function popOverlayLayer() {
     const previous = state.overlayStack.pop();
     if (!previous) return false;
+    if (state.overlay?.type === "plan-pdf") releasePlanPdfView();
     releaseOverlayHistory(1);
     state.overlay = previous;
     renderOverlay();
@@ -2621,6 +2700,7 @@
   }
 
   function clearOverlayState() {
+    releasePlanPdfView();
     state.overlay = null;
     state.overlayStack = [];
     state.booking = null;
@@ -2644,6 +2724,7 @@
   }
 
   function dismissOverlay({ fromHistory = false } = {}) {
+    if (state.overlay?.type === "plan-pdf") releasePlanPdfView();
     if (!fromHistory && popOverlayLayer()) return;
     if (!fromHistory) releaseOverlayHistory();
     clearOverlayState();
@@ -2738,6 +2819,7 @@
     if (type === "booking") return paint(renderBookingFlow());
     if (type === "doctor") return paint(renderDoctorSheet());
     if (type === "appointment") return paint(renderAppointmentSheet());
+    if (type === "plan-pdf") return paint(renderPlanPdfSheet());
     if (type === "appointment-location") return paint(renderAppointmentLocationSheet());
     if (type === "home-city") return paint(renderHomeCitySheet());
     if (type === "demand-create") return paint(renderDemandCreateSheet());
@@ -6714,13 +6796,20 @@
             : ""
         }
         ${
-          plan.pdf?.dataUrl
-            ? `<a class="plan-pdf-link" href="${esc(
-                plan.pdf.dataUrl
-              )}" target="_blank" rel="noopener">${icon(
-                "clipboard",
-                14
-              )} 查看方案附件 · ${esc(plan.pdf.name || "PDF")}</a>`
+          plan.pdf
+            ? `<button class="plan-pdf-link" type="button" data-action="open-plan-pdf"
+                data-appointment-id="${esc(appointment.id)}">
+                <span class="plan-pdf-link__icon">${icon("clipboard", 16)}</span>
+                <span class="plan-pdf-link__meta">
+                  <strong>方案附件 · ${esc(plan.pdf.name || "活动方案.pdf")}</strong>
+                  <small>${esc(formatFileSize(plan.pdf.size))} · ${
+                    planAttachmentKind(plan.pdf) === "pdf"
+                      ? "点击在线预览"
+                      : "点击查看或下载"
+                  }</small>
+                </span>
+                ${icon("chevronRight", 14)}
+              </button>`
             : ""
         }
       </section>
@@ -7741,7 +7830,9 @@
   }
 
   function adminPendingCount() {
-    return adminAppointments().filter((item) => item.status === "pending").length;
+    return adminAppointments().filter((item) =>
+      ["pending", "planning", "review", "revision"].includes(item.status)
+    ).length;
   }
 
   function adminDemandPendingCount() {
@@ -8096,9 +8187,10 @@
     };
   }
 
-  function saveReview() {
+  async function saveReview() {
     const appointment = appointmentById(state.adminReviewId);
     if (!appointment) return;
+    if (state.reviewSaving) return;
     if (["completed", "cancelled"].includes(appointment.status)) {
       return showToast("该预约已结束，方案仅供查看。");
     }
@@ -8146,6 +8238,15 @@
       ignoreId: appointment.id
     });
     if (assignmentError) return showToast(assignmentError);
+    let pdfSave;
+    try {
+      state.reviewSaving = true;
+      showToast("正在保存活动方案…");
+      pdfSave = await preparePlanPdfForSave(appointment);
+    } catch (error) {
+      state.reviewSaving = false;
+      return showToast("方案附件保存失败，请压缩文件或稍后重试。");
+    }
     const region = normalizeRegion(
       appointment.province || "北京市",
       appointment.city || "北京市"
@@ -8167,7 +8268,7 @@
       agenda: fields.agenda || "",
       team: fields.team || "",
       message: fields.message || "",
-      pdf: state.adminDraft?.planPdf || appointment.plan?.pdf || null,
+      pdf: pdfSave.pdf,
       contact: staff ? `${staff.name} · ${staff.phone}` : "",
       themeMonth: keepsTheme ? appointment.themeMonth || "" : "",
       themeTopicId: keepsTheme ? appointment.themeTopicId || "" : "",
@@ -8198,7 +8299,18 @@
     appointmentPatch.doctorId = finalSpeaker.id;
     appointmentPatch.doctorName = finalSpeaker.name;
     appointmentPatch.tier = finalSpeaker.tier;
-    const updated = updateAppointment(appointment.id, appointmentPatch);
+    let updated;
+    try {
+      updated = updateAppointment(appointment.id, appointmentPatch);
+    } catch (error) {
+      state.reviewSaving = false;
+      if (pdfSave.newKey) deletePlanPdfBlob(pdfSave.newKey);
+      return showToast("方案保存失败，请稍后重试。");
+    }
+    if (pdfSave.oldKey && pdfSave.oldKey !== pdfSave.newKey) {
+      deletePlanPdfBlob(pdfSave.oldKey);
+    }
+    state.reviewSaving = false;
     logOperation("发送或更新活动方案", `${appointment.id} · ${plan.topic}`, {
       entityType: "appointment",
       entityId: appointment.id,
@@ -8506,17 +8618,26 @@
                         <textarea data-review-field="message">${esc(draft.message)}</textarea>
                       </div>
                       <div class="field">
-                        <label>方案附件 PDF <span>选填 · 不超过 2MB</span></label>
+                        <label>方案附件 PDF / PPT / PPTX <span>选填 · 单个文件不超过 20MB</span></label>
                         <div class="plan-pdf-upload">
                           <label class="btn btn--ghost btn--sm">
-                            ${icon("clipboard", 13)} 上传 PDF
-                            <input type="file" accept="application/pdf,.pdf" data-review-pdf hidden>
+                            ${icon("clipboard", 13)} 上传附件
+                            <input type="file"
+                              accept=".pdf,.ppt,.pptx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                              data-review-pdf hidden>
                           </label>
                           ${
                             draft.planPdf
-                              ? `<span>${icon("checkCircle", 13)} ${esc(
+                              ? `<span>${icon("checkCircle", 13)} <b>${esc(
                                   draft.planPdf.name
-                                )}<button type="button" data-action="review-pdf-clear">移除</button></span>`
+                                )}</b><small>${esc(
+                                  formatFileSize(draft.planPdf.size)
+                                )}</small>${
+                                  canEdit && !saved
+                                    ? `<button type="button" data-action="open-plan-pdf"
+                                  data-appointment-id="${esc(appointment.id)}">查看</button><button type="button" data-action="review-pdf-clear">移除</button>`
+                                    : ""
+                                }</span>`
                               : `<small>可上传完整方案、课题提纲或执行手册</small>`
                           }
                         </div>
@@ -8554,6 +8675,27 @@
                         : ""
                     }
                   </section>`
+                : ""
+            }
+            ${
+              appointment.plan?.pdf && (saved || terminal)
+                ? `<button class="plan-pdf-link" type="button" data-action="open-plan-pdf"
+                    data-appointment-id="${esc(appointment.id)}">
+                    <span class="plan-pdf-link__icon">${icon("clipboard", 16)}</span>
+                    <span class="plan-pdf-link__meta">
+                      <strong>方案附件 · ${esc(
+                        appointment.plan.pdf.name || "活动方案.pdf"
+                      )}</strong>
+                      <small>${esc(
+                        formatFileSize(appointment.plan.pdf.size)
+                      )} · ${
+                        planAttachmentKind(appointment.plan.pdf) === "pdf"
+                          ? "点击在线预览"
+                          : "点击查看或下载"
+                      }</small>
+                    </span>
+                    ${icon("chevronRight", 14)}
+                  </button>`
                 : ""
             }
             ${
@@ -10734,30 +10876,302 @@
     reader.readAsDataURL(file);
   }
 
+  const PLAN_PDF_DB_NAME = "pkuih_h6_file_store";
+  const PLAN_PDF_STORE = "plan_pdfs";
+  let planPdfDbPromise = null;
+
+  function openPlanPdfDb() {
+    if (planPdfDbPromise) return planPdfDbPromise;
+    planPdfDbPromise = new Promise((resolve, reject) => {
+      if (!window.indexedDB) {
+        reject(new Error("当前浏览器不支持附件存储"));
+        return;
+      }
+      const request = window.indexedDB.open(PLAN_PDF_DB_NAME, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(PLAN_PDF_STORE)) {
+          db.createObjectStore(PLAN_PDF_STORE);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => {
+        planPdfDbPromise = null;
+        reject(request.error || new Error("附件存储初始化失败"));
+      };
+    });
+    return planPdfDbPromise;
+  }
+
+  async function savePlanPdfBlob(key, blob, meta = {}) {
+    const db = await openPlanPdfDb();
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(PLAN_PDF_STORE, "readwrite");
+      transaction.objectStore(PLAN_PDF_STORE).put(
+        {
+          ...meta,
+          blob,
+          savedAt: new Date().toISOString()
+        },
+        key
+      );
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  }
+
+  async function loadPlanPdfBlob(key) {
+    if (!key) return null;
+    const db = await openPlanPdfDb();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(PLAN_PDF_STORE, "readonly");
+      const request = transaction.objectStore(PLAN_PDF_STORE).get(key);
+      request.onsuccess = () => resolve(request.result?.blob || null);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function deletePlanPdfBlob(key) {
+    if (!key) return;
+    try {
+      const db = await openPlanPdfDb();
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction(PLAN_PDF_STORE, "readwrite");
+        transaction.objectStore(PLAN_PDF_STORE).delete(key);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+      });
+    } catch (error) {
+      console.warn("plan pdf cleanup failed", error);
+    }
+  }
+
+  async function pdfBlobFromDataUrl(dataUrl) {
+    const response = await fetch(dataUrl);
+    if (!response.ok) throw new Error("附件数据读取失败");
+    return response.blob();
+  }
+
+  function cleanPlanPdfMeta(pdf) {
+    if (!pdf) return null;
+    return {
+      name: pdf.name || "活动方案.pdf",
+      size: Number(pdf.size) || 0,
+      type: pdf.type || "application/pdf",
+      uploadedAt: pdf.uploadedAt || "",
+      storageKey: pdf.storageKey || ""
+    };
+  }
+
+  function planAttachmentKind(file = {}) {
+    const type = String(file.type || "").toLowerCase();
+    const name = String(file.name || "").toLowerCase();
+    if (type === "application/pdf" || name.endsWith(".pdf")) return "pdf";
+    if (
+      type.includes("powerpoint") ||
+      type.includes("presentationml") ||
+      name.endsWith(".ppt") ||
+      name.endsWith(".pptx")
+    ) {
+      return "ppt";
+    }
+    return "file";
+  }
+
+  function planAttachmentKindLabel(kind) {
+    if (kind === "pdf") return "PDF";
+    if (kind === "ppt") return "PPT";
+    return "附件";
+  }
+
+  function isAllowedPlanAttachment(file) {
+    const type = String(file?.type || "").toLowerCase();
+    const name = String(file?.name || "").toLowerCase();
+    return (
+      type === "application/pdf" ||
+      type === "application/vnd.ms-powerpoint" ||
+      type ===
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+      name.endsWith(".pdf") ||
+      name.endsWith(".ppt") ||
+      name.endsWith(".pptx")
+    );
+  }
+
+  async function preparePlanPdfForSave(appointment) {
+    const existingKey = appointment.plan?.pdf?.storageKey || "";
+    const draftPdf = state.adminDraft?.planPdf || null;
+    const draftBlob = state.adminDraft?.planPdfBlob || null;
+    if (!draftPdf) {
+      return { pdf: null, oldKey: existingKey, newKey: "" };
+    }
+    let blob = draftBlob;
+    if (!blob && draftPdf.dataUrl) {
+      blob = await pdfBlobFromDataUrl(draftPdf.dataUrl);
+    }
+    if (!blob) {
+      return { pdf: cleanPlanPdfMeta(draftPdf), oldKey: existingKey, newKey: "" };
+    }
+    const key = `plan-pdf-${appointment.id}-${Date.now()}`;
+    const name = draftPdf.name || "活动方案.pdf";
+    const size = Number(draftPdf.size) || blob.size || 0;
+    await savePlanPdfBlob(key, blob, {
+      name,
+      size,
+      type: draftPdf.type || blob.type || "application/pdf"
+    });
+    return {
+      pdf: {
+        name,
+        size,
+        type: draftPdf.type || blob.type || "application/pdf",
+        uploadedAt: draftPdf.uploadedAt || new Date().toISOString(),
+        storageKey: key
+      },
+      oldKey: existingKey,
+      newKey: key
+    };
+  }
+
+  function releasePlanPdfView() {
+    if (state.planPdfView?.url) {
+      URL.revokeObjectURL(state.planPdfView.url);
+    }
+    state.planPdfView = null;
+  }
+
+  async function openPlanPdf(appointmentId) {
+    const appointment = appointmentById(appointmentId);
+    if (!appointment) return showToast("预约记录不存在。");
+    const draftPdf =
+      state.adminReviewId === appointment.id ? state.adminDraft?.planPdf || null : null;
+    const pdf = appointment.plan?.pdf || draftPdf;
+    if (!pdf) return showToast("该预约暂无方案附件。");
+    const canViewClient =
+      Boolean(state.session) && clientOwnsAppointment(appointment);
+    const canViewAdmin =
+      Boolean(state.adminAuthed) &&
+      adminCanManageHospital(appointment.hospitalId);
+    if (!canViewClient && !canViewAdmin) {
+      return showToast("无权查看该方案附件。");
+    }
+    let blob = null;
+    if (
+      state.adminReviewId === appointment.id &&
+      state.adminDraft?.planPdfBlob
+    ) {
+      blob = state.adminDraft.planPdfBlob;
+    } else if (pdf.storageKey) {
+      try {
+        blob = await loadPlanPdfBlob(pdf.storageKey);
+      } catch (error) {
+        return showToast("方案附件读取失败，请稍后重试。");
+      }
+    } else if (pdf.dataUrl) {
+      try {
+        blob = await pdfBlobFromDataUrl(pdf.dataUrl);
+      } catch (error) {
+        return showToast("方案附件读取失败，请院方重新上传。");
+      }
+    }
+    if (!blob) {
+      return showToast("方案附件已失效，请联系院方重新上传。");
+    }
+    releasePlanPdfView();
+    const fallbackType =
+      planAttachmentKind(pdf) === "ppt"
+        ? "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        : "application/pdf";
+    const typedBlob = blob.type
+      ? blob
+      : new Blob([blob], {
+          type: pdf.type || fallbackType
+        });
+    const url = URL.createObjectURL(typedBlob);
+    state.planPdfView = {
+      appointmentId: appointment.id,
+      name: pdf.name || "活动方案.pdf",
+      size: Number(pdf.size) || blob.size || 0,
+      type: pdf.type || "application/pdf",
+      kind: planAttachmentKind(pdf),
+      url
+    };
+    openOverlayLayer({ type: "plan-pdf", appointmentId: appointment.id });
+  }
+
+  function renderPlanPdfSheet() {
+    const view = state.planPdfView;
+    if (!view) return "";
+    const isPdf = view.kind === "pdf";
+    return `
+      <div class="sheet-backdrop" data-action="close-overlay"></div>
+      <section class="sheet pdf-sheet" role="dialog" aria-modal="true" aria-label="方案附件预览">
+        <div class="sheet__grabber"></div>
+        <div class="sheet__bar">
+          <div><h2>方案附件</h2><p>${esc(view.name)} · ${esc(
+            formatFileSize(view.size)
+          )}</p></div>
+          <button class="sheet__close" type="button" data-action="close-overlay" aria-label="关闭">
+            ${icon("close", 15)}
+          </button>
+        </div>
+        <div class="sheet__body pdf-sheet__body">
+          ${
+            isPdf
+              ? `<div class="pdf-sheet__frame">
+                  <iframe src="${esc(view.url)}#toolbar=0&navpanes=0" title="${esc(
+                    view.name
+                  )}" loading="eager"></iframe>
+                </div>`
+              : `<div class="pdf-sheet__frame attachment-preview">
+                  <span>${icon("clipboard", 30)}</span>
+                  <strong>${esc(planAttachmentKindLabel(view.kind))} 材料</strong>
+                  <p>${esc(view.name)}</p>
+                  <small>${esc(
+                    formatFileSize(view.size)
+                  )} · 演示文稿请下载后使用 PowerPoint 或 WPS 查看</small>
+                </div>`
+          }
+          <div class="pdf-sheet__hint">
+            ${icon("shield", 13)}
+            <span>${
+              isPdf
+                ? "如微信内无法直接显示，请点击下方“下载附件”后打开；"
+                : "微信内通常不支持直接打开 PPT，请点击下方“下载附件”后查看；"
+            }附件支持最大 20MB。</span>
+          </div>
+        </div>
+        <div class="sheet__footer">
+          <button class="btn btn--ghost" type="button" data-action="close-overlay">关闭</button>
+          <a class="btn btn--primary" href="${esc(view.url)}" download="${esc(
+            view.name
+          )}" target="_blank" rel="noopener">${icon("download", 15)} 下载附件</a>
+        </div>
+      </section>
+    `;
+  }
+
   function handleReviewPdfUpload(file) {
     if (!file || !state.adminDraft) return;
-    if (
-      file.type &&
-      file.type !== "application/pdf" &&
-      !String(file.name || "").toLowerCase().endsWith(".pdf")
-    ) {
-      return showToast("请选择 PDF 文件。");
+    if (!isAllowedPlanAttachment(file)) {
+      return showToast("请选择 PDF、PPT 或 PPTX 文件。");
     }
-    if (file.size > 2 * 1024 * 1024) {
-      return showToast("方案附件请控制在 2MB 以内。");
+    if (file.size > PLAN_ATTACHMENT_MAX_BYTES) {
+      return showToast("单个方案附件请控制在 20MB 以内。");
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      state.adminDraft.planPdf = {
-        name: file.name || "活动方案.pdf",
-        size: file.size,
-        dataUrl: String(reader.result || ""),
-        uploadedAt: new Date().toISOString()
-      };
-      renderOverlay();
-      showToast("方案 PDF 已载入，保存方案后机构可查看。");
+    state.adminDraft.planPdf = {
+      name: file.name || "活动方案.pdf",
+      size: file.size,
+      type: file.type || "application/pdf",
+      uploadedAt: new Date().toISOString()
     };
-    reader.readAsDataURL(file);
+    state.adminDraft.planPdfBlob = file;
+    state.adminDraft.planPdfRemoved = false;
+    renderOverlay();
+    showToast(
+      `${planAttachmentKindLabel(planAttachmentKind(file))} 材料已载入，保存方案后机构可查看。`
+    );
   }
 
   /* =========================================================
@@ -12407,8 +12821,8 @@
             return showToast("无权查看其他医院的预约。");
           }
           state.adminReviewId = appointment.id;
+          state.adminDraft = buildReviewDraft(appointment);
         }
-        state.adminDraft = null;
         state.adminNoteEditing = false;
         state.adminReviewSaved = false;
         state.overlay = { type: "admin-review" };
@@ -12465,6 +12879,8 @@
       case "review-pdf-clear":
         if (state.adminDraft) {
           state.adminDraft.planPdf = null;
+          state.adminDraft.planPdfBlob = null;
+          state.adminDraft.planPdfRemoved = true;
           renderOverlay();
           showToast("已移除方案附件，保存后生效。");
         }
@@ -12993,6 +13409,9 @@
         renderOverlay();
         break;
       }
+      case "open-plan-pdf":
+        openPlanPdf(el.dataset.appointmentId || "");
+        break;
       case "appointment-location-edit":
         openAppointmentLocationEdit(el.dataset.appointmentId || "");
         break;
