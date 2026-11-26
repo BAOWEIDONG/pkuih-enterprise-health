@@ -110,33 +110,64 @@ python3 -m http.server 8080
 
 ## 技术说明
 
-- 当前演示为原生 JavaScript 单页实现，页面渲染与业务状态位于 `assets/app.js`，样式位于 `assets/styles.css`
+- 生产入口已切换为 Vue 3 + Vant 工程（`web/`），Vue 负责运行时、构建与后续组件迁移；现有业务视图通过 `LegacyHost` 挂载，CSS、DOM、交互和滚动行为保持不变
+- `web/src/components/LegacyHost.vue` 是唯一兼容层：它只创建原有 `#app`、`#overlay-root`、`#toast` 容器，不覆盖任何业务样式；`index.legacy.html` 保留原始入口用于像素级回归
+- `web/tests/visual-parity.mjs` 在 `320 / 390 / 430px` 三种宽度下逐页对比首页、专家、预约、我的，要求 PNG 像素完全一致
+- 页面渲染与业务状态位于 `assets/app.js`，样式位于 `assets/styles.css`；Vue 构建继续复用同一套 CSS，不引入会覆盖现有样式的全局 reset
 - `assets/config.js` 是唯一运行时配置入口，维护 API 模式、服务地址、请求超时与客户端版本
-- `assets/api.js` 是统一基础设施层，负责基础数据加载、HTTP 客户端、请求追踪、会话 token 与持久化适配；业务页面不再直接访问 `localStorage` 或静态业务数据文件
+- `assets/api.js` 是统一基础设施层，负责基础数据加载、HTTP 客户端、请求追踪、CSRF、会话与持久化适配；Cookie 模式自动请求 `/auth/csrf` 并发送 `X-XSRF-TOKEN`
 - `docs/API-CONTRACT-V1.md` 定义前后端接口、字段、状态机、权限、幂等与并发规则；正式接入后端时以该契约为准
 - `docs/CODE-REVIEW-V1.md` 记录 V1 代码审查结论、已修复风险和生产上线前必须由后端承接的安全事项
-- 正式工程采用 Vue 3 时，API 层、状态机和权限规则沿用现有契约，组件层按业务页面拆分
-- `index.html` 按 `config → api → app` 顺序加载；源码修改后执行：
+- 原始入口 `index.legacy.html` 按 `config → api → app` 顺序加载；正式入口 `index.html` 由 Vue 构建生成
+- 修改现有视图后执行：
 
 ```bash
 npm run build
 npm test
 ```
 
-正式联调只修改 `assets/config.js`：
+- 修改 Vue 外壳或迁移页面后执行：
 
-```js
-window.PKUHI_CONFIG = {
-  apiMode: "api",
-  apiBaseUrl: "https://api.example.com/api/v1",
-  authMode: "cookie",
-  apiCredentials: "include",
-  apiTimeoutMs: 15000,
-  clientVersion: "20261126-9"
-};
+```bash
+cd web
+npm ci
+npm test
+cd ..
+npm run build:web
 ```
 
+`npm run build:web` 会重新构建 Vue 产物并同步 `index.html` 与 `static/`，不会改动 `assets/` 中的图片和业务资源。
+
 - `npm test` 会检查 JavaScript 语法、架构边界、API 契约是否完整，并验证压缩产物可以由源码稳定重建
+
+## 后端与开箱运行
+
+后端位于 `server/`，要求 Java 21：
+
+```bash
+cd server
+mvn spring-boot:run
+```
+
+- 默认端口 `8080`，H2 文件数据库位于 `server/data/`，首次启动自动写入 9 家医院、59 位专家、12 个月时令主题、144 条课题匹配、机构账号与未来 61 天号源
+- 演示机构账号：`13800000001` / 验证码 `888888`
+- 超级管理员：`admin / pkuih2026`
+- 国际医院运营：`pkuih / pkuih2026`
+- 生产 PostgreSQL 通过 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD`、`DB_DRIVER=org.postgresql.Driver` 配置
+- 跨域联调通过 `CORS_ALLOWED_ORIGINS` 配置；正式环境建议同域反向代理 `/api`，并设置 `SESSION_COOKIE_SECURE=true`
+- `server/src/test/java/com/pkuih/enterprisehealth/CoreFlowIntegrationTest.java` 覆盖机构登录、号源查询、下单、院方接单、提交方案、机构确认、提需分流、提需预留与号源下限校验
+
+Vue 本地开发默认代理 `/api` 到 `http://localhost:8080`；联调后端时在 `web/.env.local` 中设置：
+
+```bash
+VITE_API_MODE=api
+VITE_API_BASE_URL=/api/v1
+VITE_AUTH_MODE=cookie
+VITE_DEV_API_TARGET=http://localhost:8080
+```
+
+当前静态演示页仍使用浏览器本地业务数据；正式页面接入时复用 `assets/api.js` 与 `docs/API-CONTRACT-V1.md`，不要在组件内直接拼接请求。
+
 - 专家、医院、时令主题与主题匹配数据位于 `assets/data/*.json`，全国省市数据位于 `assets/china-cities.json`
 - 院方 1124 表格更新后，可执行 `python3 work/build-expert-data.py [表格路径]` 重新生成专家、时令主题与课题匹配数据；脚本会校验医院绑定、服务类型、履约城市和专家重复
 - 12 张月度时令封面位于 `assets/themes/`，由医院运营选择月份后在机构端展示

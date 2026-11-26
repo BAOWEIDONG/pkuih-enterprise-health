@@ -24,7 +24,20 @@
 | `X-Request-Id` | 是 | 前端每次请求生成，用于链路追踪 |
 | `X-Client-Version` | 是 | 前端构建版本，例如 `20261126-9` |
 | `Idempotency-Key` | 写操作建议必填 | 防止重复提交、重复生成预约 |
+| `X-XSRF-TOKEN` | Cookie 模式写操作必填 | 从 `XSRF-TOKEN` Cookie 或 `/auth/csrf` 获取 |
 | `Content-Type` | JSON/表单上传时必填 | JSON 或 `multipart/form-data` |
+
+### 1.2.1 Cookie 模式 CSRF
+
+前后端同域部署时，所有请求必须携带 `credentials: "include"`。首次写操作前调用：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/auth/csrf` | 返回 `{ "token": "..." }`，同时下发 `XSRF-TOKEN` Cookie |
+
+客户端把 token 放入 `X-XSRF-TOKEN` 请求头。服务端返回 403 时，客户端只允许清空 token、重新获取并重试一次，禁止无限重试。登录、退出、预约、号源、专家、提需等所有 `POST/PUT/PATCH/DELETE` 均适用。
+
+跨域部署时必须使用 HTTPS，并设置 Cookie `SameSite=None; Secure`；更推荐通过同域反向代理提供 `/api`，避免第三方 Cookie 被微信或浏览器拦截。
 
 ### 1.3 统一响应包
 
@@ -95,6 +108,7 @@
 | POST | `/auth/institution/sms-code` | 发送登录验证码 |
 | POST | `/auth/institution/login` | 验证码登录 |
 | GET | `/auth/session` | 恢复登录态 |
+| GET | `/auth/csrf` | 获取 CSRF Token |
 | POST | `/auth/logout` | 退出登录 |
 
 发送验证码请求：

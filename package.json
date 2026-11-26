@@ -9,6 +9,8 @@
     "build:app": "esbuild assets/app.js --minify --legal-comments=none --outfile=assets/app.min.js",
     "build:css": "esbuild assets/styles.css --minify --legal-comments=none --outfile=assets/styles.min.css",
     "build": "npm run build:api && npm run build:app && npm run build:css",
+    "build:web": "node scripts/sync-web.mjs",
+    "verify:web": "npm run build:web && git diff --exit-code -- index.html static",
     "verify:build": "npm run build && git diff --exit-code -- assets/api.min.js assets/app.min.js assets/styles.min.css",
     "test": "npm run check && npm run verify:build"
   },

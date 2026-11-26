@@ -8,7 +8,8 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const app = read("assets/app.js");
 const api = read("assets/api.js");
 const config = read("assets/config.js");
-const html = read("index.html");
+const legacyHtml = read("index.legacy.html");
+const productionHtml = read("index.html");
 
 assert(
   !/localStorage\.(getItem|setItem|removeItem)/.test(app),
@@ -23,9 +24,13 @@ assert(
   "业务页面不得直接请求 assets/data 静态文件"
 );
 assert(
-  html.indexOf("assets/config.js") < html.indexOf("assets/api.min.js") &&
-    html.indexOf("assets/api.min.js") < html.indexOf("assets/app.min.js"),
-  "index.html 脚本顺序必须为 config → api → app"
+  legacyHtml.indexOf("assets/config.js") < legacyHtml.indexOf("assets/api.min.js") &&
+    legacyHtml.indexOf("assets/api.min.js") < legacyHtml.indexOf("assets/app.min.js"),
+  "legacy 入口脚本顺序必须为 config → api → app"
+);
+assert(
+  productionHtml.includes('id="vue-root"') && productionHtml.includes("static/app."),
+  "生产入口必须由 Vue 3 构建产物承载"
 );
 assert(
   config.includes("apiMode") &&
@@ -56,6 +61,7 @@ for (const contract of [
   "Authorization",
   "X-Request-Id",
   "X-Client-Version",
+  "X-XSRF-TOKEN",
   "REQUEST_TIMEOUT",
   "NETWORK_ERROR",
   "credentials"

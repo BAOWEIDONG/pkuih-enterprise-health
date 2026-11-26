@@ -16499,5 +16499,6 @@
     }
   }
 
-  boot();
+  window.PkuihLegacy = Object.freeze({ boot });
+  if (!window.PKUHI_LEGACY_MANUAL_BOOT) boot();
 })();

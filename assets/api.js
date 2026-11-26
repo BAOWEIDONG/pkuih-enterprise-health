@@ -26,6 +26,7 @@
       loginInstitution: "/auth/institution/login",
       loginAdmin: "/auth/admin/login",
       session: "/auth/session",
+      csrf: "/auth/csrf",
       logout: "/auth/logout"
     }),
     institutions: Object.freeze({
@@ -211,9 +212,54 @@
 
   let authToken = "";
   let unauthorizedHandler = null;
+  let csrfToken = "";
+  let csrfPromise = null;
 
   function usesBearerToken() {
     return runtime.authMode === "bearer";
+  }
+
+  function usesCookieAuth() {
+    return runtime.authMode !== "bearer";
+  }
+
+  function readCookie(name) {
+    const prefix = `${name}=`;
+    return String(document.cookie || "")
+      .split(";")
+      .map((item) => item.trim())
+      .find((item) => item.startsWith(prefix))
+      ?.slice(prefix.length) || "";
+  }
+
+  function csrfHeaderName() {
+    return runtime.csrfHeaderName || "X-XSRF-TOKEN";
+  }
+
+  async function ensureCsrf(force = false) {
+    if (!usesCookieAuth()) return "";
+    const cookieToken = readCookie(runtime.csrfCookieName || "XSRF-TOKEN");
+    if (cookieToken && !force) {
+      csrfToken = decodeURIComponent(cookieToken);
+      return csrfToken;
+    }
+    if (!force && csrfToken) return csrfToken;
+    if (csrfPromise) return csrfPromise;
+    csrfPromise = (async () => {
+      try {
+        const token = await request(ENDPOINTS.auth.csrf, {
+          method: "GET",
+          credentials: "include",
+          skipCsrf: true,
+          cache: "no-store"
+        });
+        csrfToken = String(token?.token || readCookie(runtime.csrfCookieName || "XSRF-TOKEN") || "");
+        return csrfToken;
+      } finally {
+        csrfPromise = null;
+      }
+    })();
+    return csrfPromise;
   }
 
   const session = Object.freeze({
@@ -257,6 +303,12 @@
       "X-Request-Id": createRequestId(),
       ...(options.headers || {})
     });
+    const method = String(options.method || (options.body == null ? "GET" : "POST")).toUpperCase();
+    const mutating = !["GET", "HEAD", "OPTIONS"].includes(method);
+    if (mutating && usesCookieAuth() && !options.skipCsrf) {
+      const token = await ensureCsrf();
+      if (token) headers.set(csrfHeaderName(), token);
+    }
     const token = session.getToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
 
@@ -268,7 +320,7 @@
 
     try {
       const response = await window.fetch(resolveUrl(path), {
-        method: options.method || (body == null ? "GET" : "POST"),
+        method,
         headers,
         body,
         signal: controller.signal,
@@ -297,6 +349,17 @@
         if (response.status === 401) {
           session.clear();
           unauthorizedHandler?.(error);
+        }
+        if (
+          response.status === 403 &&
+          mutating &&
+          usesCookieAuth() &&
+          !options.skipCsrf &&
+          !options.csrfRetried
+        ) {
+          csrfToken = "";
+          await ensureCsrf(true);
+          return request(path, { ...options, csrfRetried: true });
         }
         throw error;
       }
@@ -414,6 +477,9 @@
   }
 
   const auth = Object.freeze({
+    csrf() {
+      return ensureCsrf(true);
+    },
     sendInstitutionCode(phone) {
       requireApiMode();
       return http.post(ENDPOINTS.auth.sendInstitutionCode, { phone });
