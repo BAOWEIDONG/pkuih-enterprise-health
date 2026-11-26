@@ -32,7 +32,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261126-7";
+  const DATA_VERSION = "20261126-8";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -2344,6 +2344,39 @@
     return counts;
   }
 
+  function manualBookedDateSet(doctorId, ignoreId = "") {
+    const dates = new Set();
+    getAppointments().forEach((item) => {
+      if (
+        item.doctorId !== doctorId ||
+        item.date === undefined ||
+        item.status === "cancelled" ||
+        item.manualArrangement !== true ||
+        item.id === ignoreId
+      ) {
+        return;
+      }
+      dates.add(item.date);
+    });
+    return dates;
+  }
+
+  function matchedDemandDateSet(doctorId) {
+    const dates = new Set();
+    getDemands().forEach((demand) => {
+      if (
+        demand.status !== "matched" ||
+        demand.convertedAppointmentId ||
+        String(demand.matchedExpertId || "") !== String(doctorId || "") ||
+        !demand.matchedDate
+      ) {
+        return;
+      }
+      dates.add(demand.matchedDate);
+    });
+    return dates;
+  }
+
   function dayCapacity(doctorId, dateIso) {
     const map = getSlots(doctorId);
     return Number(map[dateIso] || 0);
@@ -2357,6 +2390,8 @@
     if (!expert) return { bookable: false, next: "", remaining: 0, dates: [] };
     const map = getSlots(expert.id);
     const booked = bookedCountMap(expert.id, ignoreId);
+    const manualDates = manualBookedDateSet(expert.id, ignoreId);
+    const reservedDemandDates = matchedDemandDateSet(expert.id);
     const lead = Math.max(0, Number(expert.leadDays) || tierOf(expert).leadDays);
     const minDate = isoDate(addDays(startOfDay(), lead));
     const today = todayIso();
@@ -2367,6 +2402,8 @@
       .sort()
       .forEach((date) => {
         if (date < minDate || date < today) return;
+        if (manualDates.has(date)) return;
+        if (reservedDemandDates.has(date)) return;
         const left = Math.max(0, Number(map[date] || 0) - (booked[date] || 0));
         if (left > 0) {
           if (!next) next = date;
@@ -5692,6 +5729,50 @@
     return Boolean(booking?.demandId && booking?.dateLocked);
   }
 
+  function coordinatedDemandIssue(entity) {
+    if (!entity?.demandId) return "";
+    const demand = demandById(entity.demandId);
+    if (!demand) {
+      return "原提需单已不存在，请联系项目人员重新处理。";
+    }
+    if (demand.convertedAppointmentId) {
+      return "该提需已生成预约，请前往预约详情查看，不能重复提交。";
+    }
+    if (demand.status !== "matched") {
+      return "院方已更新提需状态，当前匹配安排不可再提交，请返回提需详情查看。";
+    }
+    if (String(demand.matchedExpertId || "") !== String(entity.doctorId || "")) {
+      return "院方已更新匹配专家，请返回提需详情重新确认。";
+    }
+    if (String(demand.matchedDate || "") !== String(entity.date || "")) {
+      return "院方已更新履约日期，请返回提需详情重新确认。";
+    }
+    if (
+      normalizeService(demand.serviceType) !==
+      normalizeService(entity.serviceType)
+    ) {
+      return "院方已更新提需服务类型，请返回提需详情重新确认。";
+    }
+    const entityTopic = entity.customTopic || entity.topic || "";
+    if (String(demand.topic || "").trim() !== String(entityTopic).trim()) {
+      return "提需主题已发生变化，请返回提需详情重新确认。";
+    }
+    if (
+      demand.matchedHospitalId &&
+      entity.hospitalId &&
+      String(demand.matchedHospitalId) !== String(entity.hospitalId)
+    ) {
+      return "院方已更新匹配医院，请返回提需详情重新确认。";
+    }
+    if (
+      String(demand.province || "") !== String(entity.province || "") ||
+      String(demand.city || "") !== String(entity.city || "")
+    ) {
+      return "提需活动城市已发生变化，请返回提需详情重新确认。";
+    }
+    return "";
+  }
+
   function renderBookingServiceSection(booking) {
     const locked = Boolean(booking?.demandId);
     return `
@@ -6396,7 +6477,7 @@
           ${renderBookingProgress(booking.step)}
           ${
             booking.demandContext
-              ? `<div class="booking-demand-banner">${icon("sparkles", 15)}
+              ? `<div class="booking-demand-banner" id="booking-demand-banner">${icon("sparkles", 15)}
                   <div>
                     <strong>由提需 ${esc(booking.demandContext.id)} 转入</strong>
                     <p>${esc(booking.demandContext.topic)}${
@@ -6800,6 +6881,8 @@
     const issues = [];
     const add = (key, message, focus = key) =>
       issues.push({ key, message, focus });
+    const demandIssue = coordinatedDemandIssue(booking);
+    if (demandIssue) add("demand", demandIssue, "demand");
     if (!booking.serviceType) add("service", "请选择服务类型。");
     if (!booking.doctorId) {
       add(
@@ -6910,6 +6993,7 @@
       contactPhone: '[data-booking-field="contactPhone"]',
       headcount: '[data-booking-field="headcount"]',
       topics: "#booking-topics",
+      demand: "#booking-demand-banner",
       agree: '[data-booking-agree]'
     };
     return map[focus] || ".booking-validation-summary";
@@ -7031,6 +7115,66 @@
       if (items.some((item) => item.id === appointment.id)) {
         return { error: "id-collision" };
       }
+      const demandIssue = coordinatedDemandIssue(appointment);
+      if (demandIssue) {
+        return { error: "demand-stale", message: demandIssue };
+      }
+      if (
+        appointment.demandId &&
+        items.some(
+          (item) =>
+            item.demandId === appointment.demandId &&
+            item.status !== "cancelled"
+        )
+      ) {
+        return {
+          error: "demand-stale",
+          message: "该提需已生成预约，请前往预约详情查看，不能重复提交。"
+        };
+      }
+      const dateConflict = items.find(
+        (item) =>
+          item.doctorId === appointment.doctorId &&
+          item.date === appointment.date &&
+          item.status !== "cancelled"
+      );
+      if (appointment.manualArrangement && dateConflict) {
+        return {
+          error: "date-conflict",
+          message: `${appointment.doctorName || "该专家"} 在 ${formatDateCN(
+            appointment.date,
+            true
+          )} 已有其他活动安排，请更换协调日期。`
+        };
+      }
+      if (!appointment.manualArrangement && dateConflict?.manualArrangement) {
+        return {
+          error: "manual-conflict",
+          message: `${appointment.doctorName || "该专家"} 在 ${formatDateCN(
+            appointment.date,
+            true
+          )} 已有院方人工协调安排，请选择其他日期。`
+        };
+      }
+      if (!appointment.manualArrangement) {
+        const matchedDemand = getDemands().find(
+          (demand) =>
+            demand.status === "matched" &&
+            !demand.convertedAppointmentId &&
+            String(demand.matchedExpertId || "") ===
+              String(appointment.doctorId || "") &&
+            demand.matchedDate === appointment.date
+        );
+        if (matchedDemand) {
+          return {
+            error: "manual-conflict",
+            message: `${appointment.doctorName || "该专家"} 在 ${formatDateCN(
+              appointment.date,
+              true
+            )} 已由院方为其他提需预留，请选择其他日期。`
+          };
+        }
+      }
       if (!appointment.manualArrangement && (!capacity || booked >= capacity)) {
         return { error: "slot-full", booked, capacity };
       }
@@ -7151,6 +7295,9 @@
     if (result.error) {
       const messages = {
         "slot-full": "该日期号源刚被其他终端约满，请重新选择日期或专家。",
+        "demand-stale": "提需匹配安排已更新，请返回提需详情重新确认。",
+        "date-conflict": "该专家当日已有其他安排，请更换协调日期。",
+        "manual-conflict": "该专家当日已有院方人工协调安排，请选择其他日期。",
         "id-collision": "预约编号冲突，请重新提交。",
         storage: "浏览器存储空间不足，预约未写入，请清理后重试。"
       };
@@ -7167,7 +7314,9 @@
         );
       } else {
         renderOverlay();
-        showToast(messages[result.error] || "提交失败，请稍后重试。");
+        showToast(
+          result.message || messages[result.error] || "提交失败，请稍后重试。"
+        );
       }
       return;
     }
@@ -10635,6 +10784,36 @@
     }
     const hospital = hospitalById(expert.hospitalId);
     if (!hospital) return showToast("匹配专家所属医院不存在，请重新选择。");
+    const dateConflict = getAppointments().find(
+      (item) =>
+        item.doctorId === expert.id &&
+        item.date === matchDate &&
+        item.status !== "cancelled"
+    );
+    if (dateConflict) {
+      return showToast(
+        `${expert.name} 在 ${formatDateCN(
+          matchDate,
+          true
+        )} 已有其他活动安排，请更换协调日期。`
+      );
+    }
+    const duplicateMatch = getDemands().find(
+      (item) =>
+        item.id !== demand.id &&
+        item.status === "matched" &&
+        !item.convertedAppointmentId &&
+        String(item.matchedExpertId || "") === String(expert.id) &&
+        item.matchedDate === matchDate
+    );
+    if (duplicateMatch) {
+      return showToast(
+        `${expert.name} 在 ${formatDateCN(
+          matchDate,
+          true
+        )} 已被另一条提需占用，请更换专家或日期。`
+      );
+    }
     const wasMatched = demand.status === "matched";
     updateDemand(demand.id, {
       status: "matched",
@@ -10843,6 +11022,8 @@
     const baseMap = getSlots(doctor.id);
     const draftMap = state.slotDraft?.[doctor.id] || {};
     const bookedMap = bookedCountMap(doctor.id);
+    const manualDates = manualBookedDateSet(doctor.id);
+    const reservedDates = matchedDemandDateSet(doctor.id);
     const cells = [];
     for (let i = 0; i < startBlank; i += 1) cells.push(`<span class="slot-cell is-blank"></span>`);
     for (let day = 1; day <= days; day += 1) {
@@ -10851,6 +11032,8 @@
       const value =
         draftMap[date] === undefined ? baseValue : Number(draftMap[date] || 0);
       const booked = bookedMap[date] || 0;
+      const isManual = manualDates.has(date);
+      const isReserved = !isManual && reservedDates.has(date);
       const isPast = date < today;
       const beforeLead = date < leadDate;
       const changed = value !== baseValue;
@@ -10859,14 +11042,22 @@
           date === today ? "is-today" : ""
         } ${isPast ? "is-past" : ""} ${beforeLead ? "is-lead" : ""} ${
           changed ? "is-changed" : ""
-        }" type="button"
+        } ${isManual ? "is-manual" : ""} ${isReserved ? "is-reserved" : ""}" type="button"
           data-action="slot-day-open" data-value="${date}" ${
             isPast || beforeLead ? "disabled" : ""
           }>
           <span class="slot-cell__day">${day}</span>
           <strong>${value ? value : "—"}</strong>
           <small>${
-            beforeLead ? "未到预约期" : booked ? `已约 ${booked}` : "可约"
+            beforeLead
+              ? "未到预约期"
+              : isManual
+              ? "人工占用"
+              : isReserved
+              ? "提需预留"
+              : booked
+              ? `已约 ${booked}`
+              : "可约"
           }</small>
         </button>
       `);
@@ -10878,7 +11069,7 @@
           .join("")}</div>
         <div class="slot-grid">${cells.join("")}</div>
       </div>
-      <p class="slot-legend"><i class="is-open"></i> 可配置 <i class="is-full"></i> 已有预约 <i class="is-changed"></i> 本次修改 <i class="is-lead"></i> 未到预约周期</p>
+      <p class="slot-legend"><i class="is-open"></i> 可配置 <i class="is-full"></i> 已有预约 <i class="is-manual"></i> 人工占用 <i class="is-reserved"></i> 提需预留 <i class="is-changed"></i> 本次修改 <i class="is-lead"></i> 未到预约周期</p>
     `;
   }
 

@@ -7194,6 +7194,27 @@ textarea {
   color: var(--orange-text);
 }
 
+.slot-cell.is-manual,
+.slot-cell.is-reserved {
+  border-color: rgba(234, 85, 4, 0.2);
+  background: var(--orange-soft);
+}
+
+.slot-cell.is-manual strong,
+.slot-cell.is-reserved strong {
+  color: var(--orange-text);
+}
+
+.slot-cell.is-reserved {
+  border-style: dashed;
+  border-color: rgba(11, 49, 143, 0.22);
+  background: #eef4ff;
+}
+
+.slot-cell.is-reserved strong {
+  color: var(--brand);
+}
+
 .slot-cell.is-past {
   opacity: 0.34;
 }
@@ -7238,6 +7259,15 @@ textarea {
 
 .slot-legend i.is-changed {
   background: var(--orange);
+}
+
+.slot-legend i.is-manual {
+  background: #f6c79f;
+}
+
+.slot-legend i.is-reserved {
+  border: 1px dashed rgba(11, 49, 143, 0.32);
+  background: #dce9ff;
 }
 
 .slot-legend i.is-lead {
