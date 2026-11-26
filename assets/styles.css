@@ -3972,6 +3972,14 @@ textarea {
   text-overflow: ellipsis;
 }
 
+.booking-doctor__tier {
+  height: 18px;
+  flex: 0 0 auto;
+  padding: 0 6px;
+  font-size: 8px;
+  line-height: 1;
+}
+
 .booking-doctor small {
   display: block;
   overflow: hidden;
