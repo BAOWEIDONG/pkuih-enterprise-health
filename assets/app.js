@@ -7755,20 +7755,22 @@
             ${icon("plus", 14)} 新建
           </button>
         </header>
-        <div class="segmented segmented--records">
-          <button class="${state.clientRecordTab === "bookings" ? "is-active" : ""}" type="button"
-            data-action="record-tab" data-value="bookings">活动预约 <span>${appointments.length}</span></button>
-          <button class="${state.clientRecordTab === "demands" ? "is-active" : ""}" type="button"
-            data-action="record-tab" data-value="demands">专家提需 <span>${demands.length}</span></button>
+        <div class="records-sticky">
+          <div class="segmented segmented--records">
+            <button class="${state.clientRecordTab === "bookings" ? "is-active" : ""}" type="button"
+              data-action="record-tab" data-value="bookings">活动预约 <span>${appointments.length}</span></button>
+            <button class="${state.clientRecordTab === "demands" ? "is-active" : ""}" type="button"
+              data-action="record-tab" data-value="demands">专家提需 <span>${demands.length}</span></button>
+          </div>
+          <div id="record-filters">${renderRecordFilters()}</div>
         </div>
         <div id="record-panel">${renderRecordPanel()}</div>
       </div>
     `;
   }
 
-  function renderRecordPanel() {
-    if (state.clientRecordTab === "bookings") {
-      return `<div class="filter-scroll filter-scroll--page">
+  function renderAppointmentFilters() {
+    return `<div class="filter-scroll filter-scroll--page">
           ${appointmentFilterList()
             .map(
               (filter) =>
@@ -7777,13 +7779,23 @@
                 }" type="button" data-action="appointment-filter" data-value="${filter.id}">${filter.label}</button>`
             )
             .join("")}
-        </div>
-        <div id="appointment-list">${renderAppointmentList()}</div>`;
+        </div>`;
+  }
+
+  function renderRecordFilters() {
+    return state.clientRecordTab === "bookings" ? renderAppointmentFilters() : "";
+  }
+
+  function renderRecordPanel() {
+    if (state.clientRecordTab === "bookings") {
+      return `<div id="appointment-list">${renderAppointmentList()}</div>`;
     }
     return `<div id="demand-list">${renderDemandList()}</div>`;
   }
 
   function refreshRecordPanel() {
+    const filters = document.getElementById("record-filters");
+    if (filters) filters.innerHTML = renderRecordFilters();
     const panel = document.getElementById("record-panel");
     if (panel) panel.innerHTML = renderRecordPanel();
     const appointments = appointmentsForUser(state.session?.phone || "");

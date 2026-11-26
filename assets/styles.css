@@ -612,7 +612,15 @@ textarea {
 }
 
 .filter-scroll--admin {
+  position: sticky;
+  z-index: 31;
+  top: calc(108px + var(--safe-top));
+  border-bottom: 1px solid rgba(15, 23, 38, 0.04);
+  background: rgba(244, 247, 251, 0.94);
   padding-top: 8px;
+  box-shadow: 0 8px 18px rgba(20, 36, 70, 0.03);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
 }
 
 .filter-scroll--services {
@@ -705,6 +713,27 @@ textarea {
 .segmented--records {
   grid-template-columns: 1fr 1fr;
   margin: 4px 18px 0;
+}
+
+.records-sticky {
+  position: sticky;
+  z-index: 36;
+  top: calc(var(--topbar-h) + var(--safe-top));
+  padding: 6px 0 8px;
+  border-bottom: 1px solid rgba(15, 23, 38, 0.045);
+  background: rgba(241, 244, 249, 0.94);
+  box-shadow: 0 8px 18px rgba(20, 36, 70, 0.035);
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+}
+
+.records-sticky .segmented--records {
+  margin-top: 0;
+}
+
+.records-sticky .filter-scroll--page {
+  padding-top: 8px;
+  padding-bottom: 0;
 }
 
 .choice-grid {
@@ -5801,7 +5830,7 @@ textarea {
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0 auto;
-  overflow-x: hidden;
+  overflow-x: clip;
   background: var(--bg);
   box-shadow: 0 40px 120px rgba(6, 20, 48, 0.22);
   animation: screenIn 0.32s var(--ease) both;
@@ -10361,7 +10390,11 @@ textarea {
     min-height: calc(100dvh - 44px);
   }
 
-  .app-frame,
+  .app-frame {
+    overflow: clip;
+    border-radius: 38px;
+  }
+
   .auth-screen,
   .admin-login {
     overflow: hidden;

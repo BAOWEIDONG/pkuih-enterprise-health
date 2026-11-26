@@ -8,6 +8,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const app = read("assets/app.js");
 const api = read("assets/api.js");
 const config = read("assets/config.js");
+const styles = read("assets/styles.css");
 const legacyHtml = read("index.legacy.html");
 const productionHtml = read("index.html");
 const applicationConfig = read("server/src/main/resources/application.yml");
@@ -89,6 +90,15 @@ assert(
     api.includes("X-Client-Platform") &&
     api.includes("X-WeChat-Version"),
   "微信浏览器客户端必须提供平台识别与请求标记"
+);
+assert(
+  /\.records-sticky\s*\{[^}]*position:\s*sticky/s.test(styles) &&
+    /\.filter-scroll--admin\s*\{[^}]*position:\s*sticky/s.test(styles),
+  "预约与院方列表的顶部切换区必须保持吸顶"
+);
+assert(
+  /\.admin-screen\s*\{[^}]*overflow-x:\s*clip/s.test(styles),
+  "院方工作台容器不得因 overflow 裁切破坏吸顶导航"
 );
 assert(
   applicationConfig.includes("ddl-auto: validate") &&
