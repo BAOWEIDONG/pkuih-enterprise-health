@@ -51,9 +51,9 @@
     }),
     experts: Object.freeze({
       list: "/experts",
-      create: "/experts",
-      update: "/experts/:id",
-      remove: "/experts/:id"
+      create: "/admin/experts",
+      update: "/admin/experts/:id",
+      remove: "/admin/experts/:id"
     }),
     slots: Object.freeze({
       list: "/slots",

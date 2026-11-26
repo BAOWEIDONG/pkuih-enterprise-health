@@ -242,9 +242,10 @@
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
 | GET | `/experts` | 已登录 | 按医院、服务、城市、月份、科室、可约状态筛选 |
-| POST | `/experts` | 院方 | 新增本院专家 |
-| PATCH | `/experts/:id` | 院方 | 编辑本院专家 |
-| DELETE | `/experts/:id` | 院方 | 下架本院专家 |
+| GET | `/admin/experts` | 院方 | 查询本院或全部可维护专家 |
+| POST | `/admin/experts` | 院方 | 新增本院专家 |
+| PATCH | `/admin/experts/:id` | 院方 | 编辑本院专家 |
+| DELETE | `/admin/experts/:id` | 院方 | 下架本院专家（待实现） |
 
 约束：
 

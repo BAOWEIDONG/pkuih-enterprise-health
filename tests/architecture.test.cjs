@@ -10,6 +10,9 @@ const api = read("assets/api.js");
 const config = read("assets/config.js");
 const legacyHtml = read("index.legacy.html");
 const productionHtml = read("index.html");
+const expertAdminController = read(
+  "server/src/main/java/com/pkuih/enterprisehealth/expert/ExpertAdminController.java"
+);
 
 assert(
   !/localStorage\.(getItem|setItem|removeItem)/.test(app),
@@ -38,6 +41,12 @@ assert(
     config.includes("authMode") &&
     config.includes("apiCredentials"),
   "运行时配置必须提供 API 模式、基础地址与登录态传输策略"
+);
+assert(
+  api.includes('create: "/admin/experts"') &&
+    api.includes('update: "/admin/experts/:id"') &&
+    expertAdminController.includes('@RequestMapping("/api/v1/admin/experts")'),
+  "专家管理接口必须与院方后端路由保持一致"
 );
 
 const iconBlock = app.slice(app.indexOf("const ICONS = {"), app.indexOf("  };", app.indexOf("const ICONS = {")));
