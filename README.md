@@ -110,15 +110,33 @@ python3 -m http.server 8080
 
 ## 技术说明
 
-- 当前演示仍为原生 JavaScript 单页实现，业务状态集中在 `assets/app.js`，样式在 `assets/styles.css`
-- 技术团队已确定正式版本采用 Vue 3。当前阶段优先稳定业务闭环与移动端交互，Vue 3 组件化迁移作为下一阶段单独实施
-- `index.html` 加载压缩后的 `assets/app.min.js` 与 `assets/styles.min.css`；源码修改后执行：
+- 当前演示为原生 JavaScript 单页实现，页面渲染与业务状态位于 `assets/app.js`，样式位于 `assets/styles.css`
+- `assets/config.js` 是唯一运行时配置入口，维护 API 模式、服务地址、请求超时与客户端版本
+- `assets/api.js` 是统一基础设施层，负责基础数据加载、HTTP 客户端、请求追踪、会话 token 与持久化适配；业务页面不再直接访问 `localStorage` 或静态业务数据文件
+- `docs/API-CONTRACT-V1.md` 定义前后端接口、字段、状态机、权限、幂等与并发规则；正式接入后端时以该契约为准
+- `docs/CODE-REVIEW-V1.md` 记录 V1 代码审查结论、已修复风险和生产上线前必须由后端承接的安全事项
+- 正式工程采用 Vue 3 时，API 层、状态机和权限规则沿用现有契约，组件层按业务页面拆分
+- `index.html` 按 `config → api → app` 顺序加载；源码修改后执行：
 
 ```bash
-npx esbuild assets/app.js --minify --legal-comments=none --outfile=assets/app.min.js
-npx esbuild assets/styles.css --minify --legal-comments=none --outfile=assets/styles.min.css
+npm run build
+npm test
 ```
 
+正式联调只修改 `assets/config.js`：
+
+```js
+window.PKUHI_CONFIG = {
+  apiMode: "api",
+  apiBaseUrl: "https://api.example.com/api/v1",
+  authMode: "cookie",
+  apiCredentials: "include",
+  apiTimeoutMs: 15000,
+  clientVersion: "20261126-9"
+};
+```
+
+- `npm test` 会检查 JavaScript 语法、架构边界、API 契约是否完整，并验证压缩产物可以由源码稳定重建
 - 专家、医院、时令主题与主题匹配数据位于 `assets/data/*.json`，全国省市数据位于 `assets/china-cities.json`
 - 院方 1124 表格更新后，可执行 `python3 work/build-expert-data.py [表格路径]` 重新生成专家、时令主题与课题匹配数据；脚本会校验医院绑定、服务类型、履约城市和专家重复
 - 12 张月度时令封面位于 `assets/themes/`，由医院运营选择月份后在机构端展示

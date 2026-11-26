@@ -32,7 +32,7 @@
   };
 
   const DEMO_CODE = "888888";
-  const DATA_VERSION = "20261126-8";
+  const DATA_VERSION = window.PKUHI_CONFIG?.clientVersion || "20261126-9";
   const DEMO_PHONE = "13800000001";
   const DEMO_PROFILE = {
     phone: DEMO_PHONE,
@@ -443,22 +443,19 @@
   }
 
   function readJSON(key, fallback) {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch {
-      return fallback;
-    }
+    return window.PkuihApi?.storage.readJSON(key, fallback) ?? fallback;
   }
 
   function writeJSON(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch {
+    const saved = window.PkuihApi?.storage.writeJSON(key, value) === true;
+    if (!saved) {
       showToast("浏览器存储不可用，本次操作仅在当前页面有效。");
-      return false;
     }
+    return saved;
+  }
+
+  function removeJSON(key) {
+    return window.PkuihApi?.storage.remove(key) === true;
   }
 
   function clone(value) {
@@ -857,8 +854,8 @@
 
   function clearSession() {
     state.session = null;
-    localStorage.removeItem(STORAGE.session);
-    localStorage.removeItem(STORAGE.sessionMeta);
+    removeJSON(STORAGE.session);
+    removeJSON(STORAGE.sessionMeta);
   }
 
   function revokeInstitutionSession(message, { silent = false } = {}) {
@@ -943,7 +940,7 @@
   function clearAdminSession() {
     state.adminAuthed = false;
     state.adminUser = null;
-    localStorage.removeItem(STORAGE.adminSession);
+    removeJSON(STORAGE.adminSession);
   }
 
   function isSuperadmin() {
@@ -1504,7 +1501,7 @@
 
   function persistHomeHospital(hospitalId) {
     if (hospitalId) writeJSON(STORAGE.homeHospital, hospitalId);
-    else localStorage.removeItem(STORAGE.homeHospital);
+    else removeJSON(STORAGE.homeHospital);
   }
 
   function selectHomeHospital(hospitalId, { announce = true } = {}) {
@@ -1528,8 +1525,8 @@
 
   function clearHomeRegion() {
     state.homeRegion = null;
-    localStorage.removeItem(STORAGE.homeRegion);
-    localStorage.removeItem(STORAGE.homeHospital);
+    removeJSON(STORAGE.homeRegion);
+    removeJSON(STORAGE.homeHospital);
   }
 
   function locationDistanceText() {
@@ -7049,37 +7046,21 @@
     const token = requestToken("lock");
     const startedAt = Date.now();
     while (Date.now() - startedAt < 4000) {
-      let current = null;
-      try {
-        current = JSON.parse(localStorage.getItem(key) || "null");
-      } catch {
-        current = null;
-      }
+      const current = readJSON(key, null);
       if (!current || Date.now() - Number(current.at || 0) > 5000) {
-        try {
-          localStorage.setItem(
-            key,
-            JSON.stringify({ token, at: Date.now(), tab: requestToken("tab") })
-          );
-        } catch {
-          return task();
-        }
-        let verified = null;
-        try {
-          verified = JSON.parse(localStorage.getItem(key) || "null");
-        } catch {
-          verified = null;
-        }
+        const locked = writeJSON(key, {
+          token,
+          at: Date.now(),
+          tab: requestToken("tab")
+        });
+        if (!locked) return task();
+        const verified = readJSON(key, null);
         if (verified?.token === token) {
           try {
             return await task();
           } finally {
-            try {
-              const latest = JSON.parse(localStorage.getItem(key) || "null");
-              if (latest?.token === token) localStorage.removeItem(key);
-            } catch {
-              localStorage.removeItem(key);
-            }
+            const latest = readJSON(key, null);
+            if (latest?.token === token) removeJSON(key);
           }
         }
       }
@@ -16435,28 +16416,13 @@
     bindEvents();
     renderApp();
     try {
-      const [expertsRes, hospitalsRes, seasonalRes, matchesRes, citiesRes] = await Promise.all([
-        fetch(`assets/data/experts.json?v=${DATA_VERSION}`),
-        fetch(`assets/data/hospitals.json?v=${DATA_VERSION}`),
-        fetch(`assets/data/seasonal.json?v=${DATA_VERSION}`),
-        fetch(`assets/data/theme-matches.json?v=${DATA_VERSION}`),
-        fetch(`assets/china-cities.json?v=${DATA_VERSION}`).catch(() => null)
-      ]);
-      if (!expertsRes.ok) throw new Error(`专家数据加载失败 HTTP ${expertsRes.status}`);
-      if (!hospitalsRes.ok) throw new Error(`医院数据加载失败 HTTP ${hospitalsRes.status}`);
-      const [experts, hospitals, seasonal, matches] = await Promise.all([
-        expertsRes.json(),
-        hospitalsRes.json(),
-        seasonalRes.json(),
-        matchesRes.json()
-      ]);
-      const cities = citiesRes?.ok ? await citiesRes.json().catch(() => null) : null;
-      if (!Array.isArray(experts) || !experts.length) throw new Error("专家数据为空");
-      state.baseExperts = experts;
-      state.hospitals = applyHospitalConfig(hospitals);
-      state.seasonal = seasonal;
-      state.themeMatches = matches;
-      if (cities && typeof cities === "object" && !Array.isArray(cities)) state.chinaCities = cities;
+      if (!window.PkuihApi) throw new Error("服务层加载失败，请刷新页面后重试。");
+      const bootstrap = await window.PkuihApi.data.bootstrap(DATA_VERSION);
+      state.baseExperts = bootstrap.experts;
+      state.hospitals = applyHospitalConfig(bootstrap.hospitals);
+      state.seasonal = bootstrap.seasonal;
+      state.themeMatches = bootstrap.themeMatches;
+      state.chinaCities = bootstrap.chinaCities;
       mergeExperts();
       seedSlots();
       seedDemoRecords();

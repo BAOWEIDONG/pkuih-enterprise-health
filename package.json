@@ -1,0 +1,18 @@
+{
+  "name": "pkuih-enterprise-health-h5",
+  "version": "1.0.0",
+  "private": true,
+  "description": "北京大学国际医院名医入企企业健康服务 H5",
+  "scripts": {
+    "check": "node --check assets/config.js && node --check assets/api.js && node --check assets/app.js && node tests/architecture.test.cjs && node tests/api-foundation.test.cjs",
+    "build:api": "esbuild assets/api.js --minify --legal-comments=none --outfile=assets/api.min.js",
+    "build:app": "esbuild assets/app.js --minify --legal-comments=none --outfile=assets/app.min.js",
+    "build:css": "esbuild assets/styles.css --minify --legal-comments=none --outfile=assets/styles.min.css",
+    "build": "npm run build:api && npm run build:app && npm run build:css",
+    "verify:build": "npm run build && git diff --exit-code -- assets/api.min.js assets/app.min.js assets/styles.min.css",
+    "test": "npm run check && npm run verify:build"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
