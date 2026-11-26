@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -90,6 +91,19 @@ public class SlotService {
             requireManageable(principal, expert);
             LocalDate earliest = LocalDate.now().plusDays(expert.getLeadDays() == null ? 7 : expert.getLeadDays());
             LocalDate start = request.from().isBefore(earliest) ? earliest : request.from();
+            List<SlotEntity> locked = slots.findRangeForUpdate(doctorId, request.from(), request.to());
+            Map<java.time.LocalDate, SlotEntity> existingByDate = locked.stream()
+                .collect(Collectors.toMap(SlotEntity::getDate, item -> item));
+            long aggregateVersion = locked.stream()
+                .map(SlotEntity::getVersion)
+                .filter(Objects::nonNull)
+                .mapToLong(Long::longValue)
+                .sum();
+            boolean versionProblem = !locked.isEmpty() && (
+                request.versionByDoctor() == null ||
+                    !request.versionByDoctor().containsKey(doctorId) ||
+                    !Objects.equals(request.versionByDoctor().get(doctorId), aggregateVersion)
+            );
             for (LocalDate date = start; !date.isAfter(request.to()); date = date.plusDays(1)) {
                 if (!weekdays.contains(date.getDayOfWeek().getValue())) continue;
                 LocalDate slotDate = date;
@@ -100,14 +114,24 @@ public class SlotService {
                         slotDate + " 已预约 " + booked + " 人，号源不能小于已预约数量。"
                     );
                 }
-                SlotEntity slot = slots.findByDoctorIdAndDate(doctorId, slotDate)
-                    .orElseGet(() -> SlotEntity.builder()
+                SlotEntity slot = existingByDate.get(slotDate);
+                if (slot == null) {
+                    slot = SlotEntity.builder()
                         .id(slotId(doctorId, slotDate))
                         .doctorId(doctorId)
                         .date(slotDate)
-                        .build());
+                        .build();
+                    existingByDate.put(slotDate, slot);
+                }
                 slot.setCapacity(request.capacity());
                 rows.add(slot);
+            }
+            if (versionProblem) {
+                String code = locked.isEmpty() ? "SLOT_VERSION_REQUIRED" : "SLOT_VERSION_CONFLICT";
+                String message = locked.isEmpty()
+                    ? "号源已发生变化，请刷新后重试。"
+                    : "号源已被其他运营人员更新，请刷新后重试。";
+                throw ApiException.conflict(code, message);
             }
         }
         slots.saveAll(rows);

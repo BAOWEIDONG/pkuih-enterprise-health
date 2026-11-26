@@ -51,6 +51,7 @@
     }),
     experts: Object.freeze({
       list: "/experts",
+      adminList: "/admin/experts",
       create: "/admin/experts",
       update: "/admin/experts/:id",
       remove: "/admin/experts/:id"
@@ -510,6 +511,117 @@
     }
   });
 
+  function requireBusinessMode() {
+    requireApiMode();
+  }
+
+  const experts = Object.freeze({
+    list(params = {}) {
+      requireBusinessMode();
+      return http.get(`${ENDPOINTS.experts.list}${buildQuery(params)}`);
+    },
+    adminList() {
+      requireBusinessMode();
+      return http.get(ENDPOINTS.experts.adminList);
+    },
+    create(payload) {
+      requireBusinessMode();
+      return http.post(ENDPOINTS.experts.create, payload);
+    },
+    update(id, payload) {
+      requireBusinessMode();
+      return http.patch(buildPath(ENDPOINTS.experts.update, { id }), payload);
+    }
+  });
+
+  const slots = Object.freeze({
+    list(params) {
+      requireBusinessMode();
+      return http.get(`${ENDPOINTS.slots.list}${buildQuery(params)}`);
+    },
+    batch(payload) {
+      requireBusinessMode();
+      return http.put(ENDPOINTS.slots.batch, payload);
+    }
+  });
+
+  const appointments = Object.freeze({
+    list() {
+      requireBusinessMode();
+      return http.get(ENDPOINTS.appointments.list);
+    },
+    detail(id) {
+      requireBusinessMode();
+      return http.get(buildPath(ENDPOINTS.appointments.detail, { id }));
+    },
+    create(payload, { idempotencyKey = createRequestId(), signal } = {}) {
+      requireBusinessMode();
+      return http.post(ENDPOINTS.appointments.create, payload, {
+        headers: { "Idempotency-Key": idempotencyKey },
+        signal
+      });
+    },
+    accept(id) {
+      requireBusinessMode();
+      return http.post(buildPath(ENDPOINTS.appointments.accept, { id }));
+    },
+    savePlan(id, payload) {
+      requireBusinessMode();
+      return http.put(buildPath(ENDPOINTS.appointments.plan, { id }), payload);
+    },
+    confirm(id) {
+      requireBusinessMode();
+      return http.post(buildPath(ENDPOINTS.appointments.confirm, { id }));
+    },
+    requestRevision(id, feedback) {
+      requireBusinessMode();
+      return http.post(buildPath(ENDPOINTS.appointments.revise, { id }), { feedback });
+    },
+    cancel(id, reason = "") {
+      requireBusinessMode();
+      return http.post(buildPath(ENDPOINTS.appointments.cancel, { id }), { reason });
+    },
+    complete(id) {
+      requireBusinessMode();
+      return http.post(buildPath(ENDPOINTS.appointments.complete, { id }));
+    },
+    updateLocation(id, payload) {
+      requireBusinessMode();
+      return http.patch(buildPath(ENDPOINTS.appointments.location, { id }), payload);
+    },
+    saveInternalNote(id, note) {
+      requireBusinessMode();
+      return http.patch(buildPath(ENDPOINTS.appointments.internalNote, { id }), { note });
+    }
+  });
+
+  const demands = Object.freeze({
+    list() {
+      requireBusinessMode();
+      return http.get(ENDPOINTS.demands.list);
+    },
+    detail(id) {
+      requireBusinessMode();
+      return http.get(buildPath(ENDPOINTS.demands.detail, { id }));
+    },
+    create(payload) {
+      requireBusinessMode();
+      return http.post(ENDPOINTS.demands.create, payload);
+    },
+    contact(id, note = "") {
+      requireBusinessMode();
+      return http.post(buildPath(ENDPOINTS.demands.contact, { id }), { note });
+    },
+    match(id, payload) {
+      requireBusinessMode();
+      return http.post(buildPath(ENDPOINTS.demands.match, { id }), payload);
+    },
+    close(id, reason = "") {
+      requireBusinessMode();
+      return http.post(buildPath(ENDPOINTS.demands.close, { id }), { reason });
+    }
+  });
+
   window.PkuihApi = Object.freeze({
     config: Object.freeze(runtime),
     endpoints: ENDPOINTS,
@@ -517,6 +629,10 @@
     http,
     data,
     auth,
+    experts,
+    slots,
+    appointments,
+    demands,
     session,
     ApiError,
     buildPath,

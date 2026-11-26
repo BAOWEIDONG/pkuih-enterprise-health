@@ -19,4 +19,16 @@ public interface SlotRepository extends JpaRepository<SlotEntity, String> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from SlotEntity s where s.doctorId = :doctorId and s.date = :date")
     Optional<SlotEntity> findForUpdate(@Param("doctorId") String doctorId, @Param("date") LocalDate date);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select s from SlotEntity s
+        where s.doctorId = :doctorId and s.date between :from and :to
+        order by s.date
+        """)
+    List<SlotEntity> findRangeForUpdate(
+        @Param("doctorId") String doctorId,
+        @Param("from") LocalDate from,
+        @Param("to") LocalDate to
+    );
 }

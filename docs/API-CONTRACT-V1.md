@@ -23,7 +23,7 @@
 | `Authorization` | Bearer 模式必填 | `Bearer <token>`；Cookie 模式由 HttpOnly Cookie 携带 |
 | `X-Request-Id` | 是 | 前端每次请求生成，用于链路追踪 |
 | `X-Client-Version` | 是 | 前端构建版本，例如 `20261126-9` |
-| `Idempotency-Key` | 写操作建议必填 | 防止重复提交、重复生成预约 |
+| `Idempotency-Key` | 创建预约必填 | 防止重复提交、重复生成预约；同一 key 只能对应同一请求内容 |
 | `X-XSRF-TOKEN` | Cookie 模式写操作必填 | 从 `XSRF-TOKEN` Cookie 或 `/auth/csrf` 获取 |
 | `Content-Type` | JSON/表单上传时必填 | JSON 或 `multipart/form-data` |
 
@@ -86,7 +86,11 @@
 | `EXPERT_NOT_FOUND` | 404 | 专家不存在或已下架 |
 | `SLOT_NOT_AVAILABLE` | 409 | 专家当日号源不足 |
 | `SLOT_CAPACITY_BELOW_BOOKED` | 409 | 批量号源低于已预约数量 |
+| `SLOT_VERSION_REQUIRED` | 409 | 已有号源批量保存时未提供版本 |
+| `SLOT_VERSION_CONFLICT` | 409 | 号源已被其他运营人员修改 |
 | `APPOINTMENT_STATE_CONFLICT` | 409 | 预约状态不允许当前操作 |
+| `CONCURRENT_UPDATE` | 409 | 预约等资源被并发修改，需要刷新后重试 |
+| `DATA_CONFLICT` | 409 | 唯一键或数据完整性冲突 |
 | `DEMAND_STATE_CONFLICT` | 409 | 提需状态不允许当前操作 |
 | `DEMAND_ALREADY_CONVERTED` | 409 | 提需已生成预约，不能重复提交 |
 | `DEMAND_MATCH_STALE` | 409 | 提需匹配信息已被院方更新 |
@@ -305,6 +309,8 @@
 5. 预约与号源调整必须对同一专家、同一日期加锁或使用数据库条件更新。
 6. 人工协调预约计入 `manualBooked`，不占用公开号源序号。
 7. 已匹配但尚未转预约的提需日期计入 `reserved`。
+8. `versionByDoctor` 是该专家在本次 `from`～`to` 范围内所有已有号源 `version` 的合计值；客户端必须先查询号源再提交，不能自行猜测。
+9. 已有号源未传版本返回 `SLOT_VERSION_REQUIRED`；传入值与服务端加锁后的合计值不一致返回 `SLOT_VERSION_CONFLICT`。新日期首次创建号源时版本可为空。
 
 ## 7. 预约
 
@@ -369,6 +375,8 @@
 
 - 创建预约必须使用 `Idempotency-Key`。
 - 同一幂等键重复提交且请求一致，返回同一预约。
+- 同一个幂等键提交不同预约内容必须返回 `DUPLICATE_REQUEST`，不得返回旧预约。
+- 预约状态更新使用数据库乐观锁；并发接单或并发状态更新返回 `CONCURRENT_UPDATE`。
 - 重复提需转换返回 `DEMAND_ALREADY_CONVERTED`。
 - 同一专家、同一日期的并发预约由数据库条件更新或行锁保证不超卖。
 - 客户端 `localStorage` 锁只能用于演示，不作为正式库存控制手段。
@@ -552,6 +560,7 @@
 - `PkuihApi.http`：带超时、token、请求 ID 和错误归一化的 HTTP 客户端。
 - `PkuihApi.endpoints`：本文件对应的端点清单。
 - `PkuihApi.auth`：登录与会话接口。
+- `PkuihApi.experts`、`PkuihApi.slots`、`PkuihApi.appointments`、`PkuihApi.demands`：已实现后端的业务客户端，页面不得再自行拼接 URL。
 - `PkuihApi.session`：token 生命周期。
 
 切换正式后端时修改 `assets/config.js`：

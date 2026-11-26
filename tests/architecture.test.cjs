@@ -10,6 +10,7 @@ const api = read("assets/api.js");
 const config = read("assets/config.js");
 const legacyHtml = read("index.legacy.html");
 const productionHtml = read("index.html");
+const applicationConfig = read("server/src/main/resources/application.yml");
 const expertAdminController = read(
   "server/src/main/java/com/pkuih/enterprisehealth/expert/ExpertAdminController.java"
 );
@@ -48,6 +49,27 @@ assert(
     expertAdminController.includes('@RequestMapping("/api/v1/admin/experts")'),
   "专家管理接口必须与院方后端路由保持一致"
 );
+for (const client of ["experts", "slots", "appointments", "demands"]) {
+  assert(
+    api.includes(`const ${client} = Object.freeze`),
+    `业务 API 客户端缺少模块：${client}`
+  );
+}
+assert(
+  api.includes('"Idempotency-Key"'),
+  "预约创建客户端必须支持 Idempotency-Key"
+);
+assert(
+  applicationConfig.includes("ddl-auto: validate") &&
+    applicationConfig.includes("flyway:"),
+  "生产配置必须启用 Flyway 并使用 validate 校验实体结构"
+);
+for (const migration of [
+  "server/src/main/resources/db/migration/V1__baseline.sql",
+  "server/src/main/resources/db/migration/V2__appointment_production_fields.sql"
+]) {
+  assert(fs.existsSync(path.join(root, migration)), `数据库迁移缺失：${migration}`);
+}
 
 const iconBlock = app.slice(app.indexOf("const ICONS = {"), app.indexOf("  };", app.indexOf("const ICONS = {")));
 const usedIcons = new Set([...app.matchAll(/icon\("([^"]+)"/g)].map((match) => match[1]));

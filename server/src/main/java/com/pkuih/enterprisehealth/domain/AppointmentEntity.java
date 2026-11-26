@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,6 +25,8 @@ public class AppointmentEntity {
     private String id;
     @Column(unique = true)
     private String idempotencyKey;
+    @Column(length = 64)
+    private String idempotencyFingerprint;
     private String ownerPhone;
     private String hospitalId;
     private String serviceType;
@@ -59,4 +62,6 @@ public class AppointmentEntity {
     private Instant cancelledAt;
     private Instant completedAt;
     private Instant locationUpdatedAt;
+    @Version
+    private Long version;
 }

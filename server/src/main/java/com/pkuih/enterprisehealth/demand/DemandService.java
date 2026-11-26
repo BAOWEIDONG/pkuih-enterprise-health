@@ -24,6 +24,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class DemandService {
+    private static final Set<String> SERVICES = Set.of("讲座", "健康咨询", "1V1报告解读");
+
     private final DemandRepository demands;
     private final AppointmentRepository appointments;
     private final CatalogService catalogService;
@@ -41,7 +43,8 @@ public class DemandService {
         if ("hospital".equals(request.targetType())) {
             catalogService.requireHospital(request.hospitalId());
         }
-        if (blank(request.serviceType()) || blank(request.topic()) ||
+        if (blank(request.serviceType()) || !SERVICES.contains(request.serviceType()) ||
+            blank(request.topic()) ||
             blank(request.audience()) || request.headcount() == null || request.headcount() <= 0) {
             throw ApiException.badRequest("VALIDATION_ERROR", "服务类型、主题、参与人群和人数均为必填项。");
         }

@@ -3,6 +3,7 @@ package com.pkuih.enterprisehealth;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pkuih.enterprisehealth.repository.AppointmentRepository;
+import com.pkuih.enterprisehealth.repository.InstitutionAccountRepository;
 import com.pkuih.enterprisehealth.repository.SlotRepository;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,9 @@ class CoreFlowIntegrationTest {
 
     @Autowired
     private AppointmentRepository appointments;
+
+    @Autowired
+    private InstitutionAccountRepository institutionAccounts;
 
     @Test
     void institutionCanBookAndHospitalCanDeliverConfirmedPlan() throws Exception {
@@ -194,15 +198,137 @@ class CoreFlowIntegrationTest {
             .andExpect(jsonPath("$.data.manualArrangement").value(true));
     }
 
+    @Test
+    void disabledInstitutionSessionIsRejectedImmediately() throws Exception {
+        HttpSession institution = institutionSession("13911112222");
+        var account = institutionAccounts.findById("13911112222").orElseThrow();
+        account.setActive(false);
+        institutionAccounts.save(account);
+        try {
+            mvc.perform(get("/api/v1/appointments")
+                    .session((org.springframework.mock.web.MockHttpSession) institution))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_DISABLED"));
+        } finally {
+            account.setActive(true);
+            institutionAccounts.save(account);
+        }
+    }
+
+    @Test
+    void idempotencyKeyRejectsDifferentAppointmentPayload() throws Exception {
+        HttpSession institution = institutionSession();
+        LocalDate date = slots.findByDoctorIdAndDateBetweenOrderByDateAsc(
+            "director-03",
+            LocalDate.now(),
+            LocalDate.now().plusDays(90)
+        ).getFirst().getDate();
+        Map<String, Object> payload = appointmentPayload("director-03", date, "幂等测试主题");
+
+        MvcResult first = mvc.perform(post("/api/v1/appointments")
+                .session((org.springframework.mock.web.MockHttpSession) institution)
+                .with(csrf())
+                .header("Idempotency-Key", "integration-idempotency-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+            .andExpect(status().isOk())
+            .andReturn();
+        String appointmentId = json(first).path("data").path("id").asText();
+
+        mvc.perform(post("/api/v1/appointments")
+                .session((org.springframework.mock.web.MockHttpSession) institution)
+                .with(csrf())
+                .header("Idempotency-Key", "integration-idempotency-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(appointmentId));
+
+        payload.put("topic", "不同的主题");
+        mvc.perform(post("/api/v1/appointments")
+                .session((org.springframework.mock.web.MockHttpSession) institution)
+                .with(csrf())
+                .header("Idempotency-Key", "integration-idempotency-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("DUPLICATE_REQUEST"));
+    }
+
+    @Test
+    void slotBatchRejectsStaleAggregateVersion() throws Exception {
+        HttpSession operator = adminSession("pkuih", "pkuih2026");
+        var slot = slots.findByDoctorIdAndDateBetweenOrderByDateAsc(
+            "director-05",
+            LocalDate.now(),
+            LocalDate.now().plusDays(90)
+        ).getFirst();
+        long currentVersion = slot.getVersion() == null ? 0 : slot.getVersion();
+        Map<String, Object> request = Map.of(
+            "doctorIds", new String[]{"director-05"},
+            "from", slot.getDate().toString(),
+            "to", slot.getDate().toString(),
+            "weekdays", new int[]{slot.getDate().getDayOfWeek().getValue()},
+            "capacity", 2,
+            "versionByDoctor", Map.of("director-05", currentVersion + 1)
+        );
+
+        mvc.perform(put("/api/v1/slots/batch")
+                .session((org.springframework.mock.web.MockHttpSession) operator)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("SLOT_VERSION_CONFLICT"));
+
+        Map<String, Object> validRequest = Map.of(
+            "doctorIds", new String[]{"director-05"},
+            "from", slot.getDate().toString(),
+            "to", slot.getDate().toString(),
+            "weekdays", new int[]{slot.getDate().getDayOfWeek().getValue()},
+            "capacity", 2,
+            "versionByDoctor", Map.of("director-05", currentVersion)
+        );
+        mvc.perform(put("/api/v1/slots/batch")
+                .session((org.springframework.mock.web.MockHttpSession) operator)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validRequest)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.saved").value(1));
+    }
+
     private HttpSession institutionSession() throws Exception {
+        return institutionSession("13800000001");
+    }
+
+    private HttpSession institutionSession(String phone) throws Exception {
         MvcResult result = mvc.perform(post("/api/v1/auth/institution/login")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"phone\":\"13800000001\",\"code\":\"888888\"}"))
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", phone,
+                    "code", "888888"
+                ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.role").value("INSTITUTION"))
             .andReturn();
         return result.getRequest().getSession(false);
+    }
+
+    private Map<String, Object> appointmentPayload(String doctorId, LocalDate date, String topic) {
+        return new java.util.HashMap<>(Map.ofEntries(
+            Map.entry("serviceType", "讲座"),
+            Map.entry("doctorId", doctorId),
+            Map.entry("date", date.toString()),
+            Map.entry("province", "北京市"),
+            Map.entry("city", "北京市"),
+            Map.entry("address", "北京市朝阳区幂等测试路1号"),
+            Map.entry("venue", "会议厅"),
+            Map.entry("topic", topic),
+            Map.entry("audience", "企业员工"),
+            Map.entry("headcount", 60)
+        ));
     }
 
     private HttpSession adminSession(String username, String password) throws Exception {

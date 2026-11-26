@@ -99,10 +99,7 @@ public class AuthService {
     }
 
     public AuthView current() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal principal)) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_REQUIRED", "请先登录。");
-        }
+        UserPrincipal principal = currentPrincipal();
         InstitutionAccountEntity account =
             "INSTITUTION".equals(principal.role()) ? institutionAccounts.findById(principal.id()).orElse(null) : null;
         return AuthView.of(principal, account);
@@ -113,7 +110,7 @@ public class AuthService {
         if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal principal)) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_REQUIRED", "请先登录。");
         }
-        return principal;
+        return refreshPrincipal(principal);
     }
 
     public void logout(HttpServletRequest request) {
@@ -135,6 +132,41 @@ public class AuthService {
         HttpSession session = request.getSession(true);
         request.changeSessionId();
         securityContextRepository.saveContext(context, request, response);
+    }
+
+    private UserPrincipal refreshPrincipal(UserPrincipal principal) {
+        if ("INSTITUTION".equals(principal.role())) {
+            InstitutionAccountEntity account = institutionAccounts.findById(principal.id())
+                .filter(item -> Boolean.TRUE.equals(item.getActive()))
+                .orElseThrow(() -> new ApiException(
+                    HttpStatus.FORBIDDEN,
+                    "ACCOUNT_DISABLED",
+                    "该机构账号已停用，请重新登录。"
+                ));
+            return new UserPrincipal(
+                account.getPhone(),
+                account.getName(),
+                account.getPhone(),
+                "INSTITUTION",
+                "",
+                true
+            );
+        }
+        AdminAccountEntity account = adminAccounts.findById(principal.id())
+            .filter(item -> Boolean.TRUE.equals(item.getActive()))
+            .orElseThrow(() -> new ApiException(
+                HttpStatus.FORBIDDEN,
+                "ACCOUNT_DISABLED",
+                "该院方账号已停用，请联系超级管理员。"
+            ));
+        return new UserPrincipal(
+            account.getUsername(),
+            account.getName(),
+            account.getPhone(),
+            account.getRole(),
+            account.getHospitalId() == null ? "" : account.getHospitalId(),
+            true
+        );
     }
 
     private void applyProfile(InstitutionAccountEntity account, Map<String, Object> profile) {

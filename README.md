@@ -155,7 +155,9 @@ mvn spring-boot:run
 - 国际医院运营：`pkuih / pkuih2026`
 - 生产 PostgreSQL 通过 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD`、`DB_DRIVER=org.postgresql.Driver` 配置
 - 跨域联调通过 `CORS_ALLOWED_ORIGINS` 配置；正式环境建议同域反向代理 `/api`，并设置 `SESSION_COOKIE_SECURE=true`
-- `server/src/test/java/com/pkuih/enterprisehealth/CoreFlowIntegrationTest.java` 覆盖机构登录、号源查询、下单、院方接单、提交方案、机构确认、提需分流、提需预留与号源下限校验
+- `server/src/main/resources/db/migration/` 已接入 Flyway；主配置使用 `ddl-auto: validate`，现有 H2/PostgreSQL 数据库首次启动会自动建立迁移基线
+- `server/src/test/java/com/pkuih/enterprisehealth/CoreFlowIntegrationTest.java` 覆盖机构登录、号源查询、下单、院方接单、提交方案、机构确认、提需分流、提需预留、停用账号会话、幂等冲突与号源版本冲突
+- `server/src/test/java/com/pkuih/enterprisehealth/SchemaMigrationIntegrationTest.java` 使用 H2 执行全部 Flyway 迁移，再校验 JPA 实体与表结构一致
 
 Vue 本地开发默认代理 `/api` 到 `http://localhost:8080`；联调后端时在 `web/.env.local` 中设置：
 
@@ -166,13 +168,13 @@ VITE_AUTH_MODE=cookie
 VITE_DEV_API_TARGET=http://localhost:8080
 ```
 
-当前静态演示页仍使用浏览器本地业务数据；正式页面接入时复用 `assets/api.js` 与 `docs/API-CONTRACT-V1.md`，不要在组件内直接拼接请求。
+当前静态演示页仍使用浏览器本地业务数据；正式页面接入时复用 `assets/api.js` 与 `docs/API-CONTRACT-V1.md`，不要在组件内直接拼接请求。`PkuihApi.experts`、`PkuihApi.slots`、`PkuihApi.appointments`、`PkuihApi.demands` 已封装现有后端接口，页面迁移时直接调用这些客户端即可。
 
 ### 交付状态
 
 - 静态 H5 演示可直接使用，现有 UI 不会因为 Vue 3 接入而变化；Vue 目前负责生产入口与构建外壳，业务视图仍由 `LegacyHost` 加载原有运行层。
 - 前后端联调已覆盖登录、Bootstrap、专家查询、号源、预约和提需主链路，但业务页面尚未全面切换到 API。
-- 当前版本不是“改一个配置即可生产上线”：机构/角色管理、时令配置、方案模板、海报、文件、推送等后端接口仍需补齐，验证码、数据库迁移、审计、文件安全和并发控制也需生产化。
+- 当前版本不是“改一个配置即可生产上线”：机构/角色管理、时令配置、方案模板、海报、文件、推送等后端接口仍需补齐，验证码、审计、文件安全和邮件/短信发送也需生产化。
 - 完整审查结论见 `docs/CODE-REVIEW-V1.md`。
 
 - 专家、医院、时令主题与主题匹配数据位于 `assets/data/*.json`，全国省市数据位于 `assets/china-cities.json`

@@ -20,9 +20,13 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,10 +53,22 @@ public class AppointmentService {
     @Transactional
     public Map<String, Object> create(UserPrincipal principal, String idempotencyKey, CreateAppointmentRequest request) {
         requireRole(principal, "INSTITUTION", "仅机构账号可以提交预约。");
+        String normalizedKey = blankToNull(idempotencyKey);
+        if (normalizedKey != null && normalizedKey.length() > 128) {
+            throw ApiException.badRequest("VALIDATION_ERROR", "Idempotency-Key 长度不能超过 128 个字符。");
+        }
+        String requestFingerprint = normalizedKey == null ? null : fingerprint(request);
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             var existing = appointments.findByIdempotencyKey(idempotencyKey);
             if (existing.isPresent()) {
                 requireOwner(principal, existing.get());
+                String storedFingerprint = existing.get().getIdempotencyFingerprint();
+                if (storedFingerprint != null && !storedFingerprint.equals(requestFingerprint)) {
+                    throw ApiException.conflict(
+                        "DUPLICATE_REQUEST",
+                        "该 Idempotency-Key 已用于不同的预约内容，请重新发起。"
+                    );
+                }
                 return view(existing.get());
             }
         }
@@ -120,7 +136,8 @@ public class AppointmentService {
         Instant now = Instant.now();
         AppointmentEntity appointment = AppointmentEntity.builder()
             .id("BD-" + LocalDate.now().toString().replace("-", "") + "-" + randomSuffix())
-            .idempotencyKey(blankToNull(idempotencyKey))
+            .idempotencyKey(normalizedKey)
+            .idempotencyFingerprint(requestFingerprint)
             .ownerPhone(principal.id())
             .hospitalId(expert.getHospitalId())
             .serviceType(request.serviceType())
@@ -350,6 +367,7 @@ public class AppointmentService {
         map.put("confirmedAt", appointment.getConfirmedAt());
         map.put("cancelledAt", appointment.getCancelledAt());
         map.put("completedAt", appointment.getCompletedAt());
+        map.put("version", appointment.getVersion());
         return map;
     }
 
@@ -431,6 +449,34 @@ public class AppointmentService {
 
     private boolean blank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String fingerprint(CreateAppointmentRequest request) {
+        String canonical = String.join(
+            "\u001f",
+            normalize(request.serviceType()),
+            normalize(request.doctorId()),
+            normalize(request.date()),
+            normalize(request.province()),
+            normalize(request.city()),
+            normalize(request.address()),
+            normalize(request.venue()),
+            normalize(request.topic()),
+            normalize(request.audience()),
+            normalize(request.headcount()),
+            normalize(request.note()),
+            normalize(request.demandId())
+        );
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(canonical.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 不可用。", exception);
+        }
+    }
+
+    private String normalize(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private String randomSuffix() {
