@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: pkuih
+      POSTGRES_USER: pkuih
+      POSTGRES_PASSWORD: pkuih_local_only
+    ports:
+      - "5432:5432"
+    volumes:
+      - pkuih-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pkuih -d pkuih"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./server
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/pkuih
+      DB_USERNAME: pkuih
+      DB_PASSWORD: pkuih_local_only
+      DB_DRIVER: org.postgresql.Driver
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+      SESSION_COOKIE_SECURE: "false"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pkuih-postgres:

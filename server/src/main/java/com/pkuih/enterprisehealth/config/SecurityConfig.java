@@ -43,7 +43,12 @@ public class SecurityConfig {
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**", "/api/v1/bootstrap").permitAll()
+                .requestMatchers(
+                    "/api/v1/auth/**",
+                    "/api/v1/bootstrap",
+                    "/actuator/health",
+                    "/actuator/health/**"
+                ).permitAll()
                 .anyRequest().authenticated()
             )
             .exceptionHandling(errors -> errors

@@ -46,6 +46,13 @@ class CoreFlowIntegrationTest {
     private InstitutionAccountRepository institutionAccounts;
 
     @Test
+    void healthEndpointIsPubliclyAvailable() throws Exception {
+        mvc.perform(get("/actuator/health"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
     void institutionCanBookAndHospitalCanDeliverConfirmedPlan() throws Exception {
         HttpSession institution = institutionSession();
         LocalDate date = slots.findByDoctorIdAndDateBetweenOrderByDateAsc(
@@ -296,6 +303,75 @@ class CoreFlowIntegrationTest {
                 .content(objectMapper.writeValueAsString(validRequest)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.saved").value(1));
+    }
+
+    @Test
+    void superadminCanProvisionInstitutionOperatorAndHospitalPhone() throws Exception {
+        HttpSession superadmin = adminSession("admin", "pkuih2026");
+
+        mvc.perform(post("/api/v1/admin/institution-accounts")
+                .session((org.springframework.mock.web.MockHttpSession) superadmin)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", "13700000099",
+                    "name", "测试机构联系人"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.phone").value("13700000099"))
+            .andExpect(jsonPath("$.data.active").value(true));
+
+        mvc.perform(post("/api/v1/auth/institution/login")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", "13700000099",
+                    "code", "888888"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.role").value("INSTITUTION"));
+
+        mvc.perform(post("/api/v1/admin/operator-accounts")
+                .session((org.springframework.mock.web.MockHttpSession) superadmin)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "username", "ops-test",
+                    "password", "ops-test-pass",
+                    "name", "测试运营",
+                    "phone", "13700000098",
+                    "role", "OPERATOR",
+                    "hospitalId", "pkuih"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.username").value("ops-test"))
+            .andExpect(jsonPath("$.data.role").value("OPERATOR"))
+            .andExpect(jsonPath("$.data.hospitalId").value("pkuih"));
+
+        HttpSession operator = adminSession("ops-test", "ops-test-pass");
+        mvc.perform(get("/api/v1/admin/institution-accounts")
+                .session((org.springframework.mock.web.MockHttpSession) operator))
+            .andExpect(status().isForbidden());
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/api/v1/admin/hospitals/pkuih"
+                )
+                .session((org.springframework.mock.web.MockHttpSession) superadmin)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"phone\":\"010-12345678\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.phone").value("010-12345678"));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/api/v1/admin/operator-accounts/admin"
+                )
+                .session((org.springframework.mock.web.MockHttpSession) superadmin)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"active\":false}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("SELF_ACCOUNT_LOCKOUT"));
     }
 
     private HttpSession institutionSession() throws Exception {

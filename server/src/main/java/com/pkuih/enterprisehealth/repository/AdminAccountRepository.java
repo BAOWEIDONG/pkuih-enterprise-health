@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface AdminAccountRepository extends JpaRepository<AdminAccountEntity, String> {
     List<AdminAccountEntity> findAllByOrderByRoleAscNameAsc();
+
+    long countByRoleAndActiveTrue(String role);
 }

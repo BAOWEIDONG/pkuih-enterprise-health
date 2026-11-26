@@ -14,6 +14,12 @@ const applicationConfig = read("server/src/main/resources/application.yml");
 const expertAdminController = read(
   "server/src/main/java/com/pkuih/enterprisehealth/expert/ExpertAdminController.java"
 );
+const adminManagementController = read(
+  "server/src/main/java/com/pkuih/enterprisehealth/admin/AdminManagementController.java"
+);
+const securityConfig = read(
+  "server/src/main/java/com/pkuih/enterprisehealth/config/SecurityConfig.java"
+);
 
 assert(
   !/localStorage\.(getItem|setItem|removeItem)/.test(app),
@@ -49,7 +55,26 @@ assert(
     expertAdminController.includes('@RequestMapping("/api/v1/admin/experts")'),
   "专家管理接口必须与院方后端路由保持一致"
 );
-for (const client of ["experts", "slots", "appointments", "demands"]) {
+assert(
+  api.includes('"/admin/institution-accounts"') &&
+    api.includes('"/admin/operator-accounts"') &&
+    api.includes('adminList: "/admin/hospitals"') &&
+    adminManagementController.includes('@RequestMapping("/api/v1/admin")'),
+  "医院与账号管理接口必须与超级管理员后端路由保持一致"
+);
+assert(
+  securityConfig.includes('"/actuator/health"'),
+  "健康检查接口必须允许容器编排匿名探活"
+);
+for (const client of [
+  "experts",
+  "slots",
+  "appointments",
+  "demands",
+  "institutionAccounts",
+  "adminAccounts",
+  "hospitals"
+]) {
   assert(
     api.includes(`const ${client} = Object.freeze`),
     `业务 API 客户端缺少模块：${client}`

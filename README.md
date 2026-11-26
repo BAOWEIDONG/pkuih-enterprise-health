@@ -149,7 +149,16 @@ cd server
 mvn spring-boot:run
 ```
 
+PostgreSQL + 后端容器：
+
+```bash
+docker compose up --build
+```
+
+健康检查地址为 `http://localhost:8080/actuator/health`。Compose 中的数据库密码只用于本地开发，正式环境请用密钥管理系统覆盖 `.env.example` 中的变量。
+
 - 默认端口 `8080`，H2 文件数据库位于 `server/data/`，首次启动自动写入 9 家医院、59 位专家、12 个月时令主题、144 条课题匹配、机构账号与未来 61 天号源
+- `/actuator/health` 提供 Kubernetes/Docker 健康检查；`server/Dockerfile` 和根目录 `docker-compose.yml` 提供 PostgreSQL 本地部署骨架
 - 演示机构账号：`13800000001` / 验证码 `888888`
 - 超级管理员：`admin / pkuih2026`
 - 国际医院运营：`pkuih / pkuih2026`
@@ -174,7 +183,7 @@ VITE_DEV_API_TARGET=http://localhost:8080
 
 - 静态 H5 演示可直接使用，现有 UI 不会因为 Vue 3 接入而变化；Vue 目前负责生产入口与构建外壳，业务视图仍由 `LegacyHost` 加载原有运行层。
 - 前后端联调已覆盖登录、Bootstrap、专家查询、号源、预约和提需主链路，但业务页面尚未全面切换到 API。
-- 当前版本不是“改一个配置即可生产上线”：机构/角色管理、时令配置、方案模板、海报、文件、推送等后端接口仍需补齐，验证码、审计、文件安全和邮件/短信发送也需生产化。
+- 当前版本不是“改一个配置即可生产上线”：时令配置、方案模板、海报、文件、推送等后端接口仍需补齐，验证码、审计、文件安全和邮件/短信发送也需生产化。
 - 完整审查结论见 `docs/CODE-REVIEW-V1.md`。
 
 - 专家、医院、时令主题与主题匹配数据位于 `assets/data/*.json`，全国省市数据位于 `assets/china-cities.json`

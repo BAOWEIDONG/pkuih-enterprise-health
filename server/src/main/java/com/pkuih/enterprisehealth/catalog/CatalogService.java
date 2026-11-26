@@ -45,6 +45,10 @@ public class CatalogService {
         return payload;
     }
 
+    public List<Map<String, Object>> hospitalList() {
+        return hospitals.findByActiveTrueOrderByNameAsc().stream().map(this::hospitalMap).toList();
+    }
+
     public List<Map<String, Object>> expertList(String hospitalId, String service, String city) {
         List<ExpertEntity> source = hospitalId == null || hospitalId.isBlank()
             ? experts.findByActiveTrueOrderByTierAscNameAsc()

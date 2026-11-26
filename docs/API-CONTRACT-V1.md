@@ -165,6 +165,27 @@
 
 登录态默认由服务端通过 `HttpOnly; Secure; SameSite=Lax` Cookie 下发。H5 不把长期 token 写入 `localStorage`。只有明确采用 Bearer 模式时才允许通过配置启用，并应配合短有效期、刷新 token 轮换和退出失效。
 
+### 2.3 超级管理员账号维护
+
+以下接口仅 `SUPERADMIN` 可访问。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/admin/institution-accounts` | 机构白名单列表 |
+| POST | `/admin/institution-accounts` | 开通机构账号，手机号和姓名必填 |
+| PATCH | `/admin/institution-accounts/:phone` | 修改机构资料或启用状态 |
+| GET | `/admin/operator-accounts` | 院方账号列表，不返回密码哈希 |
+| POST | `/admin/operator-accounts` | 新增超级管理员或医院运营账号 |
+| PATCH | `/admin/operator-accounts/:username` | 修改姓名、手机号、密码、角色或启用状态 |
+
+院方账号规则：
+
+- `role` 只能是 `SUPERADMIN`、`OPERATOR`。
+- `OPERATOR` 必须绑定一个启用的医院；`SUPERADMIN` 的 `hospitalId` 为空。
+- 当前登录账号不能停用自己或移除自己的超级管理员角色。
+- 系统必须至少保留一个启用的超级管理员。
+- 密码只接受明文写入并立即哈希，任何查询接口不得返回密码哈希。
+
 ## 3. 基础数据
 
 ### 3.1 `GET /bootstrap`
@@ -215,6 +236,17 @@
 仅超级管理员。可修改名称、地址、经纬度、联系电话、启用状态。
 
 经纬度必须由管理员直接填写或由受信任地图服务回填，前端不得自行伪造。
+
+### 4.3 超级管理员医院维护
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/hospitals` | 已登录用户查询启用医院 |
+| GET | `/admin/hospitals` | 超级管理员查询全部医院，包含停用医院 |
+| POST | `/admin/hospitals` | 新增医院 |
+| PATCH | `/admin/hospitals/:id` | 修改医院名称、电话、地址、经纬度和启用状态 |
+
+医院名称、省份、城市、详细地址为必填项；纬度范围为 -90～90，经度范围为 -180～180。
 
 ## 5. 专家
 

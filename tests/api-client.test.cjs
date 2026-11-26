@@ -57,7 +57,16 @@ vm.createContext(context);
 vm.runInContext(source, context, { filename: "assets/api.js" });
 
 const api = window.PkuihApi;
-assert(api.experts && api.slots && api.appointments && api.demands, "业务 API 客户端未暴露");
+assert(
+  api.experts &&
+    api.slots &&
+    api.appointments &&
+    api.demands &&
+    api.institutionAccounts &&
+    api.adminAccounts &&
+    api.hospitals,
+  "业务 API 客户端未暴露"
+);
 api.session.setToken("test-token");
 
 function lastRequest() {
@@ -91,6 +100,28 @@ async function run() {
   await api.demands.match("XQ-1", { doctorId: "expert-1", date: "2026-12-02" });
   assert.equal(lastRequest().url, "/api/v1/demands/XQ-1/match");
   assert.equal(lastRequest().options.method, "POST");
+
+  await api.institutionAccounts.update("138 0000 0001", { active: false });
+  assert.equal(
+    lastRequest().url,
+    "/api/v1/admin/institution-accounts/138%200000%200001"
+  );
+  assert.equal(lastRequest().options.method, "PATCH");
+
+  await api.adminAccounts.create({
+    username: "operator",
+    password: "secret",
+    name: "运营",
+    phone: "13800000001",
+    role: "OPERATOR",
+    hospitalId: "pkuih"
+  });
+  assert.equal(lastRequest().url, "/api/v1/admin/operator-accounts");
+  assert.equal(lastRequest().options.method, "POST");
+
+  await api.hospitals.update("pkuih", { phone: "010-69007777" });
+  assert.equal(lastRequest().url, "/api/v1/admin/hospitals/pkuih");
+  assert.equal(lastRequest().options.method, "PATCH");
 
   console.log("api client OK");
 }

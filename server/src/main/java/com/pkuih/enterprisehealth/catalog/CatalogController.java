@@ -21,6 +21,11 @@ public class CatalogController {
         return ApiResponse.ok(catalogService.bootstrap());
     }
 
+    @GetMapping("/hospitals")
+    public ApiResponse<List<Map<String, Object>>> hospitals() {
+        return ApiResponse.ok(catalogService.hospitalList());
+    }
+
     @GetMapping("/experts")
     public ApiResponse<List<Map<String, Object>>> experts(
         @RequestParam(required = false) String hospitalId,

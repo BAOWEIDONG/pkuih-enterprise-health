@@ -46,6 +46,7 @@
     }),
     hospitals: Object.freeze({
       list: "/hospitals",
+      adminList: "/admin/hospitals",
       create: "/admin/hospitals",
       update: "/admin/hospitals/:id"
     }),
@@ -622,6 +623,61 @@
     }
   });
 
+  const institutionAccounts = Object.freeze({
+    list() {
+      requireBusinessMode();
+      return http.get(ENDPOINTS.institutionAccounts.list);
+    },
+    create(payload) {
+      requireBusinessMode();
+      return http.post(ENDPOINTS.institutionAccounts.create, payload);
+    },
+    update(phone, payload) {
+      requireBusinessMode();
+      return http.patch(
+        buildPath(ENDPOINTS.institutionAccounts.update, { phone }),
+        payload
+      );
+    }
+  });
+
+  const adminAccounts = Object.freeze({
+    list() {
+      requireBusinessMode();
+      return http.get(ENDPOINTS.adminAccounts.list);
+    },
+    create(payload) {
+      requireBusinessMode();
+      return http.post(ENDPOINTS.adminAccounts.create, payload);
+    },
+    update(username, payload) {
+      requireBusinessMode();
+      return http.patch(
+        buildPath(ENDPOINTS.adminAccounts.update, { username }),
+        payload
+      );
+    }
+  });
+
+  const hospitals = Object.freeze({
+    list() {
+      requireBusinessMode();
+      return http.get(ENDPOINTS.hospitals.list);
+    },
+    adminList() {
+      requireBusinessMode();
+      return http.get(ENDPOINTS.hospitals.adminList);
+    },
+    create(payload) {
+      requireBusinessMode();
+      return http.post(ENDPOINTS.hospitals.create, payload);
+    },
+    update(id, payload) {
+      requireBusinessMode();
+      return http.patch(buildPath(ENDPOINTS.hospitals.update, { id }), payload);
+    }
+  });
+
   window.PkuihApi = Object.freeze({
     config: Object.freeze(runtime),
     endpoints: ENDPOINTS,
@@ -633,6 +689,9 @@
     slots,
     appointments,
     demands,
+    institutionAccounts,
+    adminAccounts,
+    hospitals,
     session,
     ApiError,
     buildPath,
