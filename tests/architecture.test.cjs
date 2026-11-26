@@ -65,8 +65,10 @@ assert(
   "生产配置必须启用 Flyway 并使用 validate 校验实体结构"
 );
 for (const migration of [
-  "server/src/main/resources/db/migration/V1__baseline.sql",
-  "server/src/main/resources/db/migration/V2__appointment_production_fields.sql"
+  "server/src/main/resources/db/migration/h2/V1__baseline.sql",
+  "server/src/main/resources/db/migration/h2/V2__appointment_production_fields.sql",
+  "server/src/main/resources/db/migration/postgresql/V1__baseline.sql",
+  "server/src/main/resources/db/migration/postgresql/V2__appointment_production_fields.sql"
 ]) {
   assert(fs.existsSync(path.join(root, migration)), `数据库迁移缺失：${migration}`);
 }
