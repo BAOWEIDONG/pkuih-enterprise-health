@@ -40,6 +40,12 @@ assert(
   "运行时配置必须提供 API 模式、基础地址与登录态传输策略"
 );
 
+const iconBlock = app.slice(app.indexOf("const ICONS = {"), app.indexOf("  };", app.indexOf("const ICONS = {")));
+const usedIcons = new Set([...app.matchAll(/icon\("([^"]+)"/g)].map((match) => match[1]));
+const definedIcons = new Set([...iconBlock.matchAll(/^\s{4}([A-Za-z0-9_]+):/gm)].map((match) => match[1]));
+const missingIcons = [...usedIcons].filter((name) => !definedIcons.has(name)).sort();
+assert.deepEqual(missingIcons, [], `图标名称未定义：${missingIcons.join(", ")}`);
+
 for (const section of [
   "auth",
   "institutions",

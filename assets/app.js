@@ -2890,8 +2890,12 @@
     minus: '<path d="M5 12h14"/>',
     edit: '<path d="M4 20h4L20 8l-4-4L4 16Z"/><path d="m14 6 4 4"/>',
     trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/>',
+    lock:
+      '<rect x="5" y="10" width="14" height="10.5" rx="2.6"/><path d="M8.2 10V7.5a3.8 3.8 0 0 1 7.6 0V10"/><path d="M12 14.2v3"/>',
     logout: '<path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5"/><path d="M14 8l4 4-4 4M8 12h10"/>',
     mapPin: '<path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/>',
+    pin:
+      '<path d="M12 21s6.8-5.4 6.8-10.8a6.8 6.8 0 1 0-13.6 0C5.2 15.6 12 21 12 21Z"/><circle cx="12" cy="10.2" r="2.4"/>',
     sparkles:
       '<path d="M12 3.5 13.8 9l5.5 1.8-5.5 1.8L12 18l-1.8-5.4L4.7 10.8 10.2 9Z"/><path d="M19 16.5 19.8 19l2.5.8-2.5.8L19 23l-.8-2.4-2.5-.8 2.5-.8Z"/>',
     leaf: '<path d="M20 4C11 4 4.5 8.5 4.5 15.5c0 2 .7 3.5 1.8 4.5C8 13 12 10 18 8c-4.6 2.6-7.7 6.2-9.2 11.4 2.2.7 4.3.4 6.2-.8C20 15.8 20 9.2 20 4Z"/>',
@@ -7727,7 +7731,7 @@
             <p>登录后查看预约进度、院方方案与项目对接人。</p>
           </header>
           <div class="login-required">
-            <span class="login-required__icon">${icon("lock", 28)}</span>
+            <span class="login-required__icon">${icon("user", 28)}</span>
             <h2>登录企业账号</h2>
             <p>登录后可提交预约与提需、确认院方方案，并在下次打开时保持登录状态。</p>
             <button class="btn btn--primary btn--block" type="button" data-action="start-login" data-pending="appointments">
