@@ -38,7 +38,9 @@ public class AppointmentEntity {
     private String city;
     private String address;
     private String venue;
+    @Lob
     private String topic;
+    @Lob
     private String audience;
     private Integer headcount;
     @Lob
