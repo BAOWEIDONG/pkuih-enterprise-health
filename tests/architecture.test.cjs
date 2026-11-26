@@ -85,6 +85,12 @@ assert(
   "预约创建客户端必须支持 Idempotency-Key"
 );
 assert(
+  api.includes("MicroMessenger") &&
+    api.includes("X-Client-Platform") &&
+    api.includes("X-WeChat-Version"),
+  "微信浏览器客户端必须提供平台识别与请求标记"
+);
+assert(
   applicationConfig.includes("ddl-auto: validate") &&
     applicationConfig.includes("flyway:"),
   "生产配置必须启用 Flyway 并使用 validate 校验实体结构"

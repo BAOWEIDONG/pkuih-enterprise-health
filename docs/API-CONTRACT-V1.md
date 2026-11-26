@@ -23,6 +23,8 @@
 | `Authorization` | Bearer 模式必填 | `Bearer <token>`；Cookie 模式由 HttpOnly Cookie 携带 |
 | `X-Request-Id` | 是 | 前端每次请求生成，用于链路追踪 |
 | `X-Client-Version` | 是 | 前端构建版本，例如 `20261126-9` |
+| `X-Client-Platform` | 是 | `wechat` 或 `browser` |
+| `X-WeChat-Version` | 微信环境必填 | 微信 WebView 版本，例如 `8.0.50` |
 | `Idempotency-Key` | 创建预约必填 | 防止重复提交、重复生成预约；同一 key 只能对应同一请求内容 |
 | `X-XSRF-TOKEN` | Cookie 模式写操作必填 | 从 `XSRF-TOKEN` Cookie 或 `/auth/csrf` 获取 |
 | `Content-Type` | JSON/表单上传时必填 | JSON 或 `multipart/form-data` |

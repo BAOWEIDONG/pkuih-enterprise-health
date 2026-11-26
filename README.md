@@ -185,6 +185,7 @@ VITE_DEV_API_TARGET=http://localhost:8080
 - 前后端联调已覆盖登录、Bootstrap、专家查询、号源、预约和提需主链路，但业务页面尚未全面切换到 API。
 - 当前版本不是“改一个配置即可生产上线”：时令配置、方案模板、海报、文件、推送等后端接口仍需补齐，验证码、审计、文件安全和邮件/短信发送也需生产化。
 - 完整审查结论见 `docs/CODE-REVIEW-V1.md`。
+- 微信内置浏览器的登录、Cookie、定位、分享、附件、缓存和真机验收要求见 `docs/WECHAT-H5-PRODUCTION.md`。
 
 - 专家、医院、时令主题与主题匹配数据位于 `assets/data/*.json`，全国省市数据位于 `assets/china-cities.json`
 - 院方 1124 表格更新后，可执行 `python3 work/build-expert-data.py [表格路径]` 重新生成专家、时令主题与课题匹配数据；脚本会校验医院绑定、服务类型、履约城市和专家重复

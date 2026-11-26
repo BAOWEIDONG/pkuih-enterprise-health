@@ -19,6 +19,20 @@
     window.PKUHI_CONFIG || {}
   );
 
+  const userAgent = String(
+    (typeof navigator !== "undefined" && navigator.userAgent) ||
+      window.navigator?.userAgent ||
+      ""
+  );
+  const wechatVersion = /MicroMessenger\/([\d.]+)/i.exec(userAgent)?.[1] || "";
+  const platform = Object.freeze({
+    userAgent,
+    isWeChat: /MicroMessenger/i.test(userAgent),
+    wechatVersion,
+    isIOS: /iPhone|iPad|iPod/i.test(userAgent),
+    isAndroid: /Android/i.test(userAgent)
+  });
+
   const ENDPOINTS = Object.freeze({
     bootstrap: "/bootstrap",
     auth: Object.freeze({
@@ -302,7 +316,9 @@
     const headers = new Headers({
       Accept: "application/json",
       "X-Client-Version": runtime.clientVersion,
+      "X-Client-Platform": platform.isWeChat ? "wechat" : "browser",
       "X-Request-Id": createRequestId(),
+      ...(platform.wechatVersion ? { "X-WeChat-Version": platform.wechatVersion } : {}),
       ...(options.headers || {})
     });
     const method = String(options.method || (options.body == null ? "GET" : "POST")).toUpperCase();
@@ -680,6 +696,7 @@
 
   window.PkuihApi = Object.freeze({
     config: Object.freeze(runtime),
+    platform,
     endpoints: ENDPOINTS,
     storage,
     http,

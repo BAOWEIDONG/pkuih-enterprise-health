@@ -92,6 +92,7 @@ async function run() {
   assert.equal(lastRequest().options.method, "POST");
   assert.equal(lastRequest().options.headers.get("Idempotency-Key"), "idem-1");
   assert.equal(lastRequest().options.headers.get("Authorization"), "Bearer test-token");
+  assert.equal(lastRequest().options.headers.get("X-Client-Platform"), "browser");
 
   await api.appointments.accept("BD 1");
   assert.equal(lastRequest().url, "/api/v1/appointments/BD%201/accept");
@@ -126,7 +127,68 @@ async function run() {
   console.log("api client OK");
 }
 
-run().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+async function runWechat() {
+  const wechatRequests = [];
+  const wechatWindow = {
+    PKUHI_CONFIG: {
+      apiMode: "api",
+      apiBaseUrl: "/api/v1",
+      authMode: "bearer",
+      apiCredentials: "include",
+      apiTimeoutMs: 15000,
+      clientVersion: "test"
+    },
+    crypto: { randomUUID },
+    setTimeout,
+    clearTimeout,
+    async fetch(url, options) {
+      wechatRequests.push({ url, options });
+      return new Response(JSON.stringify({ code: 0, message: "ok", data: { ok: true } }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }
+  };
+  const wechatContext = {
+    window: wechatWindow,
+    navigator: {
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 " +
+        "(KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.50(0x1800323c) NetType/WIFI Language/zh_CN"
+    },
+    localStorage: {
+      getItem() {
+        return null;
+      },
+      setItem() {},
+      removeItem() {}
+    },
+    Headers,
+    AbortController,
+    URLSearchParams,
+    FormData,
+    Response,
+    document: { cookie: "" },
+    console
+  };
+  vm.createContext(wechatContext);
+  vm.runInContext(source, wechatContext, { filename: "assets/api.js" });
+
+  const wechatApi = wechatWindow.PkuihApi;
+  assert.equal(wechatApi.platform.isWeChat, true, "微信 UA 应被识别");
+  assert.equal(wechatApi.platform.wechatVersion, "8.0.50", "应解析微信版本");
+  assert.equal(wechatApi.platform.isIOS, true, "应识别 iOS");
+  assert.equal(wechatApi.platform.isAndroid, false, "iOS 不应识别为 Android");
+
+  await wechatApi.experts.list({ hospitalId: "pkuih" });
+  const request = wechatRequests.at(-1);
+  assert.equal(request.options.headers.get("X-Client-Platform"), "wechat");
+  assert.equal(request.options.headers.get("X-WeChat-Version"), "8.0.50");
+}
+
+run()
+  .then(runWechat)
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
