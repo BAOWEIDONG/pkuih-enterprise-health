@@ -12591,41 +12591,6 @@
   /* =========================================================
      Admin hospitals & accounts
      ========================================================= */
-  const HOSPITAL_MAP_BOUNDS = {
-    west: 73.2,
-    east: 135.4,
-    south: 17.8,
-    north: 54.2
-  };
-
-  function hospitalMapPercent(lat, lng) {
-    const bounds = HOSPITAL_MAP_BOUNDS;
-    const safeLat = Number.isFinite(Number(lat)) ? Number(lat) : bounds.north;
-    const safeLng = Number.isFinite(Number(lng)) ? Number(lng) : bounds.west;
-    return {
-      x: Math.max(
-        0,
-        Math.min(100, ((safeLng - bounds.west) / (bounds.east - bounds.west)) * 100)
-      ),
-      y: Math.max(
-        0,
-        Math.min(100, ((bounds.north - safeLat) / (bounds.north - bounds.south)) * 100)
-      )
-    };
-  }
-
-  function hospitalMapCoordinate(xPercent, yPercent) {
-    const bounds = HOSPITAL_MAP_BOUNDS;
-    return {
-      lng:
-        bounds.west +
-        (Math.max(0, Math.min(100, xPercent)) / 100) * (bounds.east - bounds.west),
-      lat:
-        bounds.north -
-        (Math.max(0, Math.min(100, yPercent)) / 100) * (bounds.north - bounds.south)
-    };
-  }
-
   function openHospitalEditor(hospitalId = "") {
     if (!isSuperadmin()) return showToast("仅超级管理员可维护医院资料。");
     const hospital = hospitalId ? hospitalConfigFor(hospitalId) : null;
@@ -12648,47 +12613,8 @@
           flagship: false,
           isNew: true
         };
-    state.hospitalMapZoom = 1;
     state.overlay = { type: "hospital-editor", hospitalId: hospitalId || "" };
     renderOverlay();
-  }
-
-  function renderHospitalMapPicker(draft) {
-    const point = hospitalMapPercent(draft.lat, draft.lng);
-    const zoom = Math.max(1, Math.min(8, Number(state.hospitalMapZoom) || 1));
-    return `
-      <div class="hospital-map-card">
-        <div class="hospital-map-card__head">
-          <span>${icon("pin", 14)} 地图选点</span>
-          <div>
-            <button type="button" data-action="hospital-map-locate">${icon(
-              "pin",
-              13
-            )} 当前定位</button>
-            <button type="button" data-action="hospital-map-zoom-out" ${
-              zoom <= 1 ? "disabled" : ""
-            }>−</button>
-            <button type="button" data-action="hospital-map-zoom-in" ${
-              zoom >= 8 ? "disabled" : ""
-            }>＋</button>
-          </div>
-        </div>
-        <div class="hospital-map-viewport" data-hospital-map-viewport>
-          <div class="hospital-map-stage" data-hospital-map-stage
-            style="transform:scale(${zoom});transform-origin:${point.x}% ${point.y}%">
-            <img src="assets/china-map.jpg" alt="中国行政区示意地图" draggable="false">
-            <span class="hospital-map-marker" style="left:${point.x}%;top:${point.y}%">
-              <i></i><b>${esc(draft.short || draft.name || "医院位置")}</b>
-            </span>
-          </div>
-          <div class="hospital-map-crosshair" aria-hidden="true"></div>
-        </div>
-        <p class="hospital-map-hint">${icon(
-          "info",
-          12
-        )} 演示底图为离线行政区示意：点击地图拾取大致位置，再用下方经纬度微调；正式版接入高德/腾讯地图 SDK。</p>
-      </div>
-    `;
   }
 
   function renderHospitalEditorSheet() {
@@ -12744,23 +12670,22 @@
                 draft.phone
               )}" placeholder="如：010-69007777">
             </div>
-            ${renderHospitalMapPicker(draft)}
             <div class="field-row">
-              <div class="field"><label>纬度 <em>*</em></label>
-                <input type="number" inputmode="decimal" step="0.000001" data-hospital-field="lat" value="${esc(
+              <div class="field"><label>纬度（Lat） <em>*</em></label>
+                <input type="number" inputmode="decimal" step="0.000001" min="3" max="54" data-hospital-field="lat" value="${esc(
                   draft.lat
                 )}" placeholder="39.904200">
               </div>
-              <div class="field"><label>经度 <em>*</em></label>
-                <input type="number" inputmode="decimal" step="0.000001" data-hospital-field="lng" value="${esc(
+              <div class="field"><label>经度（Lng） <em>*</em></label>
+                <input type="number" inputmode="decimal" step="0.000001" min="73" max="136" data-hospital-field="lng" value="${esc(
                   draft.lng
                 )}" placeholder="116.407400">
               </div>
             </div>
-            <div class="template-form-note">${icon(
-              "shield",
-              13
-            )} 经纬度会影响“就近医院”排序，请使用地图选点或现场定位获取。修改后，机构端重新进入首页即可看到新的距离排序。</div>
+            <div class="field-help hospital-coordinate-help">${icon(
+              "info",
+              12
+            )} 经纬度用于就近医院距离排序，请直接填写准确的纬度（3–54）和经度（73–136）。修改后，机构端重新进入首页即可看到新的距离排序。</div>
           </div>
         </div>
         <div class="sheet__footer">
@@ -12771,79 +12696,6 @@
         </div>
       </section>
     `;
-  }
-
-  function updateHospitalMapPreview() {
-    const draft = state.hospitalEditorDraft;
-    if (!draft) return;
-    const stage = overlayRoot.querySelector("[data-hospital-map-stage]");
-    const marker = overlayRoot.querySelector(".hospital-map-marker");
-    if (!stage || !marker) return;
-    const point = hospitalMapPercent(draft.lat, draft.lng);
-    const zoom = Math.max(1, Math.min(8, Number(state.hospitalMapZoom) || 1));
-    stage.style.transform = `scale(${zoom})`;
-    stage.style.transformOrigin = `${point.x}% ${point.y}%`;
-    marker.style.left = `${point.x}%`;
-    marker.style.top = `${point.y}%`;
-    marker.style.transform = `translate(-50%, -100%) scale(${1 / zoom})`;
-    const label = marker.querySelector("b");
-    if (label) label.textContent = draft.short || draft.name || "医院位置";
-    overlayRoot
-      .querySelectorAll('[data-action="hospital-map-zoom-in"]')
-      .forEach((button) => {
-        button.disabled = zoom >= 8;
-      });
-    overlayRoot
-      .querySelectorAll('[data-action="hospital-map-zoom-out"]')
-      .forEach((button) => {
-        button.disabled = zoom <= 1;
-      });
-  }
-
-  function pickHospitalMapPoint(clientX, clientY) {
-    const draft = state.hospitalEditorDraft;
-    const stage = overlayRoot.querySelector("[data-hospital-map-stage]");
-    if (!draft || !stage) return;
-    const zoom = Math.max(1, Math.min(8, Number(state.hospitalMapZoom) || 1));
-    const rect = stage.getBoundingClientRect();
-    const xPercent = ((clientX - rect.left) / rect.width) * 100;
-    const yPercent = ((clientY - rect.top) / rect.height) * 100;
-    if (xPercent < 0 || xPercent > 100 || yPercent < 0 || yPercent > 100) return;
-    const point = hospitalMapCoordinate(xPercent, yPercent);
-    draft.lat = Number(point.lat.toFixed(6));
-    draft.lng = Number(point.lng.toFixed(6));
-    const latInput = overlayRoot.querySelector('[data-hospital-field="lat"]');
-    const lngInput = overlayRoot.querySelector('[data-hospital-field="lng"]');
-    if (latInput) latInput.value = draft.lat;
-    if (lngInput) lngInput.value = draft.lng;
-    updateHospitalMapPreview();
-  }
-
-  function locateHospitalDraft() {
-    const draft = state.hospitalEditorDraft;
-    if (!draft) return;
-    if (!navigator.geolocation) return showToast("当前浏览器不支持定位，请手动填写经纬度。");
-    showToast("正在获取当前位置…");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        draft.lat = Number(position.coords.latitude.toFixed(6));
-        draft.lng = Number(position.coords.longitude.toFixed(6));
-        const latInput = overlayRoot.querySelector('[data-hospital-field="lat"]');
-        const lngInput = overlayRoot.querySelector('[data-hospital-field="lng"]');
-        if (latInput) latInput.value = draft.lat;
-        if (lngInput) lngInput.value = draft.lng;
-        updateHospitalMapPreview();
-        showToast("已使用当前定位，请确认地址与坐标一致。");
-      },
-      (error) => {
-        showToast(
-          error?.code === 1
-            ? "定位权限未开启，请在浏览器设置中允许定位或手动填写。"
-            : "定位失败，请在地图上选点或手动填写经纬度。"
-        );
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    );
   }
 
   function saveHospitalEditor() {
@@ -14424,8 +14276,6 @@
       const field = target.dataset.hospitalField;
       state.hospitalEditorDraft[field] =
         field === "lat" || field === "lng" ? Number(target.value) : target.value;
-      if (field === "lat" || field === "lng") updateHospitalMapPreview();
-      if (field === "name" || field === "short") updateHospitalMapPreview();
       return;
     }
     if (target.matches("[data-expert-search]")) {
@@ -15280,23 +15130,6 @@
       case "hospital-editor-save":
         saveHospitalEditor();
         break;
-      case "hospital-map-locate":
-        locateHospitalDraft();
-        break;
-      case "hospital-map-zoom-in":
-        state.hospitalMapZoom = Math.min(
-          8,
-          (Number(state.hospitalMapZoom) || 1) * 1.6
-        );
-        updateHospitalMapPreview();
-        break;
-      case "hospital-map-zoom-out":
-        state.hospitalMapZoom = Math.max(
-          1,
-          (Number(state.hospitalMapZoom) || 1) / 1.6
-        );
-        updateHospitalMapPreview();
-        break;
       case "hospital-phone-save":
         saveHospitalPhoneDraft();
         break;
@@ -15830,11 +15663,6 @@
       if (!target) return;
       event.preventDefault();
       handleAction(target.dataset.action, target);
-    });
-    document.addEventListener("click", (event) => {
-      const viewport = event.target.closest("[data-hospital-map-viewport]");
-      if (!viewport || event.target.closest("[data-action]")) return;
-      pickHospitalMapPoint(event.clientX, event.clientY);
     });
     document.addEventListener("input", handleInput);
     document.addEventListener("change", handleChange);

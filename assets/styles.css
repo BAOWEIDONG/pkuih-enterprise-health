@@ -11076,170 +11076,21 @@ textarea {
   white-space: nowrap;
 }
 
-.hospital-map-card {
-  margin: 2px 0 13px;
-  padding: 11px;
-  border: 1px solid rgba(11, 49, 143, 0.1);
-  border-radius: 18px;
-  background:
-    radial-gradient(200px 120px at 100% 0%, rgba(80, 137, 255, 0.1), transparent 75%),
-    linear-gradient(145deg, #f9fbff, #eef4fe);
-  box-shadow: 0 10px 26px rgba(10, 37, 93, 0.055);
-}
-
-.hospital-map-card__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 1px 2px 0;
-}
-
-.hospital-map-card__head > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--brand);
-  font-size: 9px;
-  font-weight: 740;
-}
-
-.hospital-map-card__head > div {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.hospital-map-card__head button {
-  display: inline-flex;
-  height: 27px;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 0 8px;
-  border: 1px solid rgba(11, 49, 143, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.86);
-  color: var(--brand);
-  font-size: 8px;
-  font-weight: 680;
-}
-
-.hospital-map-card__head button:disabled {
-  opacity: 0.36;
-}
-
-.hospital-map-viewport {
-  position: relative;
-  height: 192px;
-  overflow: hidden;
-  margin-top: 9px;
-  border: 1px solid rgba(11, 49, 143, 0.12);
-  border-radius: 13px;
-  background: #dce8f6;
-  box-shadow: inset 0 1px 6px rgba(11, 49, 143, 0.08);
-  touch-action: manipulation;
-}
-
-.hospital-map-stage {
-  position: absolute;
-  inset: 0;
-  transform-origin: 50% 50%;
-  transition: transform 180ms var(--ease);
-  will-change: transform;
-}
-
-.hospital-map-stage > img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  pointer-events: none;
-  user-select: none;
-}
-
-.hospital-map-marker {
-  position: absolute;
-  z-index: 3;
-  display: flex;
-  max-width: 130px;
-  align-items: center;
-  flex-direction: column;
-  gap: 2px;
-  transform: translate(-50%, -100%);
-  pointer-events: none;
-}
-
-.hospital-map-marker i {
-  display: block;
-  width: 13px;
-  height: 13px;
-  border: 3px solid #ffffff;
-  border-radius: 50% 50% 50% 0;
-  background: var(--brand-mid);
-  box-shadow: 0 3px 8px rgba(5, 24, 62, 0.32);
-  transform: rotate(-45deg);
-}
-
-.hospital-map-marker b {
-  display: block;
-  max-width: 130px;
-  overflow: hidden;
-  padding: 2px 5px;
-  border-radius: 5px;
-  background: rgba(4, 22, 57, 0.86);
-  color: #fff;
-  font-size: 7px;
-  font-weight: 650;
-  line-height: 1.45;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hospital-map-crosshair {
-  position: absolute;
-  z-index: 2;
-  top: 50%;
-  left: 50%;
-  width: 22px;
-  height: 22px;
-  transform: translate(-50%, -50%);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.hospital-map-crosshair::before,
-.hospital-map-crosshair::after {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.9);
-  content: "";
-  transform: translate(-50%, -50%);
-}
-
-.hospital-map-crosshair::before {
-  width: 7px;
-  height: 1px;
-}
-
-.hospital-map-crosshair::after {
-  width: 1px;
-  height: 7px;
-}
-
-.hospital-map-hint {
+.hospital-coordinate-help {
   display: flex;
   align-items: flex-start;
   gap: 4px;
-  margin: 7px 2px 0;
-  color: var(--ink-3);
-  font-size: 7.5px;
-  line-height: 1.55;
+  margin: 9px 2px 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(11, 49, 143, 0.09);
+  border-radius: 11px;
+  background: rgba(245, 249, 255, 0.9);
+  color: var(--ink-2);
+  font-size: 8.5px;
+  line-height: 1.6;
 }
 
-.hospital-map-hint svg {
+.hospital-coordinate-help svg {
   flex: 0 0 auto;
   margin-top: 1px;
   color: var(--blue-text);
