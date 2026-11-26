@@ -5396,6 +5396,7 @@
       tier: expert?.tier || tier || "specialist",
       hospitalId: hospital?.id || "",
       date: "",
+      dateLocked: false,
       province: region.province,
       city: region.city,
       address: "",
@@ -5465,7 +5466,7 @@
       }
     }
     if (demand.status !== "matched") {
-      return showToast("院方确认匹配专家后，可直接基于提需发起预约。");
+      return showToast("院方匹配专家后，可直接确认信息并生成预约单。");
     }
     const matchedExpert = demand.matchedExpertId
       ? expertById(demand.matchedExpertId)
@@ -5493,7 +5494,7 @@
       demand.phone || state.booking.contactPhone || state.session.phone || "";
     state.booking.note = [
       demand.note,
-      `由需求单 ${demand.id} 转入，院方已确认资源匹配。`
+      `由需求单 ${demand.id} 转入；原提需信息已自动带入，确认后生成预约单。`
     ]
       .filter(Boolean)
       .join("\n");
@@ -5504,13 +5505,13 @@
       audience: demand.audience,
       headcount: demand.headcount
     };
-    if (
-      demand.preferredDate &&
-      (!matchedExpert ||
-        doctorAvailability(matchedExpert).dates.includes(demand.preferredDate))
-    ) {
-      state.booking.date = demand.preferredDate;
-    }
+    const coordinatedDate =
+      demand.matchedDate ||
+      (demand.preferredDate && demand.preferredDate >= todayIso()
+        ? demand.preferredDate
+        : "");
+    state.booking.date = coordinatedDate;
+    state.booking.dateLocked = true;
     syncBookingDoctor(state.booking);
     state.booking.doctorPinned = Boolean(state.booking.doctorId);
     state.booking.doctorPickerOpen = false;
@@ -5652,20 +5653,30 @@
     `;
   }
 
+  function bookingUsesCoordinatedDemand(booking) {
+    return Boolean(booking?.demandId && booking?.dateLocked);
+  }
+
   function renderBookingServiceSection(booking) {
+    const locked = Boolean(booking?.demandId);
     return `
       <div class="choice-row choice-row--three">
         ${SERVICE_IDS.map((id) => {
           const service = SERVICES[id];
           return `
             <button class="choice-card ${booking.serviceType === id ? "is-active" : ""}" type="button"
-              data-action="booking-service" data-value="${esc(id)}">
+              data-action="booking-service" data-value="${esc(id)}"
+              ${locked && booking.serviceType !== id ? "disabled" : ""}>
               <span>${icon(
                 id === "讲座" ? "message" : id === "健康咨询" ? "stethoscope" : "users",
                 17
               )}</span>
               <strong>${esc(service.label)}</strong>
-              <small>${esc(service.desc)}</small>
+              <small>${
+                locked && booking.serviceType !== id
+                  ? "已由院方按提需锁定"
+                  : esc(service.desc)
+              }</small>
             </button>
           `;
         }).join("")}
@@ -5711,6 +5722,19 @@
         actionLabel: "不可履约"
       };
     }
+    if (
+      bookingUsesCoordinatedDemand(booking) &&
+      String(expert.id) === String(booking.doctorId)
+    ) {
+      return {
+        expert,
+        availability,
+        bookable: true,
+        status: "reserved",
+        label: "院方已协调",
+        actionLabel: "已安排"
+      };
+    }
     if (!availability.bookable) {
       return {
         expert,
@@ -5750,6 +5774,7 @@
 
   function syncBookingDoctor(booking) {
     if (!booking?.doctorId) return false;
+    if (bookingUsesCoordinatedDemand(booking)) return false;
     const expert = expertById(booking.doctorId);
     const entry = bookingDoctorEntry(expert, booking);
     if (entry?.bookable) return false;
@@ -5764,6 +5789,7 @@
     const options = bookingDoctorCandidates(booking);
     const doctor = bookingSelectedDoctor(booking);
     const themeCtx = bookingThemeContext(booking);
+    const demandLocked = bookingUsesCoordinatedDemand(booking);
     const bookableCount = options.filter((item) => item.bookable).length;
     const selectedEntry = doctor
       ? options.find((entry) => entry.expert.id === doctor.id) || null
@@ -5775,7 +5801,9 @@
     const topicExpert = themeCtx.topic?.expertId
       ? expertById(themeCtx.topic.expertId)
       : null;
-    const filterText = pinned
+    const filterText = demandLocked && doctor
+      ? `院方已匹配 ${doctor.name} 和履约日期，服务类型、专家与日期均已锁定，确认活动地址即可提交。`
+      : pinned
       ? `已带入 ${doctor.name}，可直接继续填写；同条件共 ${options.length} 位相关专家、${bookableCount} 位可约，点击“更换专家”查看。`
       : themeCtx.topic
       ? `已按课题「${themeCtx.topic.title}」筛选${
@@ -5792,7 +5820,7 @@
           专家为必选项。${esc(filterText)}
         </p>
         ${
-          themeCtx.active
+          themeCtx.active && !demandLocked
             ? `<div class="booking-doctor__filter">
                 <span>${icon("leaf", 13)}</span>
                 <span><strong>${
@@ -5810,7 +5838,7 @@
         <div class="booking-doctor__status ${doctor ? "has-doctor" : ""}">
           <span>${doctor ? `已选专家 · ${esc(doctor.name)}` : "尚未选择专家"}</span>
           ${
-            pinned
+            pinned && !demandLocked
               ? `<button type="button" data-action="booking-doctor-change">更换专家</button>`
               : ""
           }
@@ -5875,9 +5903,11 @@
         }
         ${
           doctor
-            ? `<p class="booking-hint">${icon("clock", 12)} ${esc(
-                doctor.leadLabel
-              )}；仅展示符合预约周期的可约日期。</p>`
+            ? `<p class="booking-hint">${icon("clock", 12)} ${
+                demandLocked
+                  ? "院方已协调专家与日期，无需重新选择公开号源。"
+                  : `${esc(doctor.leadLabel)}；仅展示符合预约周期的可约日期。`
+              }</p>`
             : ""
         }
       </div>
@@ -5885,6 +5915,28 @@
   }
 
   function renderBookingDates(booking) {
+    if (bookingUsesCoordinatedDemand(booking)) {
+      return `
+        <div class="date-chip-list" id="booking-dates">
+          <div class="booking-date-reserved">
+            <span class="booking-date-reserved__icon">${icon("calendar", 17)}</span>
+            <span class="booking-date-reserved__body">
+              <strong>${
+                booking.date
+                  ? formatDateCN(booking.date, true)
+                  : "院方尚未确认日期"
+              }</strong>
+              <small>${
+                booking.date
+                  ? "该日期由院方项目人员协调安排，不受公开号源限制，无需重新选择。"
+                  : "提需已匹配，日期仍待院方项目人员协调。"
+              }</small>
+            </span>
+            <em>${icon("lock", 11)} 已锁定</em>
+          </div>
+        </div>
+      `;
+    }
     if (!booking?.doctorId) {
       return `
         <div class="date-chip-list" id="booking-dates">
@@ -6074,7 +6126,11 @@
         ${bookingFieldErrorMarkup("doctor")}
       </div>
       <div class="flow-section ${bookingErrorClass("date")}">
-        <div class="flow-section__head"><h2>期望日期</h2><span>号源按整天配置，不区分时段</span></div>
+        <div class="flow-section__head"><h2>期望日期</h2><span>${
+          bookingUsesCoordinatedDemand(booking)
+            ? "院方协调安排 · 日期锁定"
+            : "号源按整天配置，不区分时段"
+        }</span></div>
         ${renderBookingDates(booking)}
         ${bookingFieldErrorMarkup("date")}
       </div>
@@ -6200,6 +6256,11 @@
         <div><span>专家</span><strong>${esc(
           expert ? `${expert.name} · ${expert.deptTitle}` : "请选择专家"
         )}</strong></div>
+        ${
+          bookingUsesCoordinatedDemand(booking)
+            ? `<div><span>日期安排</span><strong>院方人工协调 · 无需公开号源</strong></div>`
+            : ""
+        }
         <div><span>活动地点</span><strong>${esc(
           formatAddress(booking.province, booking.city, booking.address, booking.venue)
         )}</strong></div>
@@ -6261,7 +6322,7 @@
                     booking.demandContext.headcount
                       ? ` · 预计 ${esc(booking.demandContext.headcount)} 人`
                       : ""
-                  } · 院方已确认资源匹配，请补充活动地点与日期后提交。</p>
+                  } · 院方已匹配专家并协调履约日期，请补充活动地址后提交。</p>
                   </div>
                 </div>`
               : ""
@@ -6325,6 +6386,9 @@
 
   function setBookingService(value) {
     if (!state.booking) return;
+    if (state.booking.demandId) {
+      return showToast("服务类型已由院方按提需匹配结果锁定，如需调整请联系项目人员。");
+    }
     clearBookingValidation();
     const service = concreteService(value);
     if (!service) return;
@@ -6365,6 +6429,9 @@
 
   function setBookingDoctor(value) {
     if (!state.booking) return;
+    if (state.booking.demandId) {
+      return showToast("专家已由院方按提需匹配结果锁定，如需调整请联系项目人员。");
+    }
     clearBookingValidation();
     const booking = state.booking;
     const currentDoctorId = booking.doctorId || "";
@@ -6668,7 +6735,7 @@
               ? "所选专家不符合当前时令主题或课题，请重新选择专家。"
               : "所选专家不提供当前服务类型或不在当前医院，请重新选择。"
           );
-        } else if (!doctorEntry.bookable) {
+        } else if (!doctorEntry.bookable && !bookingUsesCoordinatedDemand(booking)) {
           add(
             "doctor",
             doctorEntry.status === "city"
@@ -6677,7 +6744,17 @@
           );
         }
         if (!booking.date) {
-          add("date", "请选择期望日期。");
+          add(
+            "date",
+            bookingUsesCoordinatedDemand(booking)
+              ? "院方尚未确认履约日期，请联系项目人员。"
+              : "请选择期望日期。"
+          );
+        } else if (bookingUsesCoordinatedDemand(booking)) {
+          const reservedDate = parseDate(booking.date);
+          if (!reservedDate || reservedDate < startOfDay()) {
+            add("date", "院方协调的日期已失效，请联系项目人员重新确认。");
+          }
         } else if (!doctorAvailability(expert).dates.includes(booking.date)) {
           add("date", "该日期不在专家当前可约范围内，请重新选择。");
         } else if (dayRemaining(expert.id, booking.date) <= 0) {
@@ -6864,14 +6941,14 @@
       if (items.some((item) => item.id === appointment.id)) {
         return { error: "id-collision" };
       }
-      if (!capacity || booked >= capacity) {
+      if (!appointment.manualArrangement && (!capacity || booked >= capacity)) {
         return { error: "slot-full", booked, capacity };
       }
       const nextAppointment = {
         ...appointment,
         slotKey: `${appointment.doctorId}|${appointment.date}`,
         slotSequence: booked + 1,
-        slotCapacityAtBooking: capacity,
+        slotCapacityAtBooking: Math.max(capacity, booked + 1),
         inventoryCheckedAt: new Date().toISOString()
       };
       const next = [...items, nextAppointment];
@@ -6960,6 +7037,8 @@
         source: "booking"
       },
       demandId: booking.demandId || "",
+      manualArrangement: booking.demandId && booking.dateLocked ? true : false,
+      coordinatedDate: booking.demandId && booking.dateLocked ? booking.date : "",
       clientRequestId: booking.requestId || requestToken("booking"),
       createdAt: now,
       updatedAt: now
@@ -8434,6 +8513,21 @@
               <span class="status-pill ${meta.cls}">${esc(meta.label)}</span>
             </div>
             ${
+              demand.status === "matched" &&
+              matchedExpert &&
+              !demand.convertedAppointmentId
+                ? `<section class="demand-route-note">
+                    ${icon("checkCircle", 15)}
+                    <div>
+                      <strong>院方已匹配 ${esc(
+                        matchedExpert.name
+                      )}，履约日期已协调</strong>
+                      <p>服务类型、专家、履约日期和联系人已自动带入，日期无需再选公开号源。补充活动地址并确认信息后即可生成预约单，无需重新提交提需。</p>
+                    </div>
+                  </section>`
+                : ""
+            }
+            ${
               isGroup
                 ? `<section class="demand-route-note">
                     ${icon("shield", 15)}
@@ -8458,6 +8552,13 @@
               <div class="info-row"><span>期望日期</span><strong>${esc(
                 demand.preferredDate ? formatDateCN(demand.preferredDate, true) : "待沟通"
               )}</strong></div>
+              ${
+                demand.matchedDate
+                  ? `<div class="info-row"><span>院方履约日期</span><strong>${esc(
+                      formatDateCN(demand.matchedDate, true)
+                    )}</strong></div>`
+                  : ""
+              }
               <div class="info-row"><span>活动地区</span><strong>${esc(
                 regionText(demand.province, demand.city)
               )}</strong></div>
@@ -8506,7 +8607,7 @@
               : demand.status === "matched"
               ? `<button class="btn btn--ghost" type="button" data-action="close-overlay">关闭</button>
                  <button class="btn btn--primary" type="button" data-action="demand-convert">
-                   基于提需发起预约 ${icon("arrowRight", 15)}</button>`
+                   确认并生成预约 ${icon("arrowRight", 15)}</button>`
               : `${
                   demand.assignedStaff
                     ? `<a class="btn btn--ghost" href="${esc(
@@ -10094,7 +10195,12 @@
             (expert) =>
               expert.hospitalId === hospital.id &&
               expert.active !== false &&
-              matchesService(expert, service)
+              matchesService(expert, service) &&
+              expertCoversRegion(
+                expert,
+                demand.province || "",
+                demand.city || ""
+              )
           )
           .sort(
             (a, b) =>
@@ -10124,6 +10230,16 @@
     const targetName = demandTargetName(demand);
     const isGroup = demand.targetType === "group";
     const meta = DEMAND_STATUS[demand.status] || DEMAND_STATUS.pending;
+    const earliestMatchDate = isoDate(addDays(startOfDay(), 1));
+    const latestMatchDate = isoDate(addDays(startOfDay(), 365));
+    const matchDateValue =
+      demand.matchedDate ||
+      (demand.preferredDate && demand.preferredDate >= earliestMatchDate
+        ? demand.preferredDate
+        : "");
+    const matchLocked = Boolean(demand.convertedAppointmentId);
+    const matchUpdateAllowed =
+      demand.status === "matched" && !demand.convertedAppointmentId;
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet" role="dialog" aria-modal="true" aria-label="需求详情">
@@ -10170,6 +10286,13 @@
               <div class="info-row"><span>期望日期</span><strong>${esc(
                 demand.preferredDate ? formatDateCN(demand.preferredDate, true) : "待沟通"
               )}</strong></div>
+              ${
+                demand.matchedDate
+                  ? `<div class="info-row"><span>院方履约日期</span><strong>${esc(
+                      formatDateCN(demand.matchedDate, true)
+                    )}</strong></div>`
+                  : ""
+              }
               <div class="info-row"><span>活动地区</span><strong>${esc(
                 regionText(demand.province, demand.city)
               )}</strong></div>
@@ -10188,11 +10311,28 @@
               demand.status !== "closed"
                 ? `<section class="demand-match-card">
                     <h3>${icon("experts", 14)} 匹配专家</h3>
-                    <p>选择已确认可出讲的专家，机构确认匹配后可直接转成预约单，无需重复填写需求。</p>
+                    <p>选择已确认可出讲的专家。机构确认预约信息后即可生成预约单，无需重新提交提需。</p>
                     <select data-demand-match-doctor>
                       <option value="">请选择匹配专家</option>
                       ${demandMatchDoctorOptions(demand, demand.matchedExpertId || "")}
                     </select>
+                    <div class="field demand-match-date">
+                      <label>可履约日期 <em>*</em></label>
+                      <input type="date" data-demand-match-date min="${esc(
+                        earliestMatchDate
+                      )}" max="${esc(
+                        latestMatchDate
+                      )}" value="${esc(matchDateValue)}" ${
+                        matchLocked ? "disabled" : ""
+                      }>
+                      <span class="field-help">${
+                        matchLocked
+                          ? "预约已生成，专家与履约日期不可再修改。"
+                          : demand.status === "matched"
+                          ? "当前安排已同步，机构尚未生成预约；如日期不合适，可修改后点击“更新匹配安排”。"
+                          : "提需由院方人工协调，可选择公开号源以外的日期；确认后机构端将锁定该日期。"
+                      }</span>
+                    </div>
                   </section>`
                 : ""
             }
@@ -10212,7 +10352,8 @@
               }
               <textarea data-demand-followup placeholder="记录电话沟通结果、可匹配专家或待确认事项"></textarea>
               <div class="followup-card__actions ${
-                ["matched", "closed"].includes(demand.status)
+                demand.status === "closed" ||
+                (demand.status === "matched" && !matchUpdateAllowed)
                   ? "is-single"
                   : demand.status === "pending"
                   ? ""
@@ -10224,11 +10365,16 @@
                   demand.status === "pending" ? "保存并标记已联系" : "保存沟通记录"
                 }</button>
                 ${
-                  ["matched", "closed"].includes(demand.status)
+                  demand.status === "closed" ||
+                  (demand.status === "matched" && !matchUpdateAllowed)
                     ? ""
                     : `<button class="btn ${
                         demand.status === "pending" ? "btn--ghost" : "btn--primary"
-                      } btn--sm" type="button" data-action="admin-demand-match">标记已匹配</button>`
+                      } btn--sm" type="button" data-action="admin-demand-match">${
+                        demand.status === "matched"
+                          ? "更新匹配安排"
+                          : "标记已匹配"
+                      }</button>`
                 }
               </div>
             </section>
@@ -10306,11 +10452,25 @@
     if (demand.status === "closed") {
       return showToast("该需求已关闭，不能再标记为已匹配。");
     }
+    if (demand.convertedAppointmentId) {
+      return showToast("预约已生成，不能再修改匹配专家或履约日期。");
+    }
     const doctorId = String(
       overlayRoot.querySelector("[data-demand-match-doctor]")?.value || ""
     );
     if (!doctorId) {
       return showToast("请选择一位已确认可出讲的匹配专家。");
+    }
+    const matchDate = String(
+      overlayRoot.querySelector("[data-demand-match-date]")?.value || ""
+    );
+    const earliestMatchDate = isoDate(addDays(startOfDay(), 1));
+    const latestMatchDate = isoDate(addDays(startOfDay(), 365));
+    if (!matchDate || matchDate < earliestMatchDate) {
+      return showToast("请确认明天及以后的可履约日期。");
+    }
+    if (matchDate > latestMatchDate) {
+      return showToast("可履约日期请在一年内选择。");
     }
     const expert = expertById(doctorId);
     if (!expert || expert.active === false) {
@@ -10321,19 +10481,38 @@
         `${expert.name} 不提供「${serviceLabel(demand.serviceType)}」服务，请更换专家。`
       );
     }
+    if (
+      !expertCoversRegion(
+        expert,
+        demand.province || "",
+        demand.city || ""
+      )
+    ) {
+      return showToast(
+        `${expert.name} 的履约地不覆盖 ${regionText(
+          demand.province,
+          demand.city
+        )}，请更换专家。`
+      );
+    }
     if (demand.targetType === "hospital" && demand.hospitalId !== expert.hospitalId) {
       return showToast("匹配专家必须属于机构指定的目标医院。");
     }
     const hospital = hospitalById(expert.hospitalId);
     if (!hospital) return showToast("匹配专家所属医院不存在，请重新选择。");
+    const wasMatched = demand.status === "matched";
     updateDemand(demand.id, {
       status: "matched",
       matchedExpertId: expert.id,
       matchedExpertName: expert.name,
       matchedHospitalId: expert.hospitalId,
+      matchedDate: matchDate,
       matchedAt: new Date().toISOString(),
       assignedStaff: demand.assignedStaff || staffSnapshot(state.adminUser),
-      matchNote: `已匹配 ${expert.name} · ${hospital.name}`
+      matchNote: `已匹配 ${expert.name} · ${hospital.name} · ${formatDateCN(
+        matchDate,
+        true
+      )}`
     });
     logOperation(
       "提需匹配专家",
@@ -10345,7 +10524,14 @@
       }
     );
     renderOverlay();
-    showToast(`已匹配 ${expert.name}，机构可基于提需直接发起预约。`);
+    showToast(
+      wasMatched
+        ? `匹配安排已更新为 ${expert.name} · ${formatDateCN(matchDate, true)}。`
+        : `已匹配 ${expert.name} · ${formatDateCN(
+            matchDate,
+            true
+          )}，机构确认信息后即可生成预约单。`
+    );
   }
 
   function adminDemandClose() {
@@ -13475,7 +13661,7 @@
 
   function marketingPosterManageable(poster) {
     if (!poster) return false;
-    if (isSuperadmin()) return true;
+    if (isSuperadmin()) return poster.source === "official";
     const hospital = operatorHospital();
     return Boolean(
       hospital &&
@@ -13486,9 +13672,10 @@
 
   function visibleMarketingPosters() {
     const all = getMarketingPosters();
-    const scopeHospitalId = isSuperadmin()
-      ? state.adminHospitalId
-      : operatorHospital()?.id || "";
+    if (isSuperadmin()) {
+      return all.filter((poster) => poster.source === "official");
+    }
+    const scopeHospitalId = operatorHospital()?.id || "";
     const official = all.filter((poster) => poster.source === "official");
     const hospitalPosters = all.filter(
       (poster) =>
@@ -13505,40 +13692,42 @@
     const posters = visibleMarketingPosters();
     const officialCount = all.filter((poster) => poster.source === "official").length;
     const hospital = operatorHospital();
-    const hospitalCount = all.filter(
-      (poster) =>
-        poster.source !== "official" &&
-        (isSuperadmin()
-          ? !state.adminHospitalId || poster.hospitalId === state.adminHospitalId
-          : poster.hospitalId === (hospital?.id || ""))
-    ).length;
-    const hospitalFilterLabel = isSuperadmin() ? "医院上传" : "本院海报";
+    const hospitalCount = isSuperadmin()
+      ? 0
+      : all.filter(
+          (poster) =>
+            poster.source !== "official" &&
+            poster.hospitalId === (hospital?.id || "")
+        ).length;
     return `
       <div class="admin-page-head">
         <div><h1>展业海报</h1><p>${
           isSuperadmin()
-            ? "统一维护官方海报，医院运营可直接下载分享"
-            : "官方海报统一配置，本院海报可自行上传分享"
+            ? "统一维护平台官方海报，医院自有物料由本院运营自行上传"
+            : "官方海报可直接分享，本院自有海报由你上传维护"
         }</p></div>
         <span class="admin-page-head__date">${posters.length} 张可分享</span>
       </div>
       ${renderAdminTabs()}
-      ${renderAdminHospitalFilter()}
-      <div class="marketing-tools">
-        <div class="marketing-filter">
-          ${[
-            ["all", "全部"],
-            ["official", "官方海报"],
-            ["hospital", hospitalFilterLabel]
-          ]
-            .map(
-              ([value, label]) => `
-                <button class="${state.marketingFilter === value ? "is-active" : ""}"
-                  type="button" data-action="marketing-filter" data-value="${value}">${label}</button>
-              `
-            )
-            .join("")}
-        </div>
+      <div class="marketing-tools ${isSuperadmin() ? "marketing-tools--single" : ""}">
+        ${
+          isSuperadmin()
+            ? '<span class="marketing-scope-label">官方海报</span>'
+            : `<div class="marketing-filter">
+                ${[
+                  ["all", "全部"],
+                  ["official", "官方海报"],
+                  ["hospital", "本院海报"]
+                ]
+                  .map(
+                    ([value, label]) => `
+                      <button class="${state.marketingFilter === value ? "is-active" : ""}"
+                        type="button" data-action="marketing-filter" data-value="${value}">${label}</button>
+                    `
+                  )
+                  .join("")}
+              </div>`
+        }
         <button class="btn btn--primary btn--sm" type="button" data-action="marketing-poster-add">
           ${icon("plus", 13)} ${isSuperadmin() ? "上传官方海报" : "上传本院海报"}
         </button>
@@ -13548,13 +13737,16 @@
         <h2>把专业服务，变成可分享的邀请</h2>
         <p>${
           isSuperadmin()
-            ? "官方海报由超级管理员统一配置；上传后医院运营可直接保存、下载并分享给客户。"
-            : "官方海报由超级管理员统一配置；医院运营也可上传本院自有海报，保存后即可分享或下载。"
+            ? "平台官方海报由超级管理员维护；医院运营可保存、下载并分享，也可自行上传本院物料。"
+            : "官方海报可直接保存分享；本院自有海报由你上传维护，保存后即可分享或下载。"
         }海报仅保留预约二维码，不展示项目人员姓名与电话。</p>
         <div class="marketing-hero__facts">
-          <span><b>${officialCount}</b>张官方</span><span><b>${hospitalCount}</b>张${
-            isSuperadmin() ? "医院上传" : "本院自有"
-          }</span><span><b>1</b>个预约二维码</span>
+          <span><b>${officialCount}</b>张官方</span>
+          ${
+            isSuperadmin()
+              ? ""
+              : `<span><b>${hospitalCount}</b>张本院自有</span>`
+          }
         </div>
       </section>
       ${
@@ -13585,14 +13777,20 @@
         ).join("")}</div>`
           : `<div class="empty-state marketing-empty">
               <span class="empty-state__icon">${icon("send", 26)}</span>
-              <h3>${state.marketingFilter === "hospital" ? "暂无自有海报" : "暂无海报"}</h3>
+              <h3>${
+                isSuperadmin()
+                  ? "暂无官方海报"
+                  : state.marketingFilter === "hospital"
+                  ? "暂无本院海报"
+                  : "暂无海报"
+              }</h3>
               <p>${
                 isSuperadmin()
-                  ? "上传官方海报后，医院运营即可下载分享。"
+                  ? "上传官方海报后，各医院运营即可下载分享。"
                   : "可上传本院自有海报，保存后直接分享给客户。"
               }</p>
               <button class="btn btn--primary btn--sm" type="button" data-action="marketing-poster-add">
-                ${icon("plus", 13)} 上传海报
+                ${icon("plus", 13)} ${isSuperadmin() ? "上传官方海报" : "上传本院海报"}
               </button>
               ${
                 isSuperadmin()
@@ -13604,8 +13802,8 @@
             </div>`
       }
       <div class="marketing-guide">
-        <div><span>01</span><strong>官方统一配置</strong><p>超级管理员维护品牌主视觉与标准海报。</p></div>
-        <div><span>02</span><strong>本院可上传自有海报</strong><p>医院运营上传本地物料，自动保存到海报库。</p></div>
+        <div><span>01</span><strong>平台维护官方海报</strong><p>超级管理员维护品牌主视觉与标准海报。</p></div>
+        <div><span>02</span><strong>医院维护本院物料</strong><p>各医院运营自行上传、编辑和删除本院海报，平台不代为管理。</p></div>
         <div><span>03</span><strong>下载或分享给客户</strong><p>保存高清图发朋友圈，或复制预约链接。</p></div>
       </div>
     `;
@@ -13962,7 +14160,11 @@
         : operatorHospital()?.id || "",
       eyebrow: draft.eyebrow?.trim() || (isSuperadmin() ? "官方海报" : "本院海报"),
       title: draft.title.trim(),
-      desc: draft.desc?.trim() || "院方统一展业海报，可直接下载分享。",
+      desc:
+        draft.desc?.trim() ||
+        (isSuperadmin()
+          ? "平台官方展业海报，可直接下载分享。"
+          : "本院展业海报，可直接下载分享。"),
       tags,
       image: draft.imageKey ? "" : draft.image,
       imageKey: draft.imageKey || "",
@@ -14838,7 +15040,10 @@
         break;
       case "admin-demand-followup": {
         const note = document.querySelector("[data-demand-followup]")?.value.trim() || "";
-        if (!note) return showToast("请先填写沟通记录。");
+        const demand = demandById(state.adminDemandId);
+        if (!note && demand?.status !== "pending") {
+          return showToast("请先填写沟通记录。");
+        }
         markDemandContacted(note);
         break;
       }
@@ -15176,11 +15381,19 @@
         break;
       case "marketing-poster-reset":
         if (!isSuperadmin()) return;
-        getMarketingPosters().forEach((poster) => {
-          if (poster.imageKey) deletePosterImageBlob(poster.imageKey);
-        });
+        {
+          const existing = getMarketingPosters();
+          existing
+            .filter((poster) => poster.source === "official")
+            .forEach((poster) => {
+              if (poster.imageKey) deletePosterImageBlob(poster.imageKey);
+            });
+          const hospitalPosters = existing.filter(
+            (poster) => poster.source !== "official"
+          );
+          saveMarketingPosters([...defaultMarketingPosters(), ...hospitalPosters]);
+        }
         releasePosterImage();
-        saveMarketingPosters(defaultMarketingPosters());
         state.marketingFilter = "all";
         renderApp({ scrollTo: currentWindowScroll() });
         showToast("已恢复 4 套官方海报。");
