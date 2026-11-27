@@ -874,6 +874,31 @@ textarea {
   transform: translateX(17px);
 }
 
+.switch-row input:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.account-superadmin-lock {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(183, 117, 0, 0.14);
+  border-radius: 11px;
+  background: var(--amber-soft);
+  color: var(--amber-text);
+  font-size: 8.5px;
+  font-weight: 620;
+  line-height: 1.55;
+}
+
+.account-superadmin-lock svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
 .field {
   margin-top: 13px;
 }
@@ -8123,19 +8148,222 @@ textarea {
   font-weight: 750;
 }
 
-.hospital-admin-card__operators {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-top: 8px;
-  padding: 8px 9px;
-  border-radius: 9px;
-  background: #f8fafd;
+.platform-admin-panel {
+  margin: 11px 16px 0;
+  padding: 13px;
+  border: 1px solid rgba(11, 49, 143, 0.08);
+  border-radius: 18px;
+  background:
+    radial-gradient(240px 130px at 100% 0%, rgba(234, 85, 4, 0.09), transparent 72%),
+    linear-gradient(145deg, #f8fbff, #eef4ff);
+  box-shadow: 0 9px 24px rgba(12, 28, 58, 0.055);
 }
 
-.hospital-admin-card__operators span {
+.platform-admin-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.platform-admin-panel__head > div {
+  min-width: 0;
+}
+
+.platform-admin-panel__head > div > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--orange-text);
+  font-size: 7px;
+  font-weight: 720;
+}
+
+.platform-admin-panel__head h2 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 790;
+  letter-spacing: -0.02em;
+}
+
+.platform-admin-panel__head p {
+  margin: 4px 0 0;
+  color: var(--ink-3);
+  font-size: 8px;
+  line-height: 1.55;
+}
+
+.platform-admin-panel__head .btn {
+  flex: 0 0 auto;
+  padding-inline: 8px;
+  font-size: 8.5px;
+}
+
+.platform-admin-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.platform-admin-row {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 31px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(11, 49, 143, 0.07);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.82);
+  text-align: left;
+}
+
+.platform-admin-row.is-disabled {
+  opacity: 0.6;
+}
+
+.platform-admin-row__avatar {
+  display: inline-flex;
+  width: 31px;
+  height: 31px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 3px 9px rgba(16, 42, 91, 0.07);
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 780;
+}
+
+.platform-admin-row__body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.platform-admin-row__body strong {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 9.5px;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.platform-admin-row__body small {
+  overflow: hidden;
   color: var(--ink-3);
   font-size: 7.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.platform-admin-row > svg {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+}
+
+.platform-admin-empty {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 9px;
+  border-radius: 10px;
+  background: var(--red-soft);
+  color: var(--red-text);
+  font-size: 8.5px;
+  font-weight: 650;
+}
+
+.hospital-account-section-head {
+  margin-top: 15px;
+}
+
+.hospital-operator-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.hospital-operator-row {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 29px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border: 1px solid rgba(15, 23, 38, 0.045);
+  border-radius: 10px;
+  background: #f8fafd;
+  text-align: left;
+}
+
+.hospital-operator-row.is-disabled {
+  opacity: 0.6;
+}
+
+.hospital-operator-row__avatar {
+  display: inline-flex;
+  width: 29px;
+  height: 29px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 7px rgba(16, 42, 91, 0.06);
+  color: var(--brand);
+  font-size: 9.5px;
+  font-weight: 760;
+}
+
+.hospital-operator-row__body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hospital-operator-row__body strong {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: 8.5px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hospital-operator-row__body small {
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hospital-operator-row > svg {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+}
+
+.hospital-operator-empty {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 9px;
+  border-radius: 9px;
+  background: var(--amber-soft);
+  color: var(--amber-text);
+  font-size: 7.5px;
+  line-height: 1.5;
 }
 
 .hospital-admin-card > .btn {

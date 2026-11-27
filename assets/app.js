@@ -928,8 +928,15 @@
     return accounts;
   }
 
+  function hasActiveSuperadmin(accounts) {
+    return (accounts || []).some(
+      (account) => account.role === "superadmin" && account.active
+    );
+  }
+
   function saveAdminAccounts(accounts) {
-    writeJSON(STORAGE.adminAccounts, accounts);
+    if (!hasActiveSuperadmin(accounts)) return false;
+    return writeJSON(STORAGE.adminAccounts, accounts);
   }
 
   function setAdminSession(account) {
@@ -9637,11 +9644,13 @@
     `;
   }
 
-  function hospitalOperators(hospitalId) {
+  function hospitalOperators(hospitalId, includeInactive = false) {
     return getAdminAccounts()
       .filter(
         (account) =>
-          account.active && account.role === "operator" && account.hospitalId === hospitalId
+          (includeInactive || account.active) &&
+          account.role === "operator" &&
+          account.hospitalId === hospitalId
       )
       .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   }
@@ -13561,23 +13570,77 @@
       return renderAdminAppointmentsPage();
     }
     const accounts = getAdminAccounts();
+    const superadmins = accounts
+      .filter((account) => account.role === "superadmin")
+      .sort(
+        (a, b) =>
+          Number(b.active) - Number(a.active) ||
+          a.name.localeCompare(b.name, "zh-CN")
+      );
+    const activeSuperadmins = superadmins.filter((account) => account.active).length;
     return `
       <div class="admin-page-head">
-        <div><h1>医院与账号</h1><p>超级管理员分配医院运营人员</p></div>
+        <div><h1>医院与账号</h1><p>统一维护医院、运营账号与平台权限</p></div>
         <div class="admin-page-head__actions">
-          <button class="btn btn--ghost btn--sm" type="button" data-action="admin-account-add">
-            ${icon("plus", 13)} 新增账号
-          </button>
           <button class="btn btn--primary btn--sm" type="button" data-action="hospital-editor-add">
             ${icon("plus", 13)} 新增医院
           </button>
         </div>
       </div>
       ${renderAdminTabs()}
+      <section class="platform-admin-panel">
+        <div class="platform-admin-panel__head">
+          <div>
+            <span>${icon("shield", 12)} 平台权限</span>
+            <h2>超级管理员</h2>
+            <p>至少保留 1 个启用账号；当前 ${activeSuperadmins}/${superadmins.length} 个可用</p>
+          </div>
+          <button class="btn btn--ghost btn--sm" type="button"
+            data-action="admin-account-add" data-role="superadmin">
+            ${icon("plus", 12)} 新增超管
+          </button>
+        </div>
+        <div class="platform-admin-list">
+          ${
+            superadmins.length
+              ? superadmins
+                  .map(
+                    (account) => `
+                      <button class="platform-admin-row ${account.active ? "" : "is-disabled"}"
+                        type="button" data-action="open-admin-account"
+                        data-username="${esc(account.username)}">
+                        <span class="platform-admin-row__avatar">${esc(
+                          initialOf(account.name)
+                        )}</span>
+                        <span class="platform-admin-row__body">
+                          <strong>${esc(account.name)}
+                            <i class="role-tag ${
+                              account.active ? "role-tag--superadmin" : "is-off"
+                            }">${account.active ? "已启用" : "已停用"}</i>
+                          </strong>
+                          <small>${esc(account.username)} · ${esc(account.phone)}</small>
+                        </span>
+                        ${icon("chevronRight", 13)}
+                      </button>
+                    `
+                  )
+                  .join("")
+              : `<div class="platform-admin-empty">${icon(
+                  "alert",
+                  14
+                )} 尚未配置超级管理员，请立即新增。</div>`
+          }
+        </div>
+      </section>
+      <div class="section-head section-head--admin hospital-account-section-head">
+        <div><h2>医院与运营账号</h2><p>点击账号直接编辑，账号随医院统一维护</p></div>
+        <span>${state.hospitals.length} 家</span>
+      </div>
       <div class="hospital-admin-list">
         ${state.hospitals
           .map((hospital) => {
-            const operators = hospitalOperators(hospital.id);
+            const operators = hospitalOperators(hospital.id, true);
+            const activeOperators = operators.filter((account) => account.active);
             const expertCount = state.experts.filter(
               (item) => item.hospitalId === hospital.id && item.active !== false
             ).length;
@@ -13601,27 +13664,49 @@
                     </div>
                     <span>${esc(regionText(hospital.province, hospital.city))}</span>
                   </div>
-                  <span class="${operators.length ? "is-on" : "is-off"}">${
-                    operators.length ? "已配置运营" : "待配置运营"
+                  <span class="${activeOperators.length ? "is-on" : "is-off"}">${
+                    activeOperators.length
+                      ? "已配置运营"
+                      : operators.length
+                      ? "运营已停用"
+                      : "待配置运营"
                   }</span>
                 </div>
                 <div class="hospital-admin-card__stats">
                   <span><b>${expertCount}</b> 位专家</span>
                   <span><b>${pending}</b> 待接单</span>
                 </div>
-                <div class="hospital-admin-card__operators">
+                <div class="hospital-operator-list">
                   ${
                     operators.length
                       ? operators
                           .map(
                             (account) =>
-                              `<span>${esc(account.name)} · ${phoneLink(
-                                account.phone,
-                                account.phone
-                              )}</span>`
+                              `<button class="hospital-operator-row ${
+                                account.active ? "" : "is-disabled"
+                              }" type="button" data-action="open-admin-account"
+                                data-username="${esc(account.username)}">
+                                <span class="hospital-operator-row__avatar">${esc(
+                                  initialOf(account.name)
+                                )}</span>
+                                <span class="hospital-operator-row__body">
+                                  <strong>${esc(account.name)}
+                                    <i class="role-tag ${
+                                      account.active ? "role-tag--operator" : "is-off"
+                                    }">${account.active ? "运营" : "已停用"}</i>
+                                  </strong>
+                                  <small>${esc(account.username)} · ${esc(
+                                    account.phone
+                                  )}</small>
+                                </span>
+                                ${icon("edit", 12)}
+                              </button>`
                           )
                           .join("")
-                      : '<span class="location-pending">尚未分配运营人员，机构预约将无人接单</span>'
+                      : `<div class="hospital-operator-empty">${icon(
+                          "users",
+                          14
+                        )}<span>尚未分配运营人员，机构预约将无人接单</span></div>`
                   }
                 </div>
                 <div class="hospital-admin-card__actions">
@@ -13631,40 +13716,10 @@
                   </button>
                   <button class="btn btn--ghost btn--sm" type="button" data-action="admin-hospital-operator"
                     data-hospital-id="${esc(hospital.id)}">
-                    ${icon("plus", 12)} 分配运营人员
+                    ${icon("plus", 12)} 添加运营账号
                   </button>
                 </div>
               </article>
-            `;
-          })
-          .join("")}
-      </div>
-      <div class="section-head section-head--admin">
-        <div><h2>院方账号</h2><p>超级管理员与医院运营</p></div>
-        <span>${accounts.length} 个</span>
-      </div>
-      <div class="account-list">
-        ${accounts
-          .map((account) => {
-            const hospital = hospitalById(account.hospitalId);
-            return `
-              <button class="account-row" type="button" data-action="open-admin-account"
-                data-username="${esc(account.username)}">
-                <span class="account-row__avatar">${esc(initialOf(account.name))}</span>
-                <span class="account-row__body">
-                  <strong>${esc(account.name)}
-                    <i class="role-tag role-tag--${account.role}">${esc(
-                      adminRoleMeta(account).label
-                    )}</i>
-                    ${account.active ? "" : '<i class="role-tag is-off">已停用</i>'}
-                  </strong>
-                  <span>${esc(account.username)} · ${phoneLink(account.phone, account.phone)}</span>
-                  <small>${esc(
-                    account.role === "superadmin" ? "全部医院" : hospital?.name || "未绑定医院"
-                  )}</small>
-                </span>
-                ${icon("chevronRight", 14)}
-              </button>
             `;
           })
           .join("")}
@@ -13999,6 +14054,18 @@
   function renderAdminAccountSheet() {
     const draft = state.adminAccountDraft;
     if (!draft) return "";
+    const accounts = getAdminAccounts();
+    const existingAccount = accounts.find((item) => item.username === draft.username);
+    const activeSuperadminCount = accounts.filter(
+      (item) => item.role === "superadmin" && item.active
+    ).length;
+    const editingSelf = !draft.isNew && draft.username === state.adminUser?.username;
+    const lastActiveSuperadmin = Boolean(
+      existingAccount?.role === "superadmin" &&
+        existingAccount.active &&
+        activeSuperadminCount <= 1
+    );
+    const activeToggleLocked = editingSelf || lastActiveSuperadmin;
     return `
       <div class="sheet-backdrop" data-action="close-overlay"></div>
       <section class="sheet" role="dialog" aria-modal="true" aria-label="院方账号">
@@ -14066,9 +14133,26 @@
             </div>
             <label class="switch-row">
               <span><strong>账号启用</strong><small>停用后无法登录院方工作台</small></span>
-              <input type="checkbox" data-account-active ${draft.active ? "checked" : ""}>
+              <input type="checkbox" data-account-active ${draft.active ? "checked" : ""}
+                ${activeToggleLocked ? "disabled" : ""}>
             </label>
-            <p class="field-help">医院运营登录后只能看到并维护所属医院的专家、号源与预约。</p>
+            ${
+              activeToggleLocked
+                ? `<p class="account-superadmin-lock">
+                    ${icon("shield", 12)}
+                    ${
+                      editingSelf
+                        ? "当前登录账号不能停用；如需更换管理员，请先新增并启用另一个超级管理员。"
+                        : "系统至少保留一个启用的超级管理员，当前账号不能停用。"
+                    }
+                  </p>`
+                : ""
+            }
+            <p class="field-help">${
+              draft.role === "superadmin"
+                ? "超级管理员拥有全部医院与账号权限；保存时系统会校验至少保留一个启用账号。"
+                : "医院运营登录后只能看到并维护所属医院的专家、号源与预约。"
+            }</p>
           </div>
         </div>
         <div class="sheet__footer">
@@ -14110,12 +14194,12 @@
       : accounts.map((item) =>
           item.username === draft.username ? { ...item, ...payload } : item
         );
-    if (
-      !next.some((item) => item.role === "superadmin" && item.active)
-    ) {
-      return showToast("至少需要保留一个启用的超级管理员。");
+    if (!hasActiveSuperadmin(next)) {
+      return showToast("至少需要保留一个启用的超级管理员，本次修改未保存。");
     }
-    saveAdminAccounts(next);
+    if (!saveAdminAccounts(next)) {
+      return showToast("账号保存失败，请保留至少一个启用的超级管理员后重试。");
+    }
     logOperation(
       draft.isNew ? "新增院方账号" : "更新院方账号",
       `${payload.name} · ${payload.username} · ${ROLE[payload.role]?.label || ""}`,
@@ -15880,7 +15964,7 @@
         break;
       }
       case "admin-account-add":
-        openAdminAccountEditor();
+        openAdminAccountEditor("", "", el.dataset.role || "");
         break;
       case "institution-account-add":
         openInstitutionAccountEditor();
