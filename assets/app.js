@@ -379,6 +379,7 @@
     // admin
     adminTab: "appointments",
     adminFilter: "all",
+    adminOwnerScope: "all",
     adminSearch: "",
     adminDoctorSearch: "",
     adminThemeMonth: 0,
@@ -2442,6 +2443,28 @@
       if (!hospital) return true;
       return item.hospitalId === hospital.id;
     });
+  }
+
+  function appointmentAssignedToCurrentAdmin(appointment) {
+    const staff = appointment?.assignedStaff;
+    const account = state.adminUser;
+    if (!staff || !account) return false;
+    if (staff.username && account.username) {
+      return String(staff.username) === String(account.username);
+    }
+    if (staff.phone && account.phone) {
+      return String(staff.phone) === String(account.phone);
+    }
+    return Boolean(staff.name) && staff.name === account.name;
+  }
+
+  function adminScopedAppointments(scope = state.adminOwnerScope) {
+    const list = adminAppointments();
+    if (scope !== "mine") return list;
+    return list.filter(
+      (item) =>
+        item.status === "pending" || appointmentAssignedToCurrentAdmin(item)
+    );
   }
 
   function getDemands() {
@@ -9452,7 +9475,7 @@
      Admin appointments
      ========================================================= */
   function adminStats() {
-    const list = adminAppointments();
+    const list = adminScopedAppointments();
     return {
       pending: list.filter((item) => item.status === "pending").length,
       review: list.filter((item) => item.status === "review").length,
@@ -9463,7 +9486,7 @@
 
   function filteredAdminAppointments() {
     const q = state.adminSearch.trim().toLowerCase();
-    return adminAppointments()
+    return adminScopedAppointments()
       .filter((item) => {
         if (state.adminFilter !== "all" && item.status !== state.adminFilter) return false;
         if (!q) return true;
@@ -9517,6 +9540,13 @@
         </div>
         <div class="admin-record__info">
           <span>${icon("building", 12)} ${esc(appointment.orgName)}</span>
+          <span>${icon("user", 12)} 下单人 ${esc(
+            appointment.contactName || "未填写"
+          )}${
+            appointment.contactTitle
+              ? ` · ${esc(appointment.contactTitle)}`
+              : ""
+          }</span>
           <span>${icon("phone", 12)} ${phoneLink(appointment.phone, appointment.phone)}</span>
         </div>
         <div class="admin-record__foot">
@@ -9527,6 +9557,18 @@
         </div>
       </article>
     `;
+  }
+
+  function adminAppointmentEmptyMarkup() {
+    return state.adminOwnerScope === "mine"
+      ? `<div class="empty-state"><span class="empty-state__icon">${icon(
+          "calendar",
+          26
+        )}</span><h3>当前筛选下暂无我负责的预约</h3><p>待接单项目会始终展示；其他项目仅展示当前账号已接单的记录。</p></div>`
+      : `<div class="empty-state"><span class="empty-state__icon">${icon(
+          "calendar",
+          26
+        )}</span><h3>暂无预约</h3><p>切换筛选或等待机构提交。</p></div>`;
   }
 
   function renderAdminAppointmentsPage() {
@@ -9548,17 +9590,33 @@
       </div>
       ${renderAdminTabs()}
       ${renderAdminHospitalFilter()}
-      <div class="admin-stats">
-        <div class="admin-stat"><small>待接单</small><strong>${stats.pending}</strong><span>需尽快响应</span></div>
-        <div class="admin-stat"><small>待机构确认</small><strong>${stats.review}</strong><span>方案已提交</span></div>
-        <div class="admin-stat"><small>已确认</small><strong>${stats.confirmed}</strong><span>等待执行</span></div>
-        <div class="admin-stat"><small>已完成</small><strong>${stats.completed}</strong><span>历史活动</span></div>
+      <div class="admin-stats" id="admin-appointment-stats">
+        <div class="admin-stat"><small>待接单</small><strong data-admin-stat="pending">${stats.pending}</strong><span>需尽快响应</span></div>
+        <div class="admin-stat"><small>待机构确认</small><strong data-admin-stat="review">${stats.review}</strong><span>方案已提交</span></div>
+        <div class="admin-stat"><small>已确认</small><strong data-admin-stat="confirmed">${stats.confirmed}</strong><span>等待执行</span></div>
+        <div class="admin-stat"><small>已完成</small><strong data-admin-stat="completed">${stats.completed}</strong><span>历史活动</span></div>
       </div>
       <div class="admin-search">
         ${icon("search", 15)}
         <input type="search" placeholder="搜索机构、联系人、编号" value="${esc(
           state.adminSearch
         )}" data-admin-search>
+      </div>
+      <div class="admin-owner-filter">
+        <span class="admin-owner-filter__copy">
+          <strong>${icon("users", 13)} 项目范围</strong>
+          <small data-admin-owner-hint>${
+            state.adminOwnerScope === "mine"
+              ? "我的项目 + 全部待接单"
+              : "本院全部运营项目"
+          }</small>
+        </span>
+        <div class="segmented segmented--admin-owner" role="group" aria-label="项目范围">
+          <button class="${state.adminOwnerScope === "all" ? "is-active" : ""}" type="button"
+            data-action="admin-owner-scope" data-value="all">查看所有</button>
+          <button class="${state.adminOwnerScope === "mine" ? "is-active" : ""}" type="button"
+            data-action="admin-owner-scope" data-value="mine">仅看我的</button>
+        </div>
       </div>
       <div class="filter-scroll filter-scroll--admin">
         ${filters
@@ -9573,10 +9631,7 @@
         ${
           list.length
             ? list.map(renderAdminAppointmentCard).join("")
-            : `<div class="empty-state"><span class="empty-state__icon">${icon(
-                "calendar",
-                26
-              )}</span><h3>暂无预约</h3><p>机构提交预约后会出现在这里。</p></div>`
+            : adminAppointmentEmptyMarkup()
         }
       </div>
     `;
@@ -14890,10 +14945,14 @@
     const list = filteredAdminAppointments();
     wrap.innerHTML = list.length
       ? list.map(renderAdminAppointmentCard).join("")
-      : `<div class="empty-state"><span class="empty-state__icon">${icon(
-          "calendar",
-          26
-        )}</span><h3>暂无预约</h3><p>切换筛选或等待机构提交。</p></div>`;
+      : adminAppointmentEmptyMarkup();
+  }
+
+  function refreshAdminAppointmentStats() {
+    const stats = adminStats();
+    document.querySelectorAll("[data-admin-stat]").forEach((element) => {
+      element.textContent = String(stats[element.dataset.adminStat] || 0);
+    });
   }
 
   function refreshAdminDoctorList() {
@@ -15451,6 +15510,21 @@
         state.adminThemeDraft = null;
         state.adminTemplateDraft = null;
         renderApp({ scrollTo: storedScrollForView(`admin:${state.adminTab}`) });
+        break;
+      case "admin-owner-scope":
+        state.adminOwnerScope = el.dataset.value === "mine" ? "mine" : "all";
+        document.querySelectorAll('[data-action="admin-owner-scope"]').forEach((button) => {
+          button.classList.toggle("is-active", button.dataset.value === state.adminOwnerScope);
+        });
+        const ownerHint = document.querySelector("[data-admin-owner-hint]");
+        if (ownerHint) {
+          ownerHint.textContent =
+            state.adminOwnerScope === "mine"
+              ? "我的项目 + 全部待接单"
+              : "本院全部运营项目";
+        }
+        refreshAdminAppointmentStats();
+        refreshAdminRecordList();
         break;
       case "admin-filter":
         state.adminFilter = el.dataset.value;
