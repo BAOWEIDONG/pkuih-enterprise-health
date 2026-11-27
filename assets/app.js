@@ -2288,7 +2288,7 @@
       profileSyncedAt: now,
       hospitalNotice: {
         type: "profile",
-        message: "机构同步了预约联系人/企业资料，请使用最新信息发送推送。",
+        message: "机构同步了预约联系人/企业资料，请使用最新信息重新复制推送内容。",
         at: now,
         readAt: ""
       }
@@ -7939,7 +7939,7 @@
           <p>${
             appointment.assignedStaff
               ? "院方已接单，正在填写活动主题、时间、地点、课题大纲与项目组成员。"
-              : "院方接单后，将在这里填写完整活动方案并发送给机构确认。"
+              : "院方接单后，将在这里填写完整活动方案并提交给机构确认。"
           }</p>
         </section>
       `;
@@ -8097,7 +8097,7 @@
                     ${icon("users", 16)}
                     <div>
                       <strong>企业资料已更新</strong>
-                      <p>预约保存的是下单时资料快照。院方将按快照联系人发送通知，确认后可同步最新资料。</p>
+                      <p>预约保存的是下单时资料快照。院方将按快照联系人生成推送文案，确认后可同步最新资料。</p>
                       <ul>${profileDiff
                         .map(
                           (item) =>
@@ -8248,7 +8248,7 @@
         iconName: "edit",
         tone: "is-modify",
         title: "提出修改意见",
-        desc: "说明需要调整的主题、时间、地点或流程，院方更新方案后会再次发送确认。",
+        desc: "说明需要调整的主题、时间、地点或流程，院方更新方案后会再次提交确认。",
         cancelText: "返回方案",
         submitText: "提交修改意见",
         action: "appointment-revise-submit",
@@ -8258,7 +8258,7 @@
         iconName: "edit",
         tone: "is-modify",
         title: "申请修改已确认方案",
-        desc: `提交后院方会更新方案并重新发送确认。${
+        desc: `提交后院方会更新方案并重新提交确认。${
           policy.cycleDays < 30
             ? "本次会占用 14 天周期内 1 次修改机会。"
             : ""
@@ -8483,7 +8483,7 @@
       };
       patch.hospitalNotice = {
         type: "location",
-        message: "机构在待确认阶段修改了活动地点，请更新方案后重新发送。",
+        message: "机构在待确认阶段修改了活动地点，请更新方案后重新提交。",
         at: now,
         readAt: ""
       };
@@ -8540,11 +8540,11 @@
     }
     showToast(
       patch.status === "revision"
-        ? "活动地点已更新，院方会重新发送方案后再次确认。"
+        ? "活动地点已更新，院方会重新提交方案后再次确认。"
         : appointment.status === "pending"
         ? "活动地点已更新，院方接单时会带入最新地点。"
         : appointment.status === "planning"
-        ? "活动地点已更新并通知院方，方案需重新确认后发送。"
+        ? "活动地点已更新并通知院方，方案需重新确认后提交。"
         : appointment.plan
         ? "活动地点已更新并通知院方，方案内容已同步。"
         : "活动地点已更新并通知院方。"
@@ -8981,7 +8981,7 @@
                 ${icon("alert", 17)}
                 <div>
                   <strong>企业资料待完善</strong>
-                  <p>${esc(profileIssues.join("、"))}，完善后便于院方确认方案和发送通知。</p>
+                  <p>${esc(profileIssues.join("、"))}，完善后便于院方确认方案和生成推送文案。</p>
                 </div>
                 <button type="button" data-action="open-profile">去完善</button>
               </section>`
@@ -9427,7 +9427,7 @@
           <span>${esc(serviceLabel(appointment.serviceType))}</span>
           <span class="is-hospital">${esc(hospital?.short || "")}</span>
           <span>${esc(expert ? expert.name : appointment.doctorName || "待匹配专家")}</span>
-          ${pushPending ? '<span class="is-push">推送待发送</span>' : ""}
+          ${pushPending ? '<span class="is-push">推送待复制</span>' : ""}
           ${
             appointment.changeRequest?.type === "location"
               ? '<span class="is-notice">机构改地点</span>'
@@ -9474,7 +9474,7 @@
       ${renderAdminHospitalFilter()}
       <div class="admin-stats">
         <div class="admin-stat"><small>待接单</small><strong>${stats.pending}</strong><span>需尽快响应</span></div>
-        <div class="admin-stat"><small>待机构确认</small><strong>${stats.review}</strong><span>方案已发送</span></div>
+        <div class="admin-stat"><small>待机构确认</small><strong>${stats.review}</strong><span>方案已提交</span></div>
         <div class="admin-stat"><small>已确认</small><strong>${stats.confirmed}</strong><span>等待执行</span></div>
         <div class="admin-stat"><small>已完成</small><strong>${stats.completed}</strong><span>历史活动</span></div>
       </div>
@@ -9759,7 +9759,7 @@
       deletePlanPdfBlob(pdfSave.oldKey);
     }
     state.reviewSaving = false;
-    logOperation("发送或更新活动方案", `${appointment.id} · ${plan.topic}`, {
+    logOperation("提交或更新活动方案", `${appointment.id} · ${plan.topic}`, {
       entityType: "appointment",
       entityId: appointment.id,
       hospitalId: appointment.hospitalId
@@ -9778,10 +9778,10 @@
     });
     showToast(
       wasConfirmed
-        ? "方案已更新并发送，推送通知已生成；机构需重新确认。"
+        ? "方案已更新并提交，推送文案已生成；机构需重新确认。"
         : themeTopic && !keepsTheme
-        ? "方案已发送；原时令课题关联已解除，推送通知已生成。"
-        : "方案已发送，推送通知已生成，可直接复制发送。"
+        ? "方案已提交；原时令课题关联已解除，推送文案已生成。"
+        : "方案已提交，推送文案已生成，可复制后自行发送。"
     );
   }
 
@@ -9966,7 +9966,7 @@
                     ${icon("edit", 18)}
                     <div>
                       <strong>机构已提出修改，等待本院更新方案</strong>
-                      <p>请根据下方“机构修改意见”调整课题、专家、日期、流程或说明。保存后会重新发送给机构确认，并生成新的推送通知。</p>
+                      <p>请根据下方“机构修改意见”调整课题、专家、日期、流程或说明。保存后会重新提交给机构确认，并生成新的推送文案。</p>
                     </div>
                   </div>`
                 : ""
@@ -9976,8 +9976,8 @@
                 ? `<div class="review-state-banner is-success">
                     ${icon("send", 18)}
                     <div>
-                      <strong>方案已发送，推送通知已生成</strong>
-                      <p>机构端已进入“方案待确认”。请复制下方号码和推送内容提醒客户；复制后系统视为已推送。</p>
+                      <strong>方案已提交，推送文案已生成</strong>
+                      <p>机构端已进入“方案待确认”。请复制下方号码和推送内容，自行通过短信或邮件发送；复制后会记录为已复制。</p>
                       <button class="text-link" type="button" data-action="review-edit-again">
                         继续修改方案 ${icon("chevronRight", 12)}
                       </button>
@@ -10198,12 +10198,10 @@
                       <h3>${icon("message", 14)} 推送通知</h3>
                       <span>${
                         smsCurrent
-                          ? "已复制，视为已发送"
+                          ? "已复制，可粘贴发送"
                           : smsLog
                           ? "方案已更新，需重新复制"
-                          : saved
-                          ? "当前可发送 · 尚未复制"
-                          : "尚未发送"
+                          : "待复制"
                       }</span>
                     </div>
                     <div class="push-channel">
@@ -10247,10 +10245,10 @@
               ? `<button class="btn btn--primary" type="button" data-action="review-save">
                   ${
                     appointment.status === "revision"
-                      ? "更新方案并重新发送"
+                      ? "更新方案并重新提交"
                       : appointment.plan
-                      ? "保存并重新发送"
-                      : "保存方案并发送"
+                      ? "保存并重新提交"
+                      : "保存方案并提交"
                   } ${icon("send", 14)}
                 </button>`
               : terminal
@@ -10344,7 +10342,7 @@
     const appointment = appointmentById(button?.dataset.appointmentId || state.adminReviewId);
     if (!appointment) return;
     if (!adminCanManageHospital(appointment.hospitalId)) {
-      return showToast("只能推送本院预约的通知。");
+      return showToast("只能复制本院预约的推送内容。");
     }
     const text = buildSmsText(appointment);
     const payload = `${appointment.phone}\n${text}`;
@@ -10370,7 +10368,7 @@
     );
     if (!appointment) return;
     if (!adminCanManageHospital(appointment.hospitalId)) {
-      return showToast("只能发送本院预约的邮件提醒。");
+      return showToast("只能复制本院预约的邮件内容。");
     }
     const mail = buildEmailText(appointment);
     const copied = await copyText(mail.copyText);
@@ -13824,7 +13822,7 @@
             : `<div class="empty-state"><span class="empty-state__icon">${icon(
                 "history",
                 26
-              )}</span><h3>暂无操作日志</h3><p>接单、方案发送、号源与账号变更会自动记录。</p></div>`
+              )}</span><h3>暂无操作日志</h3><p>接单、方案提交、号源与账号变更会自动记录。</p></div>`
         }
       </div>
     `;
@@ -16173,7 +16171,7 @@
           previousStatus: appointment.status
         });
         returnFromAppointmentAction();
-        showToast("修改申请已提交，院方更新方案后会再次发送确认。");
+        showToast("修改申请已提交，院方更新方案后会再次提交确认。");
         break;
       }
       case "appointment-cancel-submit": {
