@@ -17,7 +17,7 @@
     themeConfig: "pkuih_h6_theme_config",
     planTemplates: "pkuih_h6_plan_templates",
     slots: "pkuih_h6_slots",
-    smsLogs: "pkuih_h6_sms_logs",
+    pushCopies: "pkuih_h6_sms_logs",
     marketingPosters: "pkuih_h6_marketing_posters",
     hospitalConfig: "pkuih_h6_hospital_config",
     hospitalCustom: "pkuih_h6_hospital_custom",
@@ -2502,11 +2502,11 @@
       .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   }
 
-  function getSmsLogs() {
-    return readJSON(STORAGE.smsLogs, {});
+  function getPushCopyLogs() {
+    return readJSON(STORAGE.pushCopies, {});
   }
 
-  function smsLogIsCurrent(appointment, log) {
+  function pushCopyIsCurrent(appointment, log) {
     if (!log?.copiedAt) return false;
     const copiedAt = new Date(log.copiedAt).getTime();
     if (!Number.isFinite(copiedAt)) return false;
@@ -2521,10 +2521,10 @@
     return copiedAt >= Math.max(...changeTimes);
   }
 
-  function saveSmsLog(id, payload) {
-    const logs = getSmsLogs();
+  function savePushCopyLog(id, payload) {
+    const logs = getPushCopyLogs();
     logs[id] = payload;
-    writeJSON(STORAGE.smsLogs, logs);
+    writeJSON(STORAGE.pushCopies, logs);
   }
 
   function getOperationLogs() {
@@ -9490,7 +9490,7 @@
     const pushPending =
       Boolean(appointment.plan) &&
       ["review", "revision", "confirmed"].includes(appointment.status) &&
-      !smsLogIsCurrent(appointment, getSmsLogs()[appointment.id]);
+      !pushCopyIsCurrent(appointment, getPushCopyLogs()[appointment.id]);
     return `
       <article class="admin-record" role="button" tabindex="0" data-action="open-admin-appointment"
         data-appointment-id="${esc(appointment.id)}">
@@ -9924,8 +9924,8 @@
     const canEdit = canView && !terminal;
     const saved = canEdit && state.adminReviewSaved && Boolean(appointment.plan);
     const formLocked = canView && (!canEdit || saved);
-    const smsLog = getSmsLogs()[appointment.id];
-    const smsCurrent = smsLogIsCurrent(appointment, smsLog);
+    const pushLog = getPushCopyLogs()[appointment.id];
+    const pushCurrent = pushCopyIsCurrent(appointment, pushLog);
     const mail = buildEmailText(appointment);
     const planTemplates = getPlanTemplates(appointment.hospitalId);
     return `
@@ -10273,9 +10273,9 @@
                     <div class="sms-card__head">
                       <h3>${icon("message", 14)} 推送通知</h3>
                       <span>${
-                        smsCurrent
+                        pushCurrent
                           ? "已复制，可粘贴发送"
-                          : smsLog
+                          : pushLog
                           ? "方案已更新，需重新复制"
                           : "待复制"
                       }</span>
@@ -10303,6 +10303,10 @@
                         ${icon("send", 13)} 复制邮件内容
                       </button>
                     </div>
+                    <p class="push-copy-rule">
+                      ${icon("checkCircle", 12)}
+                      复制手机号和短信，或复制邮件内容，任一方式均视为已完成推送复制。
+                    </p>
                   </section>`
                 : ""
             }
@@ -10424,9 +10428,13 @@
     const payload = `${appointment.phone}\n${text}`;
     const copied = await copyText(payload);
     if (!copied) return showToast("复制失败，请手动复制。");
-    saveSmsLog(appointment.id, {
+    savePushCopyLog(appointment.id, {
       copiedAt: new Date().toISOString(),
-      copiedBy: state.adminUser ? { name: state.adminUser.name, username: state.adminUser.username } : null
+      copiedBy: state.adminUser
+        ? { name: state.adminUser.name, username: state.adminUser.username }
+        : null,
+      channel: "sms",
+      recipient: appointment.phone || ""
     });
     logOperation("复制推送通知", `${appointment.id} · ${appointment.orgName}`, {
       entityType: "appointment",
@@ -10449,6 +10457,14 @@
     const mail = buildEmailText(appointment);
     const copied = await copyText(mail.copyText);
     if (!copied) return showToast("复制失败，请手动复制。");
+    savePushCopyLog(appointment.id, {
+      copiedAt: new Date().toISOString(),
+      copiedBy: state.adminUser
+        ? { name: state.adminUser.name, username: state.adminUser.username }
+        : null,
+      channel: "email",
+      recipient: mail.recipient || ""
+    });
     logOperation("复制客户邮件", `${appointment.id} · ${mail.recipient || "未配置邮箱"}`, {
       entityType: "appointment",
       entityId: appointment.id,
@@ -10459,6 +10475,8 @@
         ? "收件人、主题和正文已复制，可打开邮件应用发送。"
         : "邮件内容已复制；机构尚未配置通知邮箱。"
     );
+    if (state.overlay?.type === "admin-review") renderOverlay();
+    else renderApp();
   }
 
   async function copyText(text) {

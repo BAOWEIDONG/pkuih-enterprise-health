@@ -6981,6 +6981,25 @@ textarea {
   margin-top: 8px;
 }
 
+.push-copy-rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 10px 0 0;
+  padding: 8px 9px;
+  border-radius: 9px;
+  background: rgba(15, 143, 107, 0.07);
+  color: var(--green-text);
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.push-copy-rule svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
 /* =========================================================
    Slot config
    ========================================================= */
