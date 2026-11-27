@@ -1688,9 +1688,16 @@
     ) {
       return false;
     }
-    if (availability !== "all" && !doctorAvailability(expert).bookable) return false;
+    if (availability !== "all") {
+      const monthAvailability =
+        month > 0
+          ? availabilityInMonth(doctorAvailability(expert), month)
+          : doctorAvailability(expert);
+      if (!monthAvailability.bookable) return false;
+    }
     if (month > 0) {
       if (!matchesService(expert, "讲座")) return false;
+      if (!themesForExpert(expert, month).length) return false;
       if (
         !expertThemeCoversRegion(
           expert,
@@ -2409,6 +2416,20 @@
         }
       });
     return { bookable: remaining > 0, next, remaining, dates };
+  }
+
+  function availabilityInMonth(availability, month) {
+    const dates = (availability?.dates || []).filter((date) => {
+      const parsed = parseDate(date);
+      return parsed && parsed.getMonth() + 1 === Number(month);
+    });
+    return {
+      ...availability,
+      bookable: dates.length > 0,
+      next: dates[0] || "",
+      remaining: dates.length,
+      dates
+    };
   }
 
   function adminAppointments() {
@@ -4511,7 +4532,8 @@
       : null;
     const topicExpert = topic?.expertId ? expertById(topic.expertId) : null;
     const doctorId =
-      topicExpert && doctorAvailability(topicExpert).bookable
+      topicExpert &&
+      availabilityInMonth(doctorAvailability(topicExpert), Number(month)).bookable
         ? topicExpert.id
         : "";
     openBooking(
@@ -4596,7 +4618,7 @@
           ? linkedExpert
           : null;
       const availability = expert
-        ? doctorAvailability(expert)
+        ? availabilityInMonth(doctorAvailability(expert), month)
         : { bookable: false, next: "", remaining: 0, dates: [] };
       const available = themeTopicCoversRegion(
         coverage,
@@ -4863,7 +4885,10 @@
      ========================================================= */
   function renderExpertCard(expert) {
     const tier = tierOf(expert);
-    const availability = doctorAvailability(expert);
+    const availability =
+      state.expertMonth > 0
+        ? availabilityInMonth(doctorAvailability(expert), state.expertMonth)
+        : doctorAvailability(expert);
     const serviceTags =
       state.expertMonth > 0
         ? [{ service: "讲座" }]
@@ -4882,7 +4907,15 @@
           <span class="expert-card__head">
             <span><strong>${esc(expert.name)}</strong><i>${esc(expert.deptTitle)}</i></span>
             <span class="expert-card__avail ${availability.bookable ? "is-open" : "is-full"}">
-              ${availability.bookable ? `可约 ${formatMD(availability.next)}` : "暂无号源"}
+              ${
+                availability.bookable
+                  ? `${
+                      state.expertMonth > 0 ? `${state.expertMonth}月` : ""
+                    }可约 ${formatMD(availability.next)}`
+                  : state.expertMonth > 0
+                  ? `${state.expertMonth}月暂无号源`
+                  : "暂无号源"
+              }
             </span>
           </span>
           <span class="expert-card__hospital">${icon("building", 12)} <strong class="hospital-name">${esc(
@@ -5233,11 +5266,17 @@
     const expert = expertById(state.overlay?.doctorId);
     if (!expert) return "";
     const tier = tierOf(expert);
-    const availability = doctorAvailability(expert);
-    const month = Number(state.overlay?.month) || currentMonth();
+    const themeMonth = Number(state.overlay?.themeMonth) || 0;
+    const month = themeMonth || Number(state.overlay?.month) || currentMonth();
+    const rawAvailability = doctorAvailability(expert);
+    const availability = themeMonth
+      ? availabilityInMonth(rawAvailability, themeMonth)
+      : rawAvailability;
     const monthTheme = hospitalTheme(expert.hospitalId, month);
     const season = monthTheme || seasonalOf(month);
     const themes = themesForExpert(expert, month);
+    const themeUnavailable = themeMonth > 0 && themes.length === 0;
+    const canBook = availability.bookable && !themeUnavailable;
     const matchedMonths = monthsForExpert(expert);
     const fromBooking = state.overlayStack.some((item) => item.type === "booking");
     const selected = fromBooking && state.booking?.doctorId === expert.id;
@@ -5268,7 +5307,13 @@
             <span>${icon("clock", 12)} ${esc(expert.leadLabel || tier.leadDays + " 天预约周期")}</span>
             <span>${icon("mapPin", 12)} ${esc(coverageText(expert))}</span>
             <span class="doctor-hero__avail ${availability.bookable ? "is-open" : "is-full"}">
-              ${availability.bookable ? `最近可约 ${formatMD(availability.next)}` : "暂无可约档期"}
+              ${
+                availability.bookable
+                  ? `${
+                      themeMonth ? `${themeMonth} 月` : "最近"
+                    }可约 ${formatMD(availability.next)}`
+                  : `${themeMonth ? `${themeMonth} 月` : ""}暂无可约档期`
+              }
             </span>
           </div>
         </div>
@@ -5306,17 +5351,24 @@
                 <h3>${icon("leaf", 14)} 时令主题讲座</h3>
                 <span>${month}月 · ${themes.length ? "院方配置课题" : "本月暂无课题"}</span>
               </div>
-              <div class="month-tabs">
-                ${Array.from({ length: 12 }, (_, index) => index + 1)
-                  .map(
-                    (item) =>
-                      `<button class="${item === month ? "is-active" : ""} ${
-                        matchedMonths.has(item) ? "has-match" : ""
-                      }" type="button"
-                        data-action="doctor-month" data-value="${item}">${item}月</button>`
-                  )
-                  .join("")}
-              </div>
+              ${
+                themeMonth
+                  ? `<div class="season-detail__lock">
+                      ${icon("leaf", 12)}
+                      <span>当前从 ${themeMonth} 月时令主题进入，仅展示该月课题与该月号源</span>
+                    </div>`
+                  : `<div class="month-tabs">
+                      ${Array.from({ length: 12 }, (_, index) => index + 1)
+                        .map(
+                          (item) =>
+                            `<button class="${item === month ? "is-active" : ""} ${
+                              matchedMonths.has(item) ? "has-match" : ""
+                            }" type="button"
+                              data-action="doctor-month" data-value="${item}">${item}月</button>`
+                        )
+                        .join("")}
+                    </div>`
+              }
               <div class="season-detail__summary">
                 <strong>${esc(seasonalHeadline(season?.season || ""))}</strong>
                 <p>${esc(season?.focus || "")}</p>
@@ -5338,10 +5390,11 @@
                           `
                         )
                         .join("")
-                    : `<div class="theme-empty">${icon(
-                        "leaf",
-                        15
-                      )} 本月未给该专家绑定讲座课题，可切换月份查看。</div>`
+                    : `<div class="theme-empty">${icon("leaf", 15)} ${
+                        themeMonth
+                          ? `该专家 ${themeMonth} 月未配置时令主题，不能通过本主题预约。`
+                          : "本月未给该专家绑定讲座课题，可切换月份查看。"
+                      }</div>`
                 }
               </div>
               <p class="season-detail__note">仅展示本院月度主题中绑定到该专家的课题；课题、时令内容与覆盖城市均由医院运营维护。</p>
@@ -5365,7 +5418,7 @@
           ${
             fromBooking
               ? `<button class="btn btn--primary" type="button" data-action="booking-use-doctor"
-                  data-doctor-id="${esc(expert.id)}" ${availability.bookable ? "" : "disabled"}>
+                  data-doctor-id="${esc(expert.id)}" ${canBook ? "" : "disabled"}>
                   ${selected ? "已选择该专家" : "选择该专家"} ${icon("check", 15)}
                 </button>`
               : `<button class="btn btn--primary" type="button" data-action="book-doctor" data-doctor-id="${esc(
@@ -5373,9 +5426,15 @@
                 )}" data-service="${esc(nextService)}" data-month="${
                   state.overlay?.themeMonth || 0
                 }" ${
-                  availability.bookable ? "" : "disabled"
+                  canBook ? "" : "disabled"
                 }>
-                  ${availability.bookable ? "预约该专家" : "暂无可约档期"} ${icon("arrowRight", 15)}
+                  ${
+                    themeUnavailable
+                      ? "该月未配置主题"
+                      : availability.bookable
+                      ? "预约该专家"
+                      : `${themeMonth ? `${themeMonth} 月` : ""}暂无可约档期`
+                  } ${icon("arrowRight", 15)}
                 </button>`
           }
         </div>
@@ -5391,7 +5450,13 @@
     if (booking.doctorId) {
       const expert = expertById(booking.doctorId);
       if (!expert) return [];
-      return doctorAvailability(expert).dates.slice(0, 30);
+      const availability = doctorAvailability(expert);
+      const themeMonth =
+        normalizeService(booking.serviceType) === "讲座"
+          ? Number(booking.themeMonth) || 0
+          : 0;
+      return (themeMonth ? availabilityInMonth(availability, themeMonth) : availability)
+        .dates.slice(0, 30);
     }
     const list = [];
     const today = startOfDay();
@@ -5826,7 +5891,10 @@
     if (!matchesService(expert, booking.serviceType)) return null;
     if (themeCtx.active && !themeCtx.expertIds.includes(String(expert.id))) return null;
 
-    const availability = doctorAvailability(expert);
+    const rawAvailability = doctorAvailability(expert);
+    const availability = themeCtx.active
+      ? availabilityInMonth(rawAvailability, themeCtx.month)
+      : rawAvailability;
     const covers = themeCtx.active
       ? themeCtx.topic
         ? themeTopicCoversRegion(
@@ -5875,7 +5943,7 @@
         availability,
         bookable: false,
         status: "full",
-        label: "暂无号源",
+        label: themeCtx.active ? `${themeCtx.month} 月暂无号源` : "暂无号源",
         actionLabel: "暂无号源"
       };
     }
@@ -6104,8 +6172,16 @@
                 })
                 .join("")
             : `<div class="inline-empty booking-demand-empty">
-                <strong>该专家暂无可约日期</strong>
-                <span>请选择其他专家，或发起提需由医院运营人员电话沟通。</span>
+                <strong>${
+                  Number(booking.themeMonth)
+                    ? `该专家 ${booking.themeMonth} 月暂无可约日期`
+                    : "该专家暂无可约日期"
+                }</strong>
+                <span>${
+                  Number(booking.themeMonth)
+                    ? "时令主题只能选择该主题月份内的号源；请选择其他专家、查看其他月份主题，或发起提需。"
+                    : "请选择其他专家，或发起提需由医院运营人员电话沟通。"
+                }</span>
                 <button class="btn btn--soft btn--sm" type="button" data-action="booking-open-demand">
                   ${icon("send", 13)} 发起提需
                 </button>
