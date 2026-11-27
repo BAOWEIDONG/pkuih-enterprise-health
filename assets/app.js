@@ -4537,6 +4537,10 @@
     if (!theme) return "";
     const isCurrent = month === currentMonth();
     const fromBooking = state.overlayStack.some((item) => item.type === "booking");
+    const bookingMonth =
+      fromBooking && state.booking ? bookingTopicMonth(state.booking) : 0;
+    const isBookingMonth = Boolean(fromBooking && bookingMonth === month);
+    const isActionable = isCurrent || isBookingMonth;
     const boundExperts = themeExpertList(theme, hospital?.id);
     const topicIndex = Number(state.overlay?.topicIndex);
     const selectedTopic = Number.isInteger(topicIndex) && topicIndex >= 0 ? topicIndex : -1;
@@ -4634,7 +4638,7 @@
             <span>${icon("leaf", 13)} 时令主题 · 讲座</span>
             <div class="theme-hero__top-actions">
               ${
-                isCurrent
+                isActionable
                   ? ""
                   : `<em class="theme-readonly-badge">${icon("history", 11)} 往期主题 · 仅供浏览</em>`
               }
@@ -4664,7 +4668,7 @@
                 <strong>${esc(regionText(location.province, location.city))}</strong>
               </span>
               <em>${
-                isCurrent
+                isActionable
                   ? `${bookableCount}/${topics.length} 个课题可约`
                   : `${availableCount}/${topics.length} 个课题覆盖本地`
               }</em>
@@ -4676,7 +4680,7 @@
             </div>
             <section class="theme-section">
               <div class="theme-section__head">
-                <div><small>本月关注</small><h3>时令健康重点</h3></div>
+                <div><small>${isCurrent ? "本月关注" : `${month} 月关注`}</small><h3>时令健康重点</h3></div>
                 <span>${esc(hospital?.short || "")}</span>
               </div>
               <div class="theme-focus-grid">
@@ -4687,10 +4691,14 @@
             <section class="theme-section">
               <div class="theme-section__head">
                 <div><small>Lecture topics</small><h3>${
-                  isCurrent ? "本月推荐讲座" : "往期讲座课题"
+                  isCurrent
+                    ? "本月推荐讲座"
+                    : isBookingMonth
+                    ? `${month} 月推荐讲座`
+                    : "往期讲座课题"
                 }</h3></div>
                 <span>${
-                  isCurrent
+                  isActionable
                     ? fromBooking
                       ? "点选后返回预约确认"
                       : "点选后统一预约"
@@ -4704,7 +4712,7 @@
                         .map((topic, index) => {
                     const row = topicRows[index];
                     const expert = row.expert;
-                    const statusText = isCurrent
+                    const statusText = isActionable
                       ? !row.available
                         ? "当前城市不可约"
                         : !expert
@@ -4715,7 +4723,7 @@
                       : row.available
                       ? "覆盖当前城市"
                       : "不在当前城市履约";
-                    const blocked = isCurrent
+                    const blocked = isActionable
                       ? !row.bookable
                       : !row.available;
                     const content = `
@@ -4727,9 +4735,9 @@
                         }">${icon("mapPin", 10)} ${esc(row.coverage.label)} · ${esc(
                           statusText
                         )}</em>
-                        <i>${icon(isCurrent ? "arrowRight" : "history", 13)}</i>
+                        <i>${icon(isActionable ? "arrowRight" : "history", 13)}</i>
                     `;
-                    return isCurrent
+                    return isActionable
                       ? `<button class="theme-topic-card ${
                           index === selectedTopic ? "is-focus" : ""
                         } ${blocked ? "is-unavailable" : ""}" type="button"
@@ -4741,13 +4749,13 @@
                     : `<div class="theme-topic-empty">${icon(
                         "leaf",
                         18
-                      )}<strong>本月暂无已绑定专家的时令课题</strong><p>医院运营配置课题并绑定本院讲座专家后，会在这里展示。</p></div>`
+                      )}<strong>${month} 月暂无已绑定专家的时令课题</strong><p>医院运营配置课题并绑定本院讲座专家后，会在这里展示。</p></div>`
                 }
               </div>
             </section>
             <section class="theme-section">
               <div class="theme-section__head">
-                <div><small>Expert team</small><h3>本月绑定专家</h3></div>
+                <div><small>Expert team</small><h3>${isCurrent ? "本月绑定专家" : `${month} 月绑定专家`}</h3></div>
                 <button class="theme-text-btn" type="button" data-action="theme-experts"
                   data-month="${month}" data-hospital-id="${esc(hospital?.id || "")}">查看全部 ${icon(
                     "chevronRight",
@@ -4763,7 +4771,7 @@
                           (expert) => `
                             <button class="theme-expert" type="button" data-action="open-doctor"
                               data-doctor-id="${esc(expert.id)}" data-month="${month}"
-                              data-theme-month="${month === currentMonth() ? month : 0}">
+                              data-theme-month="${isActionable ? month : 0}">
                               <img src="${esc(expertAvatar(expert))}" alt="${esc(
                                 expert.name
                               )}" loading="lazy" decoding="async">
@@ -4792,16 +4800,16 @@
                 }
               </div>
             </section>
-            <p class="theme-sheet__note">本月课题、绑定专家与覆盖城市由${esc(
+            <p class="theme-sheet__note">${month} 月课题、绑定专家与覆盖城市由${esc(
               hospital?.name || "院方"
             )}配置；每个课题的履约地独立于专家日常服务范围，最终出讲安排以院方确认为准。</p>
           </div>
         </div>
-        <div class="theme-sheet__footer ${isCurrent ? "" : "is-readonly"}">
+        <div class="theme-sheet__footer ${isActionable ? "" : "is-readonly"}">
           <button class="theme-filter-btn" type="button" data-action="theme-experts"
             data-month="${month}" data-hospital-id="${esc(hospital?.id || "")}">按月筛专家</button>
           ${
-            !isCurrent
+            !isActionable
               ? `<span class="theme-sheet__readonly-note">${icon("history", 15)}
                   <span><strong>往期主题仅供浏览</strong><small>预约请选择 ${currentMonth()} 月时令主题</small></span>
                 </span>`
@@ -5619,8 +5627,17 @@
     ];
   }
 
+  function bookingDateMonth(booking) {
+    const date = parseDate(booking?.date || "");
+    return date ? date.getMonth() + 1 : 0;
+  }
+
+  function bookingTopicMonth(booking) {
+    return bookingDateMonth(booking) || Number(booking?.themeMonth) || currentMonth();
+  }
+
   function bookingTopicContext(booking) {
-    const month = Number(booking?.themeMonth) || currentMonth();
+    const month = bookingTopicMonth(booking);
     const expert = bookingSelectedDoctor(booking);
     const hospital = bookingHospital(booking);
     const hospitalId = hospital?.id || expert?.hospitalId || "";
@@ -5927,7 +5944,7 @@
           topicExpert ? `，仅展示主讲专家 ${topicExpert.name}` : ""
         }；${options.length} 位相关，${bookableCount} 位可约。`
       : themeCtx.active
-      ? `已按 ${themeCtx.month} 月时令主题筛选，仅展示本月绑定专家；${options.length} 位相关，${bookableCount} 位可约。`
+      ? `已按 ${themeCtx.month} 月时令主题筛选，仅展示该月绑定专家；${options.length} 位相关，${bookableCount} 位可约。`
       : `当前共 ${options.length} 位可提供「${serviceLabel(
           booking.serviceType
         )}」的专家，${bookableCount} 位可约。`;
@@ -5941,7 +5958,7 @@
             ? `<div class="booking-doctor__filter">
                 <span>${icon("leaf", 13)}</span>
                 <span><strong>${
-                  themeCtx.topic ? "课题已限定专家" : "本月时令主题已筛选"
+                  themeCtx.topic ? "课题已限定专家" : `${themeCtx.month} 月时令主题已筛选`
                 }</strong><small>${
                   themeCtx.topic
                     ? doctor
@@ -6001,7 +6018,7 @@
                 <strong>${themeCtx.active ? "当前主题暂无可承接专家" : "当前医院暂无可选专家"}</strong>
                 <span>${
                   themeCtx.active
-                    ? "本院本月时令主题未绑定符合当前服务类型与活动城市的专家。可切换课题、调整活动城市，或发起提需由医院运营人员协调。"
+                    ? `本院 ${themeCtx.month} 月时令主题未绑定符合当前服务类型与活动城市的专家。可切换课题、调整活动城市，或发起提需由医院运营人员协调。`
                     : `暂无同时满足「${esc(
                         serviceLabel(booking.serviceType)
                       )}」服务类型、履约城市和可预约号源的专家。专家为必选项，请切换服务类型或发起提需。`
@@ -6117,7 +6134,22 @@
     const list = bookingTopicChoices(booking);
     const { month, hospitalId, theme } = bookingTopicContext(booking);
     const selected = bookingSelectedTopicCoverage(booking);
-    const monthBookable = month === currentMonth();
+    const isLecture = normalizeService(booking.serviceType) === "讲座";
+    const datedMonth = bookingDateMonth(booking);
+    const monthNote = datedMonth
+      ? `已按预约日期 ${formatDateCN(booking.date, true)} 匹配`
+      : Number(booking.themeMonth)
+      ? "已按所选主题月份展示"
+      : "尚未选择预约日期，暂展示当前月；选择日期后自动切换";
+    const monthHeader = isLecture
+      ? `<div class="booking-topic-month">
+          <span class="booking-topic-month__icon">${icon("leaf", 15)}</span>
+          <span>
+            <strong>${month} 月时令主题</strong>
+            <small>${esc(monthNote)}</small>
+          </span>
+        </div>`
+      : "";
     const coverageCallout = selected
       ? `<div class="booking-topic-coverage ${
           selected.available ? "is-available" : "is-unavailable"
@@ -6135,6 +6167,7 @@
       : "";
     return `
       <div id="booking-topics">
+      ${monthHeader}
       ${coverageCallout}
       <div class="topic-chip-list">
         ${
@@ -6152,7 +6185,7 @@
                     (!booking.themeTopicId ||
                       !topic.id ||
                       String(booking.themeTopicId) === String(topic.id));
-                  const selectable = available && monthBookable;
+                  const selectable = available;
                   return `
                     <div class="topic-chip ${active ? "is-active" : ""} ${
                       available ? "" : "is-unavailable"
@@ -6172,7 +6205,7 @@
                       <button class="topic-chip__select ${active ? "is-active" : ""}" type="button"
                         data-action="booking-topic" data-value="${esc(topic.title)}"
                         ${selectable ? "" : "disabled"}>
-                        ${active ? "已选" : available ? (monthBookable ? "选择" : "仅浏览") : "不可约"}
+                        ${active ? "已选" : available ? "选择" : "不可约"}
                       </button>
                     </div>
                   `;
@@ -6184,8 +6217,8 @@
                   : normalizeService(booking.serviceType) === "健康咨询"
                   ? "健康咨询不展示讲座课题，请直接填写咨询方向或人群健康需求。"
                   : booking.doctorId
-                  ? "该专家本月暂未绑定讲座课题，可在下方填写自定义主题，或取消选择其他专家。"
-                  : "本月主题暂无可选课题，可在下方填写自定义主题。"
+                  ? `该专家 ${month} 月暂未绑定讲座课题，可在下方填写自定义主题，或取消选择其他专家。`
+                  : `${month} 月主题暂无可选课题，可在下方填写自定义主题。`
               }</div>`
         }
       </div>
@@ -6210,7 +6243,7 @@
     if (normalizeService(serviceType) === "1V1报告解读") {
       return "填写报告解读方向";
     }
-    return "可选本月主题，也可自定义";
+    return "可选预约月份主题，也可自定义";
   }
 
   function bookingThemeTopicLocked(booking) {
@@ -6721,8 +6754,11 @@
       }
     )[Number(topicIndex)];
     if (!booking || !topic) return showToast("该主题暂不可用。");
-    if (Number(month) !== currentMonth()) {
-      return showToast("非本月时令主题仅可浏览，不能预约。");
+    const selectedMonth = bookingDateMonth(booking);
+    if (selectedMonth && Number(month) !== selectedMonth) {
+      return showToast(
+        `所选主题为 ${month} 月，与预约日期所在的 ${selectedMonth} 月不一致，请重新选择。`
+      );
     }
     const coverage = themeTopicCoverage(topic, theme, hospitalId);
     if (!themeTopicCoversRegion(coverage, booking.province, booking.city)) {
@@ -6758,10 +6794,11 @@
     const booking = state.booking;
     if (!booking || !title) return;
     clearBookingValidation();
+    const { month, hospitalId, theme } = bookingTopicContext(booking);
     const active =
       Boolean(booking.themeMonth && booking.themeTopicId) &&
       String(booking.customTopic || "").trim() === String(title).trim() &&
-      Number(booking.themeMonth) === currentMonth();
+      Number(booking.themeMonth) === Number(month);
     if (active) {
       clearBookingTopicSelection();
       syncBookingDoctor(booking);
@@ -6772,14 +6809,16 @@
       showToast(`已取消主题「${title}」，时令主题为可选项。`);
       return;
     }
-    const { month, hospitalId, theme } = bookingTopicContext(booking);
     const source = theme?.topics || [];
     const topic = source.find(
       (item) => String(item.title || "").trim() === String(title).trim()
     );
     if (!topic) return showToast("该主题暂不可用。");
-    if (month !== currentMonth()) {
-      return showToast("非本月时令主题仅可浏览，不能预约。");
+    const selectedMonth = bookingDateMonth(booking);
+    if (selectedMonth && Number(month) !== selectedMonth) {
+      return showToast(
+        `所选主题为 ${month} 月，与预约日期所在的 ${selectedMonth} 月不一致，请重新选择。`
+      );
     }
     const coverage = themeTopicCoverage(topic, theme, hospitalId);
     if (!themeTopicCoversRegion(coverage, booking.province, booking.city)) {
@@ -6811,11 +6850,39 @@
   function setBookingDate(value) {
     if (!state.booking) return;
     clearBookingValidation();
-    state.booking.date = value;
+    const booking = state.booking;
+    const previousMonth = bookingTopicMonth(booking);
+    const nextMonth = parseDate(value)?.getMonth() + 1 || 0;
+    booking.date = value;
+    let clearedTopic = false;
+    let themeChanged = false;
+    if (
+      normalizeService(booking.serviceType) === "讲座" &&
+      nextMonth &&
+      nextMonth !== previousMonth
+    ) {
+      if (booking.themeTopicId) {
+        booking.customTopic = "";
+        booking.themeTopicId = "";
+        booking.themeCoverage = "";
+        const input = document.querySelector('[data-booking-field="customTopic"]');
+        if (input) input.value = "";
+        clearedTopic = true;
+      }
+      if (Number(booking.themeMonth) && Number(booking.themeMonth) !== nextMonth) {
+        booking.themeMonth = 0;
+        themeChanged = true;
+      }
+    }
     document.querySelectorAll('[data-action="booking-date"]').forEach((button) => {
       button.classList.toggle("is-active", button.dataset.value === value);
     });
+    syncBookingTopicField();
     refreshBookingTopics();
+    if (clearedTopic || themeChanged) refreshBookingDoctors();
+    if (clearedTopic) {
+      showToast(`日期已切换至 ${nextMonth} 月，原时令主题已清除，请重新选择。`);
+    }
   }
 
   function refreshBookingForLocation() {
