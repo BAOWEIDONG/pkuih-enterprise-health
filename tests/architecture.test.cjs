@@ -101,6 +101,21 @@ assert(
   "院方工作台容器不得因 overflow 裁切破坏吸顶导航"
 );
 assert(
+  app.includes("const visibleOptions = options;") &&
+    !app.includes("const visibleOptions = pinned ? [selectedEntry] : options;"),
+  "预约专家选择后仍必须保留完整候选列表，支持直接切换与再次点击取消"
+);
+assert(
+  app.includes("const canConfirm = appointment.status === \"review\";") &&
+    app.includes("(mode === \"confirm\" && !policy.canConfirm)"),
+  "待确认状态必须独立于修改窗口，机构端始终可以确认院方最新方案"
+);
+assert(
+  read("server/src/main/java/com/pkuih/enterprisehealth/appointment/AppointmentService.java")
+    .includes('Set.of("planning", "revision", "confirmed")'),
+  "院方应可在预约已确认后继续更新方案并重新提交机构确认"
+);
+assert(
   applicationConfig.includes("ddl-auto: validate") &&
     applicationConfig.includes("flyway:"),
   "生产配置必须启用 Flyway 并使用 validate 校验实体结构"

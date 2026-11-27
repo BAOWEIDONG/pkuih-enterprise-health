@@ -214,7 +214,7 @@ public class AppointmentService {
     public Map<String, Object> savePlan(UserPrincipal principal, String id, Map<String, Object> plan) {
         AppointmentEntity appointment = require(id);
         requireAdminAccess(principal, appointment.getHospitalId());
-        if (!Set.of("planning", "revision").contains(appointment.getStatus())) {
+        if (!Set.of("planning", "revision", "confirmed").contains(appointment.getStatus())) {
             throw ApiException.conflict("APPOINTMENT_STATE_CONFLICT", "当前状态不能提交方案。");
         }
         if (plan == null || String.valueOf(plan.getOrDefault("topic", "")).isBlank()) {
@@ -223,6 +223,7 @@ public class AppointmentService {
         appointment.setPlanJson(catalogService.toJson(plan));
         appointment.setStatus("review");
         appointment.setPlanSentAt(Instant.now());
+        appointment.setConfirmedAt(null);
         appointment.setUpdatedAt(Instant.now());
         appointments.save(appointment);
         return view(appointment);

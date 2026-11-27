@@ -5587,8 +5587,6 @@
       preferredTheme
     );
     syncBookingDoctor(state.booking);
-    state.booking.doctorPinned = Boolean(state.booking.doctorId);
-    state.booking.doctorPickerOpen = false;
     state.overlay = { type: "booking" };
     renderOverlay();
   }
@@ -5689,8 +5687,6 @@
     state.booking.date = coordinatedDate;
     state.booking.dateLocked = true;
     syncBookingDoctor(state.booking);
-    state.booking.doctorPinned = Boolean(state.booking.doctorId);
-    state.booking.doctorPickerOpen = false;
     state.overlay = { type: "booking" };
     renderOverlay();
   }
@@ -5816,7 +5812,8 @@
     const expertTopics = expert
       ? hospitalTopics.filter((topic) => String(topic.expertId || "") === String(expert.id))
       : [];
-    const source = expert ? expertTopics : hospitalTopics;
+    const selectedTopic = !expert ? bookingSelectedTopic(booking) : null;
+    const source = expert ? expertTopics : selectedTopic ? [selectedTopic] : hospitalTopics;
     const seen = new Set();
     return source
       .filter((topic) => {
@@ -6012,8 +6009,6 @@
     if (entry?.bookable) return false;
     booking.doctorId = "";
     booking.date = "";
-    booking.doctorPinned = false;
-    booking.doctorPickerOpen = true;
     return true;
   }
 
@@ -6023,20 +6018,14 @@
     const themeCtx = bookingThemeContext(booking);
     const demandLocked = bookingUsesCoordinatedDemand(booking);
     const bookableCount = options.filter((item) => item.bookable).length;
-    const selectedEntry = doctor
-      ? options.find((entry) => entry.expert.id === doctor.id) || null
-      : null;
-    const pinned = Boolean(
-      doctor && selectedEntry && booking.doctorPinned && !booking.doctorPickerOpen
-    );
-    const visibleOptions = pinned ? [selectedEntry] : options;
+    const visibleOptions = options;
     const topicExpert = themeCtx.topic?.expertId
       ? expertById(themeCtx.topic.expertId)
       : null;
     const filterText = demandLocked && doctor
       ? `院方已匹配 ${doctor.name} 和履约日期，服务类型、专家与日期均已锁定，确认活动地址即可提交。`
-      : pinned
-      ? `已带入 ${doctor.name}，可直接继续填写；同条件共 ${options.length} 位相关专家、${bookableCount} 位可约，点击“更换专家”查看。`
+      : doctor
+      ? `当前已选 ${doctor.name}，其他符合条件专家仍可直接切换；再次点击当前专家即可取消选择。`
       : themeCtx.topic
       ? `已按课题「${themeCtx.topic.title}」筛选${
           topicExpert ? `，仅展示主讲专家 ${topicExpert.name}` : ""
@@ -6069,11 +6058,6 @@
         }
         <div class="booking-doctor__status ${doctor ? "has-doctor" : ""}">
           <span>${doctor ? `已选专家 · ${esc(doctor.name)}` : "尚未选择专家"}</span>
-          ${
-            pinned && !demandLocked
-              ? `<button type="button" data-action="booking-doctor-change">更换专家</button>`
-              : ""
-          }
         </div>
         ${visibleOptions
           .map((entry) => {
@@ -6707,8 +6691,6 @@
     if (doctor && !matchesService(doctor, service)) {
       state.booking.doctorId = "";
       state.booking.date = "";
-      state.booking.doctorPinned = false;
-      state.booking.doctorPickerOpen = false;
     }
     syncBookingDoctor(state.booking);
     const wrap = document.getElementById("booking-doctors");
@@ -6753,8 +6735,6 @@
     }
     booking.doctorId = nextDoctorId;
     booking.date = "";
-    booking.doctorPinned = Boolean(nextDoctorId);
-    booking.doctorPickerOpen = !nextDoctorId;
     const expert = nextDoctorId ? expertById(nextDoctorId) : null;
     if (expert) {
       booking.tier = expert.tier;
@@ -6793,8 +6773,6 @@
     const applied = () => {
       booking.doctorId = expert.id;
       booking.tier = expert.tier;
-      booking.doctorPinned = true;
-      booking.doctorPickerOpen = false;
       if (booking.date && !doctorAvailability(expert).dates.includes(booking.date)) {
         booking.date = "";
       }
@@ -7519,6 +7497,7 @@
     if (!appointment) {
       return {
         canModify: false,
+        canConfirm: false,
         canCancel: false,
         canEditLocation: false,
         days: null,
@@ -7581,6 +7560,7 @@
     const modifiableStatuses = ["review", "revision", "confirmed"];
     const canModify =
       !modifyReason && modifiableStatuses.includes(appointment.status);
+    const canConfirm = appointment.status === "review";
     const canCancel = !cancelReason && !terminal;
     const locationStatuses = ["pending", "planning", "review", "revision", "confirmed"];
     let locationReason = baseReason;
@@ -7607,6 +7587,7 @@
       (appointment.status !== "confirmed" || canModify);
     return {
       canModify,
+      canConfirm,
       canCancel,
       canEditLocation,
       days,
@@ -8243,14 +8224,21 @@
             }
             ${
               appointment.status === "review"
-                ? policy.canModify
-                  ? `<div class="review-actions">
-                      <button class="btn btn--primary" type="button" data-action="appointment-action" data-value="confirm">确认最终预约</button>
-                      <button class="btn btn--ghost" type="button" data-action="appointment-action" data-value="revise">提出修改</button>
-                    </div>`
-                  : `<div class="policy-lock-card">${icon("lock", 16)}<div><strong>修改窗口已锁定</strong><p>${esc(
-                      policy.modifyReason
-                    )}</p><span>仍可确认最终方案；如需协调，请联系项目对接人。</span></div></div>`
+                ? `<div class="review-actions">
+                    <button class="btn btn--primary" type="button" data-action="appointment-action" data-value="confirm">确认最终预约</button>
+                    ${
+                      policy.canModify
+                        ? `<button class="btn btn--ghost" type="button" data-action="appointment-action" data-value="revise">提出修改</button>`
+                        : ""
+                    }
+                  </div>
+                  ${
+                    policy.canModify
+                      ? ""
+                      : `<div class="policy-lock-card">${icon("lock", 16)}<div><strong>修改窗口已锁定</strong><p>${esc(
+                          policy.modifyReason
+                        )}</p><span>仍可确认院方最新方案；如需协调，请联系项目对接人。</span></div></div>`
+                  }`
                 : ""
             }
             ${
@@ -16338,11 +16326,13 @@
             (["change", "revise"].includes(mode) &&
               !policy.canModify) ||
             (mode === "cancel" && !policy.canCancel) ||
-            (mode === "confirm" && !policy.canModify)
+            (mode === "confirm" && !policy.canConfirm)
           ) {
             return showToast(
               mode === "cancel"
                 ? policy.cancelReason || "当前阶段不可取消。"
+                : mode === "confirm"
+                ? "当前预约不在待确认状态，请刷新后重试。"
                 : policy.modifyReason || "当前阶段不可修改。"
             );
           }
@@ -16494,11 +16484,6 @@
         break;
       case "booking-doctor":
         setBookingDoctor(el.dataset.value);
-        break;
-      case "booking-doctor-change":
-        if (!state.booking) return;
-        state.booking.doctorPickerOpen = true;
-        refreshBookingDoctors();
         break;
       case "booking-doctor-preview": {
         const expert = expertById(el.dataset.value || "");
